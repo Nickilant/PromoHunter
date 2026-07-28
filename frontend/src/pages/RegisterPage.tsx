@@ -2,6 +2,7 @@ import { FormEvent, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
 import { useAuth } from '../hooks/useAuth';
+import { useCity } from '../hooks/useCity';
 
 export default function RegisterPage() {
   const [phone, setPhone] = useState('');
@@ -10,6 +11,7 @@ export default function RegisterPage() {
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const { register } = useAuth();
+  const { city } = useCity();
   const navigate = useNavigate();
 
   const submit = async (e: FormEvent) => {
@@ -17,7 +19,8 @@ export default function RegisterPage() {
     setError(null);
     setSending(true);
     try {
-      await register(phone, password, displayName);
+      // город из сессии станет городом по умолчанию в профиле
+      await register(phone, password, displayName, city);
       navigate('/');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Не получилось зарегистрироваться');

@@ -9,6 +9,7 @@ interface RestForm {
   id: number | null;
   brand_id: string;
   title: string;
+  city: string;
   address: string;
   lat: string;
   lng: string;
@@ -19,6 +20,7 @@ const emptyForm: RestForm = {
   id: null,
   brand_id: '',
   title: '',
+  city: '',
   address: '',
   lat: '',
   lng: '',
@@ -54,6 +56,7 @@ export default function AdminRestaurants() {
     const body = {
       brand_id: Number(form.brand_id),
       title: form.title || null,
+      city: form.city,
       address: form.address,
       lat: Number(form.lat),
       lng: Number(form.lng),
@@ -114,6 +117,7 @@ export default function AdminRestaurants() {
             <tr>
               <th>Бренд</th>
               <th>Название</th>
+              <th>Город</th>
               <th>Адрес</th>
               <th>Координаты</th>
               <th>Статус</th>
@@ -128,6 +132,7 @@ export default function AdminRestaurants() {
                   {r.brand.name}
                 </td>
                 <td>{r.title || '—'}</td>
+                <td>{r.city}</td>
                 <td>{r.address}</td>
                 <td>
                   {r.lat.toFixed(4)}, {r.lng.toFixed(4)}
@@ -147,6 +152,7 @@ export default function AdminRestaurants() {
                           id: r.id,
                           brand_id: String(r.brand.id),
                           title: r.title ?? '',
+                          city: r.city,
                           address: r.address,
                           lat: String(r.lat),
                           lng: String(r.lng),
@@ -203,6 +209,15 @@ export default function AdminRestaurants() {
                         value={form.title}
                         onChange={(e) => setForm({ ...form, title: e.target.value })}
                         placeholder="ТЦ Галерея, 2 этаж"
+                      />
+                    </div>
+                    <div className="field">
+                      <label>Город</label>
+                      <input
+                        value={form.city}
+                        onChange={(e) => setForm({ ...form, city: e.target.value })}
+                        placeholder="Санкт-Петербург"
+                        required
                       />
                     </div>
                     <div className="field">

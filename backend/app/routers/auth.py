@@ -24,6 +24,8 @@ def register(payload: RegisterIn, db: Session = Depends(get_db)):
         is_phone_verified=True,
         password_hash=hash_password(payload.password),
         display_name=payload.display_name,
+        # Город из сессии становится городом по умолчанию
+        city=(payload.city or "").strip() or None,
         # Первый зарегистрированный пользователь становится админом
         role=UserRole.admin if users_count == 0 else UserRole.user,
     )

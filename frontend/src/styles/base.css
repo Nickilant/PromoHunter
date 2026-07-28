@@ -51,7 +51,7 @@ input, textarea, select {
   min-height: 100%;
   display: flex;
   flex-direction: column;
-  padding-bottom: calc(64px + env(safe-area-inset-bottom));
+  padding-bottom: calc(104px + env(safe-area-inset-bottom));
 }
 
 .app-shell.full-bleed {
@@ -78,48 +78,76 @@ input, textarea, select {
   font-size: 22px;
 }
 
-/* ---------- нижняя навигация ---------- */
+/* ---------- плавающий док (навигация одним большим пальцем) ---------- */
 
-.bottom-nav {
+.dock {
   position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: var(--surface);
-  border-top: 1px solid var(--border);
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(14px + env(safe-area-inset-bottom));
+  width: min(92vw, 420px);
   display: flex;
-  justify-content: center;
+  align-items: center;
+  justify-content: space-around;
+  gap: 4px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  box-shadow: 0 10px 30px rgba(46, 42, 38, 0.16);
   z-index: 500;
-  padding-bottom: env(safe-area-inset-bottom);
 }
 
-.bottom-nav-inner {
-  display: flex;
-  width: 100%;
-  max-width: 560px;
-}
-
-.bottom-nav a {
-  flex: 1;
+.dock-item {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
-  padding: 8px 0 6px;
+  gap: 1px;
+  min-width: 68px;
+  min-height: 48px;
+  justify-content: center;
+  border-radius: 999px;
   color: var(--text-muted);
-  font-size: 12px;
-  min-height: 44px;
-  transition: opacity 0.15s;
-}
-
-.bottom-nav a.active {
-  color: var(--primary);
+  font-size: 11px;
   font-weight: 600;
+  transition: transform 0.15s, opacity 0.15s;
 }
 
-.bottom-nav .nav-icon {
+.dock-item:active {
+  transform: scale(0.94);
+}
+
+.dock-item.active {
+  color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.dock-icon {
   font-size: 20px;
-  line-height: 1;
+  line-height: 1.1;
+}
+
+.dock-action {
+  width: 54px;
+  height: 54px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 28px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: translateY(-14px);
+  box-shadow: 0 8px 20px rgba(201, 139, 107, 0.45);
+  transition: transform 0.15s, opacity 0.15s;
+}
+
+.dock-action:active {
+  transform: translateY(-14px) scale(0.94);
 }
 
 /* ---------- поиск ---------- */
@@ -560,7 +588,6 @@ input, textarea, select {
 .map-page {
   position: fixed;
   inset: 0;
-  bottom: calc(64px + env(safe-area-inset-bottom));
 }
 
 .map-page .leaflet-container {
@@ -571,7 +598,7 @@ input, textarea, select {
 .locate-btn {
   position: absolute;
   right: 12px;
-  bottom: 16px;
+  bottom: calc(96px + env(safe-area-inset-bottom));
   z-index: 400;
   background: var(--surface);
   border-radius: 999px;
@@ -584,12 +611,51 @@ input, textarea, select {
   font-size: 20px;
 }
 
+.map-search {
+  position: absolute;
+  top: calc(12px + env(safe-area-inset-top));
+  left: 12px;
+  right: 12px;
+  z-index: 450;
+  display: flex;
+  gap: 8px;
+  max-width: 536px;
+  margin: 0 auto;
+}
+
+.map-search .search-input {
+  flex: 1;
+  box-shadow: var(--shadow-soft);
+}
+
+.map-search .btn {
+  min-width: 48px;
+  padding: 10px 12px;
+  box-shadow: var(--shadow-soft);
+}
+
+.map-search-error {
+  position: absolute;
+  top: calc(64px + env(safe-area-inset-top));
+  left: 12px;
+  right: 12px;
+  z-index: 450;
+  max-width: 536px;
+  margin: 0 auto;
+  background: #F9E9E9;
+  color: #A05252;
+  border-radius: var(--radius-control);
+  padding: 8px 12px;
+  font-size: 13px;
+  box-shadow: var(--shadow-soft);
+}
+
 .bottom-sheet {
   position: fixed;
   left: 0;
   right: 0;
-  bottom: calc(64px + env(safe-area-inset-bottom));
-  z-index: 600;
+  bottom: calc(88px + env(safe-area-inset-bottom));
+  z-index: 480;
   display: flex;
   justify-content: center;
   pointer-events: none;
@@ -598,11 +664,11 @@ input, textarea, select {
 .bottom-sheet-inner {
   pointer-events: auto;
   background: var(--surface);
-  width: 100%;
+  width: calc(100% - 16px);
   max-width: 560px;
-  max-height: 60vh;
-  border-radius: var(--radius-card) var(--radius-card) 0 0;
-  box-shadow: 0 -4px 16px rgba(46, 42, 38, 0.12);
+  max-height: 56vh;
+  border-radius: var(--radius-card);
+  box-shadow: 0 -4px 24px rgba(46, 42, 38, 0.18);
   overflow-y: auto;
   animation: slide-up 0.2s ease;
 }
@@ -694,4 +760,202 @@ input, textarea, select {
   text-align: center;
   font-size: 14px;
   color: var(--text-muted);
+}
+
+/* ---------- выбор города ---------- */
+
+.city-picker {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  background: var(--bg);
+  overflow-y: auto;
+  animation: fade-in 0.15s ease;
+}
+
+.city-picker-inner {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: calc(24px + env(safe-area-inset-top)) 16px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.city-picker-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.city-picker-head h1 {
+  font-size: 24px;
+}
+
+.city-picker-head .subtitle {
+  color: var(--text-muted);
+  font-size: 14px;
+  margin-top: 2px;
+}
+
+.city-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.city-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: var(--surface);
+  border-radius: var(--radius-control);
+  box-shadow: var(--shadow-soft);
+  padding: 14px 16px;
+  min-height: 52px;
+  font-size: 15px;
+  font-weight: 600;
+  text-align: left;
+  transition: transform 0.15s;
+}
+
+.city-item:active {
+  transform: scale(0.98);
+}
+
+.city-item .muted {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.city-item.current {
+  outline: 2px solid var(--primary);
+}
+
+.city-item.other {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.city-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 8px 14px;
+  min-height: 40px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  box-shadow: var(--shadow-soft);
+  transition: transform 0.15s;
+  white-space: nowrap;
+}
+
+.city-chip:active {
+  transform: scale(0.96);
+}
+
+.city-chip.muted-chip {
+  box-shadow: none;
+  color: var(--text-muted);
+}
+
+/* ---------- каталог: сеть -> адреса ---------- */
+
+.brand-card,
+.address-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  background: var(--surface);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-soft);
+  padding: 14px 16px;
+  text-align: left;
+  transition: transform 0.15s;
+}
+
+.brand-card:active,
+.address-card:active {
+  transform: scale(0.985);
+}
+
+.brand-avatar {
+  width: 46px;
+  height: 46px;
+  flex-shrink: 0;
+  border-radius: 14px;
+  color: #fff;
+  font-size: 20px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.brand-card-body,
+.address-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.brand-card-title {
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.brand-card-meta {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.brand-card-promos {
+  color: var(--primary);
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chevron-right {
+  color: var(--text-muted);
+  font-size: 22px;
+  flex-shrink: 0;
+}
+
+.back-btn {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-soft);
+  font-size: 24px;
+  line-height: 1;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-bottom: 3px;
+}
+
+.promo-in-modal {
+  background: var(--surface-alt);
+  border-radius: var(--radius-control);
+  overflow: hidden;
+}
+
+.promo-in-modal .promo-block {
+  border-top: none;
 }

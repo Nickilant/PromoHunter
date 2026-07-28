@@ -39,6 +39,9 @@ class User(Base):
     is_phone_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     display_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    # Город по умолчанию: записывается из сессии при регистрации,
+    # редактирование в настройках профиля — следующий этап
+    city: Mapped[str | None] = mapped_column(String(100))
     role: Mapped[UserRole] = mapped_column(
         Enum(UserRole, name="user_role", values_callable=lambda e: [x.value for x in e]),
         default=UserRole.user,
@@ -70,13 +73,19 @@ class Brand(Base):
 
 class Restaurant(Base):
     __tablename__ = "restaurants"
-    __table_args__ = (Index("ix_restaurants_brand_id", "brand_id"),)
+    __table_args__ = (
+        Index("ix_restaurants_brand_id", "brand_id"),
+        Index("ix_restaurants_city", "city"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     brand_id: Mapped[int] = mapped_column(
         ForeignKey("brands.id", ondelete="RESTRICT"), nullable=False
     )
     title: Mapped[str | None] = mapped_column(String(200))
+    city: Mapped[str] = mapped_column(
+        String(100), nullable=False, server_default="Санкт-Петербург"
+    )
     address: Mapped[str] = mapped_column(String(300), nullable=False)
     lat: Mapped[float] = mapped_column(Float, nullable=False)
     lng: Mapped[float] = mapped_column(Float, nullable=False)

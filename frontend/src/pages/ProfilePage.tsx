@@ -45,6 +45,10 @@ export default function ProfilePage() {
           <span>{user.phone}</span>
         </div>
         <div className="row">
+          <span className="muted">Город</span>
+          <span>{user.city ?? '—'}</span>
+        </div>
+        <div className="row">
           <span className="muted">Отчётов отправлено</span>
           <span>{reports.length >= 100 ? '100+' : reports.length}</span>
         </div>

@@ -27,6 +27,8 @@ class PhoneMixin(BaseModel):
 class RegisterIn(PhoneMixin):
     password: str = Field(min_length=6, max_length=128)
     display_name: str = Field(min_length=1, max_length=100)
+    # Город из сессии — станет городом по умолчанию в профиле
+    city: str | None = Field(default=None, max_length=100)
 
 
 class LoginIn(PhoneMixin):
@@ -38,6 +40,7 @@ class UserOut(ORMModel):
     phone: str
     is_phone_verified: bool
     display_name: str
+    city: str | None = None
     role: UserRole
     is_blocked: bool
     created_at: datetime
@@ -69,10 +72,31 @@ class RestaurantListItem(ORMModel):
     id: int
     brand: BrandShort
     title: str | None = None
+    city: str
     address: str
     lat: float
     lng: float
     active_promotions_count: int
+    last_report_at: datetime | None = None
+
+
+class CityOut(BaseModel):
+    name: str
+    restaurants_count: int
+
+
+class CatalogPromo(BaseModel):
+    id: int
+    title: str
+
+
+class CatalogBrand(BaseModel):
+    id: int
+    name: str
+    color: str
+    logo_url: str | None = None
+    restaurants_count: int
+    promotions: list[CatalogPromo]
 
 
 # --- статусы товаров ---
@@ -99,6 +123,7 @@ class RestaurantShort(ORMModel):
     id: int
     brand: BrandShort
     title: str | None = None
+    city: str
     address: str
     lat: float
     lng: float
@@ -108,6 +133,7 @@ class RestaurantDetail(BaseModel):
     id: int
     brand: BrandShort
     title: str | None = None
+    city: str
     address: str
     lat: float
     lng: float
@@ -200,6 +226,7 @@ class AdminBrandOut(BrandOut):
 class RestaurantIn(BaseModel):
     brand_id: int
     title: str | None = Field(default=None, max_length=200)
+    city: str = Field(min_length=1, max_length=100)
     address: str = Field(min_length=1, max_length=300)
     lat: float
     lng: float
@@ -209,6 +236,7 @@ class RestaurantIn(BaseModel):
 class RestaurantPatch(BaseModel):
     brand_id: int | None = None
     title: str | None = Field(default=None, max_length=200)
+    city: str | None = Field(default=None, min_length=1, max_length=100)
     address: str | None = Field(default=None, min_length=1, max_length=300)
     lat: float | None = None
     lng: float | None = None
@@ -219,6 +247,7 @@ class AdminRestaurantOut(ORMModel):
     id: int
     brand: BrandShort
     title: str | None = None
+    city: str
     address: str
     lat: float
     lng: float

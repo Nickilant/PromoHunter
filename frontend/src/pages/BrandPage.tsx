@@ -1,0 +1,78 @@
+import { useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+
+import { api } from '../api/client';
+import RestaurantModal from '../components/RestaurantModal';
+import { useCity } from '../hooks/useCity';
+import type { RestaurantListItem } from '../types';
+import { timeAgo } from '../utils/time';
+
+// Внутри сети: список адресов в выбранном городе.
+// Тап по адресу открывает модалку точки с акциями.
+export default function BrandPage() {
+  const { brandId } = useParams();
+  const [restaurants, setRestaurants] = useState<RestaurantListItem[] | null>(null);
+  const [openId, setOpenId] = useState<number | null>(null);
+  const { city } = useCity();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!city || !brandId) return;
+    const params = new URLSearchParams({ city, brand_id: brandId });
+    api
+      .get<RestaurantListItem[]>(`/restaurants?${params}`)
+      .then(setRestaurants)
+      .catch(() => setRestaurants([]));
+  }, [city, brandId]);
+
+  const brand = restaurants?.[0]?.brand ?? null;
+
+  return (
+    <div className="page">
+      <div className="page-header">
+        <button className="back-btn" onClick={() => navigate(-1)} aria-label="Назад">
+          ‹
+        </button>
+        {brand ? (
+          <span className="brand-chip" style={{ background: brand.color }}>
+            {brand.name}
+          </span>
+        ) : (
+          <h1>Адреса</h1>
+        )}
+        <span className="city-chip muted-chip">📍 {city}</span>
+      </div>
+
+      {restaurants === null && <div className="empty-state">Загружаем…</div>}
+
+      {restaurants !== null && restaurants.length === 0 && (
+        <div className="empty-state">
+          <div className="big">🏙️</div>
+          <div>В городе {city} у этой сети пока нет точек</div>
+        </div>
+      )}
+
+      {restaurants?.map((r) => {
+        const updated = timeAgo(r.last_report_at);
+        return (
+          <button key={r.id} className="address-card" onClick={() => setOpenId(r.id)}>
+            <span className="address-card-body">
+              {r.title && <span className="brand-card-title">{r.title}</span>}
+              <span className={r.title ? 'brand-card-meta' : 'brand-card-title'}>
+                {r.address}
+              </span>
+              <span className="brand-card-meta">
+                {updated ? `отчёты ${updated}` : 'отчётов ещё не было'}
+              </span>
+            </span>
+            <span className="chevron-right">›</span>
+          </button>
+        );
+      })}
+
+      {openId !== null && (
+        <RestaurantModal restaurantId={openId} onClose={() => setOpenId(null)} />
+      )}
+    </div>
+  );
+}

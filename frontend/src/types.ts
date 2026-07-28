@@ -5,6 +5,7 @@ export interface User {
   phone: string;
   is_phone_verified: boolean;
   display_name: string;
+  city: string | null;
   role: Role;
   is_blocked: boolean;
   created_at: string;
@@ -35,6 +36,7 @@ export interface RestaurantShort {
   id: number;
   brand: BrandShort;
   title: string | null;
+  city: string;
   address: string;
   lat: number;
   lng: number;
@@ -42,6 +44,26 @@ export interface RestaurantShort {
 
 export interface RestaurantListItem extends RestaurantShort {
   active_promotions_count: number;
+  last_report_at: string | null;
+}
+
+export interface CityInfo {
+  name: string;
+  restaurants_count: number;
+}
+
+export interface CatalogPromo {
+  id: number;
+  title: string;
+}
+
+export interface CatalogBrand {
+  id: number;
+  name: string;
+  color: string;
+  logo_url: string | null;
+  restaurants_count: number;
+  promotions: CatalogPromo[];
 }
 
 export interface AdminRestaurant extends RestaurantShort {

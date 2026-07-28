@@ -9,6 +9,7 @@ import AdminSuggestions from './admin/AdminSuggestions';
 import AdminUsers from './admin/AdminUsers';
 import BottomNav from './components/BottomNav';
 import { useAuth } from './hooks/useAuth';
+import BrandPage from './pages/BrandPage';
 import FeedPage from './pages/FeedPage';
 import LoginPage from './pages/LoginPage';
 import MapPage from './pages/MapPage';
@@ -44,6 +45,7 @@ export default function App() {
     <Routes>
       <Route element={<UserShell />}>
         <Route path="/" element={<FeedPage />} />
+        <Route path="/brand/:brandId" element={<BrandPage />} />
         <Route path="/map" element={<MapPage />} />
         <Route
           path="/suggest"
