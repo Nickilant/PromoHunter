@@ -5,7 +5,7 @@ from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.database import get_db
-from app.models import Brand, Promotion, PromotionItem, Report, Restaurant
+from app.models import Brand, Promotion, Report, Restaurant
 from app.schemas import (
     BrandOut,
     FeedEntry,

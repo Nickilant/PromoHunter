@@ -41,8 +41,13 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 
   if (!resp.ok) {
     let detail = 'Что-то пошло не так';
-    if (typeof data?.detail === 'string') detail = data.detail;
-    else if (Array.isArray(data?.detail)) detail = 'Проверьте правильность заполнения полей';
+    if (typeof data?.detail === 'string') {
+      detail = data.detail;
+    } else if (Array.isArray(data?.detail) && data.detail.length > 0) {
+      // ошибка валидации pydantic: показываем первое сообщение по-человечески
+      const msg: string = data.detail[0]?.msg ?? '';
+      detail = msg.replace(/^Value error,\s*/, '') || 'Проверьте правильность заполнения полей';
+    }
     throw new ApiError(resp.status, detail);
   }
   return data as T;

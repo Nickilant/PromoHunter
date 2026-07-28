@@ -1,10 +1,10 @@
 from tests.test_status import make_fixtures
 
 
-def auth_headers(client, email="reporter@example.com"):
+def auth_headers(client, phone="+79165550001"):
     resp = client.post(
         "/api/auth/register",
-        json={"email": email, "password": "secret123", "display_name": "Р"},
+        json={"phone": phone, "password": "secret123", "display_name": "Р"},
     )
     return {"Authorization": f"Bearer {resp.json()['access_token']}"}
 
@@ -62,13 +62,13 @@ def test_foreign_item_rejected(client, db):
 
 def test_blocked_user_cannot_write(client, db):
     restaurant, promotion, _ = make_fixtures(db)
-    headers = auth_headers(client, "blocked@example.com")
+    headers = auth_headers(client, "+79165550009")
 
     from sqlalchemy import select
 
     from app.models import User
 
-    user = db.scalar(select(User).where(User.email == "blocked@example.com"))
+    user = db.scalar(select(User).where(User.phone == "+79165550009"))
     user.is_blocked = True
     db.commit()
 

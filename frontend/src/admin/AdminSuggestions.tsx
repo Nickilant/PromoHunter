@@ -42,7 +42,7 @@ export default function AdminSuggestions() {
 
   useEffect(load, [statusFilter]);
 
-  const openApprove = (group: SuggestionGroup, s: AdminSuggestion) => {
+  const openApprove = (s: AdminSuggestion) => {
     setError(null);
     setApproving({
       suggestion: s,
@@ -60,7 +60,6 @@ export default function AdminSuggestions() {
           .map((name) => ({ name })),
       },
     });
-    void group;
   };
 
   const approve = async (value: PromotionFormValue) => {
@@ -140,7 +139,7 @@ export default function AdminSuggestions() {
                 {s.description && <div>{s.description}</div>}
                 <div className="items-raw">{s.items_raw}</div>
                 <div className="meta">
-                  От {s.user.display_name} ({s.user.email}) · {formatDateTime(s.created_at)}
+                  От {s.user.display_name} ({s.user.phone}) · {formatDateTime(s.created_at)}
                   {s.restaurant &&
                     ` · Замечено: ${s.restaurant.title || s.restaurant.address}`}
                 </div>
@@ -151,7 +150,7 @@ export default function AdminSuggestions() {
                   <div className="actions">
                     <button
                       className="btn btn-primary btn-small"
-                      onClick={() => openApprove(g, s)}
+                      onClick={() => openApprove(s)}
                     >
                       Одобрить
                     </button>

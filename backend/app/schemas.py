@@ -1,8 +1,9 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.models import SuggestionStatus, UserRole
+from app.phone import normalize_phone
 
 
 class ORMModel(BaseModel):
@@ -11,21 +12,31 @@ class ORMModel(BaseModel):
 
 # --- auth ---
 
-class RegisterIn(BaseModel):
-    email: EmailStr
+class PhoneMixin(BaseModel):
+    phone: str
+
+    @field_validator("phone")
+    @classmethod
+    def _normalize_phone(cls, value: str) -> str:
+        normalized = normalize_phone(value)
+        if normalized is None:
+            raise ValueError("Неверный формат номера телефона")
+        return normalized
+
+
+class RegisterIn(PhoneMixin):
     password: str = Field(min_length=6, max_length=128)
     display_name: str = Field(min_length=1, max_length=100)
 
 
-class LoginIn(BaseModel):
-    # Не EmailStr: сидовый админ admin@local не проходит строгую валидацию
-    email: str
+class LoginIn(PhoneMixin):
     password: str
 
 
 class UserOut(ORMModel):
     id: int
-    email: str
+    phone: str
+    is_phone_verified: bool
     display_name: str
     role: UserRole
     is_blocked: bool

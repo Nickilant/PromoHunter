@@ -33,7 +33,10 @@ class User(Base):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    phone: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)
+    # Подтверждение номера кодом через Telegram — следующий этап;
+    # пока при регистрации ставим True без проверки
+    is_phone_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     display_name: Mapped[str] = mapped_column(String(100), nullable=False)
     role: Mapped[UserRole] = mapped_column(

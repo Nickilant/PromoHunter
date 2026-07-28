@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 from app.auth import get_current_user, require_not_blocked
 from app.config import settings
 from app.database import get_db
-from app.models import Promotion, PromotionItem, Report, ReportItem, Restaurant, User
+from app.models import Promotion, Report, ReportItem, Restaurant, User
 from app.routers.public import active_promotion_clause
 from app.schemas import ReportIn, ReportItemOut, ReportOut, RestaurantShort
 

@@ -48,7 +48,7 @@ export default function AdminUsers() {
               return (
                 <tr key={u.id}>
                   <td>
-                    {u.email}
+                    {u.phone}
                     {isSelf && ' (вы)'}
                   </td>
                   <td>{u.display_name}</td>

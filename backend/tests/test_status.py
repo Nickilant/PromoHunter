@@ -25,7 +25,7 @@ def make_fixtures(db, item_names=("Товар А", "Товар Б")):
     )
     db.add_all([restaurant, promotion])
     users = [
-        User(email=f"u{i}@example.com", password_hash=hash_password("x"), display_name=f"U{i}")
+        User(phone=f"+7900000000{i}", password_hash=hash_password("x"), display_name=f"U{i}")
         for i in range(4)
     ]
     db.add_all(users)

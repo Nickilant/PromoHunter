@@ -12,14 +12,16 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 @router.post("/register", response_model=TokenOut)
 def register(payload: RegisterIn, db: Session = Depends(get_db)):
-    email = payload.email.lower()
-    exists = db.scalar(select(User).where(User.email == email))
+    exists = db.scalar(select(User).where(User.phone == payload.phone))
     if exists:
-        raise HTTPException(status.HTTP_409_CONFLICT, detail="Email уже зарегистрирован")
+        raise HTTPException(status.HTTP_409_CONFLICT, detail="Номер уже зарегистрирован")
 
     users_count = db.scalar(select(func.count(User.id))) or 0
     user = User(
-        email=email,
+        phone=payload.phone,
+        # Проверка номера кодом через Telegram — следующий этап.
+        # Пока регистрируем без проверки и сразу считаем номер подтверждённым.
+        is_phone_verified=True,
         password_hash=hash_password(payload.password),
         display_name=payload.display_name,
         # Первый зарегистрированный пользователь становится админом
@@ -33,9 +35,9 @@ def register(payload: RegisterIn, db: Session = Depends(get_db)):
 
 @router.post("/login", response_model=TokenOut)
 def login(payload: LoginIn, db: Session = Depends(get_db)):
-    user = db.scalar(select(User).where(User.email == payload.email.lower()))
+    user = db.scalar(select(User).where(User.phone == payload.phone))
     if user is None or not verify_password(payload.password, user.password_hash):
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Неверный email или пароль")
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Неверный номер или пароль")
     return TokenOut(access_token=create_access_token(user), user=UserOut.model_validate(user))
 
 

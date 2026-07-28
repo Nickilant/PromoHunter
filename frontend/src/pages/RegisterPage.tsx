@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 
 export default function RegisterPage() {
-  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -17,7 +17,7 @@ export default function RegisterPage() {
     setError(null);
     setSending(true);
     try {
-      await register(email, password, displayName);
+      await register(phone, password, displayName);
       navigate('/');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Не получилось зарегистрироваться');
@@ -41,14 +41,19 @@ export default function RegisterPage() {
           />
         </div>
         <div className="field">
-          <label>Email</label>
+          <label>Номер телефона</label>
           <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            autoComplete="email"
+            type="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            autoComplete="tel"
+            placeholder="+7 999 123-45-67"
             required
           />
+          <div className="hint">
+            Подтверждение номера кодом в Telegram появится позже — сейчас
+            регистрация без проверки
+          </div>
         </div>
         <div className="field">
           <label>Пароль</label>

@@ -12,8 +12,8 @@ import type { AuthResponse, User } from '../types';
 interface AuthContextValue {
   user: User | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, displayName: string) => Promise<void>;
+  login: (phone: string, password: string) => Promise<void>;
+  register: (phone: string, password: string, displayName: string) => Promise<void>;
   logout: () => void;
 }
 
@@ -35,15 +35,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .finally(() => setLoading(false));
   }, []);
 
-  const login = async (email: string, password: string) => {
-    const resp = await api.post<AuthResponse>('/auth/login', { email, password });
+  const login = async (phone: string, password: string) => {
+    const resp = await api.post<AuthResponse>('/auth/login', { phone, password });
     setToken(resp.access_token);
     setUser(resp.user);
   };
 
-  const register = async (email: string, password: string, displayName: string) => {
+  const register = async (phone: string, password: string, displayName: string) => {
     const resp = await api.post<AuthResponse>('/auth/register', {
-      email,
+      phone,
       password,
       display_name: displayName,
     });

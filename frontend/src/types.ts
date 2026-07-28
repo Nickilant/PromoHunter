@@ -2,7 +2,8 @@ export type Role = 'user' | 'admin';
 
 export interface User {
   id: number;
-  email: string;
+  phone: string;
+  is_phone_verified: boolean;
   display_name: string;
   role: Role;
   is_blocked: boolean;

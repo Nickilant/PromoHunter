@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
@@ -16,7 +16,7 @@ export default function LoginPage() {
     setError(null);
     setSending(true);
     try {
-      await login(email, password);
+      await login(phone, password);
       navigate('/');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Не получилось войти');
@@ -31,12 +31,13 @@ export default function LoginPage() {
       <h1>Вход</h1>
       <form onSubmit={submit}>
         <div className="field">
-          <label>Email</label>
+          <label>Номер телефона</label>
           <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            autoComplete="email"
+            type="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            autoComplete="tel"
+            placeholder="+7 999 123-45-67"
             required
           />
         </div>

@@ -68,7 +68,8 @@ def compute_statuses(
         func.row_number()
         .over(
             partition_by=(Report.user_id, Report.promotion_id),
-            order_by=Report.created_at.desc(),
+            # id — тайбрейк при одинаковом created_at
+            order_by=(Report.created_at.desc(), Report.id.desc()),
         )
         .label("rn")
     )

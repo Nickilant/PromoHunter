@@ -41,8 +41,8 @@ export default function ProfilePage() {
           <span>{user.display_name}</span>
         </div>
         <div className="row">
-          <span className="muted">Email</span>
-          <span>{user.email}</span>
+          <span className="muted">Телефон</span>
+          <span>{user.phone}</span>
         </div>
         <div className="row">
           <span className="muted">Отчётов отправлено</span>

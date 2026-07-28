@@ -32,7 +32,7 @@ seed:
 	$(COMPOSE) exec backend python -m app.seed
 
 psql:
-	$(COMPOSE) exec db psql -U $${POSTGRES_USER:-promo} -d $${POSTGRES_DB:-promo}
+	$(COMPOSE) exec db sh -c 'psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"'
 
 test:
 	$(COMPOSE) exec backend pytest -v

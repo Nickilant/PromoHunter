@@ -28,12 +28,13 @@ from app.models import (
 rng = random.Random(42)
 
 
-def get_or_create_user(db: Session, email: str, name: str, role: UserRole) -> User:
-    user = db.scalar(select(User).where(User.email == email))
+def get_or_create_user(db: Session, phone: str, name: str, role: UserRole) -> User:
+    user = db.scalar(select(User).where(User.phone == phone))
     if user is None:
         password = "admin123" if role == UserRole.admin else "user123"
         user = User(
-            email=email,
+            phone=phone,
+            is_phone_verified=True,
             password_hash=hash_password(password),
             display_name=name,
             role=role,
@@ -120,12 +121,12 @@ def seed(db: Session) -> None:
     now = datetime.now(timezone.utc)
 
     # --- пользователи ---
-    admin = get_or_create_user(db, "admin@local", "Админ", UserRole.admin)
+    admin = get_or_create_user(db, "+79990000000", "Админ", UserRole.admin)
     users = [
-        get_or_create_user(db, "maria@example.com", "Мария", UserRole.user),
-        get_or_create_user(db, "ivan@example.com", "Иван", UserRole.user),
-        get_or_create_user(db, "olga@example.com", "Ольга", UserRole.user),
-        get_or_create_user(db, "dmitry@example.com", "Дмитрий", UserRole.user),
+        get_or_create_user(db, "+79990000001", "Мария", UserRole.user),
+        get_or_create_user(db, "+79990000002", "Иван", UserRole.user),
+        get_or_create_user(db, "+79990000003", "Ольга", UserRole.user),
+        get_or_create_user(db, "+79990000004", "Дмитрий", UserRole.user),
     ]
 
     # --- бренды ---
