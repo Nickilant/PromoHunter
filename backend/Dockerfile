@@ -16,7 +16,8 @@ COPY requirements.txt ./
 RUN /opt/venv/bin/pip install --no-cache-dir -r requirements.txt
 
 COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+# sed: страховка от CRLF после checkout на Windows — иначе ломается шебанг
+RUN sed -i 's/\r$//' /entrypoint.sh && chmod +x /entrypoint.sh
 
 USER app
 ENTRYPOINT ["/entrypoint.sh"]
