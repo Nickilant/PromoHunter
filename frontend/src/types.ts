@@ -1,0 +1,143 @@
+export type Role = 'user' | 'admin';
+
+export interface User {
+  id: number;
+  email: string;
+  display_name: string;
+  role: Role;
+  is_blocked: boolean;
+  created_at: string;
+}
+
+export interface AuthResponse {
+  access_token: string;
+  user: User;
+}
+
+export interface BrandShort {
+  id: number;
+  name: string;
+  color: string;
+}
+
+export interface Brand extends BrandShort {
+  slug: string;
+  logo_url: string | null;
+}
+
+export interface AdminBrand extends Brand {
+  created_at: string;
+  restaurants_count: number;
+}
+
+export interface RestaurantShort {
+  id: number;
+  brand: BrandShort;
+  title: string | null;
+  address: string;
+  lat: number;
+  lng: number;
+}
+
+export interface RestaurantListItem extends RestaurantShort {
+  active_promotions_count: number;
+}
+
+export interface AdminRestaurant extends RestaurantShort {
+  is_active: boolean;
+  created_at: string;
+}
+
+export type ItemStatus = 'available' | 'unavailable' | 'disputed' | 'unknown';
+
+export interface ItemWithStatus {
+  id: number;
+  name: string;
+  status: ItemStatus;
+  yes_count: number;
+  no_count: number;
+  last_report_at: string | null;
+}
+
+export interface PromotionWithStatuses {
+  id: number;
+  title: string;
+  description: string | null;
+  starts_at: string | null;
+  ends_at: string | null;
+  items: ItemWithStatus[];
+}
+
+export interface FeedEntry {
+  restaurant: RestaurantShort;
+  promotions: PromotionWithStatuses[];
+}
+
+export interface RestaurantDetail extends RestaurantShort {
+  promotions: PromotionWithStatuses[];
+}
+
+export interface ReportItemOut {
+  promotion_item_id: number;
+  name: string;
+  is_available: boolean;
+}
+
+export interface Report {
+  id: number;
+  restaurant: RestaurantShort;
+  promotion_title: string;
+  items: ReportItemOut[];
+  created_at: string;
+}
+
+export type SuggestionStatus = 'pending' | 'approved' | 'rejected';
+
+export interface Suggestion {
+  id: number;
+  brand_id: number | null;
+  brand_name_raw: string | null;
+  restaurant_id: number | null;
+  title: string;
+  description: string | null;
+  items_raw: string;
+  status: SuggestionStatus;
+  moderator_comment: string | null;
+  created_promotion_id: number | null;
+  created_at: string;
+  reviewed_at: string | null;
+}
+
+export interface AdminSuggestion extends Suggestion {
+  user: User;
+  restaurant: RestaurantShort | null;
+}
+
+export interface SuggestionGroup {
+  brand_id: number | null;
+  brand_name: string;
+  brand_color: string | null;
+  suggestions: AdminSuggestion[];
+}
+
+export interface PromotionItemAdmin {
+  id: number;
+  name: string;
+  sort_order: number;
+}
+
+export interface AdminPromotion {
+  id: number;
+  brand: BrandShort;
+  title: string;
+  description: string | null;
+  starts_at: string | null;
+  ends_at: string | null;
+  is_active: boolean;
+  created_at: string;
+  items: PromotionItemAdmin[];
+}
+
+export interface AdminUser extends User {
+  reports_count: number;
+}

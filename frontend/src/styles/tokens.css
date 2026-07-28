@@ -1,0 +1,24 @@
+:root {
+  /* палитра */
+  --bg:            #F7F5F2;   /* фон приложения, тёплый светлый */
+  --surface:       #FFFFFF;   /* карточки */
+  --surface-alt:   #F1EEE9;   /* вторичные плашки, ховеры */
+  --border:        #E5E0D8;
+  --text:          #2E2A26;
+  --text-muted:    #8A8078;
+  --primary:       #6B9080;   /* приглушённый зелёный — основные действия */
+  --primary-soft:  #E3EDE8;
+  --accent:        #C98B6B;   /* тёплая терракота — акценты, «Заявить акцию» */
+
+  /* статусы */
+  --status-available:   #7FB77E;
+  --status-unavailable: #DE8F8F;
+  --status-disputed:    #E3BC79;
+  --status-unknown:     #BFB8AE;
+
+  /* форма */
+  --radius-card: 16px;
+  --radius-control: 12px;
+  --shadow-soft: 0 2px 8px rgba(46, 42, 38, 0.06);
+  --font: -apple-system, "Segoe UI", Roboto, sans-serif;
+}

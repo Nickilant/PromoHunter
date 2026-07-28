@@ -1,0 +1,312 @@
+/* Админка: десктоп-ориентированный layout с боковым меню */
+
+.admin-shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+.admin-sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  padding: 20px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.admin-sidebar .brand-title {
+  font-weight: 600;
+  font-size: 17px;
+  padding: 0 10px 14px;
+}
+
+.admin-sidebar a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 10px;
+  border-radius: var(--radius-control);
+  color: var(--text);
+  font-size: 14px;
+  transition: opacity 0.15s;
+}
+
+.admin-sidebar a:hover {
+  background: var(--surface-alt);
+}
+
+.admin-sidebar a.active {
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.admin-sidebar .spacer {
+  flex: 1;
+}
+
+.admin-sidebar .counter {
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+
+.admin-content {
+  flex: 1;
+  padding: 24px;
+  min-width: 0;
+}
+
+.admin-content h1 {
+  font-size: 22px;
+  margin-bottom: 16px;
+}
+
+.admin-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.admin-toolbar select,
+.admin-toolbar input {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+}
+
+/* таблицы */
+
+.admin-table-wrap {
+  background: var(--surface);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-soft);
+  overflow-x: auto;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.admin-table th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-muted);
+  font-size: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.admin-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.admin-table tr:last-child td {
+  border-bottom: none;
+}
+
+.admin-table tr:hover td {
+  background: var(--surface-alt);
+}
+
+.admin-table .actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+  white-space: nowrap;
+}
+
+.color-dot {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  vertical-align: -3px;
+  margin-right: 8px;
+  border: 1px solid rgba(46, 42, 38, 0.15);
+}
+
+.tag {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 2px 9px;
+  background: var(--surface-alt);
+  color: var(--text-muted);
+}
+
+.tag.ok    { background: var(--primary-soft); color: var(--primary); }
+.tag.warn  { background: #F7EBD9; color: #A87B33; }
+.tag.error { background: #F9E9E9; color: #A05252; }
+
+/* модалка в админке — по центру, шире */
+
+.admin-modal {
+  background: var(--surface);
+  border-radius: var(--radius-card);
+  width: 100%;
+  max-width: 860px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  animation: slide-up 0.2s ease;
+}
+
+.admin-modal .modal-body {
+  padding: 8px 20px 16px;
+}
+
+.admin-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.admin-form-grid .full {
+  grid-column: 1 / -1;
+}
+
+/* форма ресторана: поля + карта рядом */
+
+.restaurant-editor {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 16px;
+}
+
+.restaurant-editor .map-picker {
+  min-height: 380px;
+  border-radius: var(--radius-control);
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.restaurant-editor .map-picker .leaflet-container {
+  width: 100%;
+  height: 100%;
+  min-height: 380px;
+}
+
+@media (max-width: 860px) {
+  .restaurant-editor {
+    grid-template-columns: 1fr;
+  }
+  .admin-form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .admin-shell {
+    flex-direction: column;
+  }
+  .admin-sidebar {
+    width: 100%;
+    flex-direction: row;
+    flex-wrap: wrap;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    padding: 10px;
+  }
+  .admin-sidebar .brand-title {
+    padding: 6px 10px;
+  }
+  .admin-sidebar .spacer {
+    display: none;
+  }
+}
+
+/* редактор списка товаров акции */
+
+.items-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.items-editor .item-line {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.items-editor .item-line input {
+  flex: 1;
+}
+
+.items-editor .item-line button {
+  min-width: 34px;
+  min-height: 38px;
+  border-radius: var(--radius-control);
+  background: var(--surface-alt);
+  color: var(--text-muted);
+}
+
+.items-editor .item-line button:hover {
+  color: var(--text);
+}
+
+/* заявки */
+
+.suggestion-group {
+  background: var(--surface);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-soft);
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+
+.suggestion-group-head {
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+}
+
+.suggestion-card {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+}
+
+.suggestion-card:last-child {
+  border-bottom: none;
+}
+
+.suggestion-card .meta {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.suggestion-card .items-raw {
+  background: var(--surface-alt);
+  border-radius: var(--radius-control);
+  padding: 8px 10px;
+  white-space: pre-line;
+  font-size: 13px;
+}
+
+.suggestion-card .actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}

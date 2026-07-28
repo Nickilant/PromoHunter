@@ -10,6 +10,7 @@ RUN apk add --no-cache shadow \
  && chown -R node:node /home/node
 
 WORKDIR /app
+RUN chown node:node /app
 COPY --chown=node:node package.json package-lock.json ./
 USER node
 RUN npm ci
