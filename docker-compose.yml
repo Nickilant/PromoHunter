@@ -1,0 +1,62 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 3s
+      timeout: 3s
+      retries: 15
+
+  backend:
+    build:
+      context: ./backend
+      target: dev
+      args:
+        UID: ${UID:-1000}
+        GID: ${GID:-1000}
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES}
+      STATUS_WINDOW_HOURS: ${STATUS_WINDOW_HOURS}
+      REPORT_COOLDOWN_MINUTES: ${REPORT_COOLDOWN_MINUTES}
+      SEED_ON_START: ${SEED_ON_START}
+    volumes:
+      # Живая правка кода. Зависимости стоят в /opt/venv (вне /app),
+      # поэтому bind-mount их не затирает.
+      - ./backend:/app
+    ports:
+      - "8000:8000"
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  frontend:
+    build:
+      context: ./frontend
+      target: dev
+      args:
+        UID: ${UID:-1000}
+        GID: ${GID:-1000}
+    environment:
+      VITE_API_PROXY_TARGET: ${VITE_API_PROXY_TARGET:-http://backend:8000}
+    volumes:
+      - ./frontend:/app
+      # Анонимный volume: хостовая папка не должна затирать node_modules,
+      # установленные при сборке образа.
+      - /app/node_modules
+    ports:
+      - "5173:5173"
+    command: npm run dev -- --host 0.0.0.0
+
+volumes:
+  pgdata:
