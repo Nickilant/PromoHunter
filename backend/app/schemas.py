@@ -2,7 +2,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app.models import SuggestionStatus, UserRole
+from app.models import ReportChannel, SuggestionStatus, UserRole
 from app.phone import normalize_phone
 
 
@@ -104,9 +104,12 @@ class CatalogBrand(BaseModel):
 class ItemStatusOut(BaseModel):
     id: int
     name: str
-    status: str  # available | unavailable | disputed | unknown
+    # available | unavailable | maybe_gone | maybe_appeared | disputed | unknown
+    status: str
     yes_count: int
     no_count: int
+    on_site_count: int = 0
+    delivery_count: int = 0
     last_report_at: datetime | None = None
 
 
@@ -156,6 +159,7 @@ class ReportIn(BaseModel):
     restaurant_id: int
     promotion_id: int
     items: list[ReportItemIn] = Field(min_length=1)
+    channel: ReportChannel = ReportChannel.on_site
     lat: float | None = None
     lng: float | None = None
 
@@ -337,3 +341,50 @@ class SuggestionApproveIn(BaseModel):
 
 class SuggestionRejectIn(BaseModel):
     moderator_comment: str = Field(min_length=1)
+    # Пометка «выдумка/спам» — штраф автору в рейтинге;
+    # обычный дубликат штрафовать нельзя
+    is_spam: bool = False
+
+
+# --- rating ---
+
+class RatingEntryOut(BaseModel):
+    user_id: int
+    display_name: str
+    points: int
+    reports_count: int
+    pioneers_count: int
+    position: int
+
+
+class RatingMeOut(BaseModel):
+    position: int | None = None
+    points: int
+
+
+class RatingOut(BaseModel):
+    entries: list[RatingEntryOut]
+    me: RatingMeOut | None = None
+
+
+class RatingCategoryOut(BaseModel):
+    type: str
+    count: int
+    points: int
+
+
+class RatingEventOut(BaseModel):
+    type: str
+    points: int
+    city: str | None = None
+    context: str | None = None
+    created_at: datetime
+
+
+class RatingCardOut(BaseModel):
+    user_id: int
+    display_name: str
+    total_points: int
+    categories: list[RatingCategoryOut]
+    # Полная лента — только владельцу карточки
+    events: list[RatingEventOut] | None = None

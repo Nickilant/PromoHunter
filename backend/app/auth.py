@@ -49,6 +49,22 @@ def get_current_user(
     return user
 
 
+def get_current_user_optional(
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+    db: Session = Depends(get_db),
+) -> User | None:
+    """Для эндпоинтов, где авторизация желательна, но не обязательна."""
+    if credentials is None:
+        return None
+    try:
+        payload = jwt.decode(
+            credentials.credentials, settings.jwt_secret, algorithms=[ALGORITHM]
+        )
+        return db.get(User, int(payload["sub"]))
+    except (JWTError, KeyError, ValueError):
+        return None
+
+
 def require_not_blocked(user: User = Depends(get_current_user)) -> User:
     """Для write-эндпоинтов: заблокированный пользователь может только читать."""
     if user.is_blocked:

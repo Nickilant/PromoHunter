@@ -11,10 +11,12 @@
   --accent:        #C98B6B;   /* тёплая терракота — акценты, «Заявить акцию» */
 
   /* статусы */
-  --status-available:   #7FB77E;
-  --status-unavailable: #DE8F8F;
-  --status-disputed:    #E3BC79;
-  --status-unknown:     #BFB8AE;
+  --status-available:      #7FB77E;
+  --status-unavailable:    #DE8F8F;
+  --status-disputed:       #E3BC79;
+  --status-maybe-gone:     #E3A76B;   /* было и возможно кончилось */
+  --status-maybe-appeared: #8FBFA9;   /* не было и возможно появилось */
+  --status-unknown:        #BFB8AE;
 
   /* форма */
   --radius-card: 16px;

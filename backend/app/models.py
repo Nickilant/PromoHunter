@@ -29,6 +29,17 @@ class SuggestionStatus(str, enum.Enum):
     rejected = "rejected"
 
 
+class ReportChannel(str, enum.Enum):
+    on_site = "on_site"      # человек на точке
+    delivery = "delivery"    # заказ через доставку
+
+
+class VerdictOutcome(str, enum.Enum):
+    confirmed = "confirmed"
+    refuted = "refuted"
+    neutral = "neutral"
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -42,6 +53,11 @@ class User(Base):
     # Город по умолчанию: записывается из сессии при регистрации,
     # редактирование в настройках профиля — следующий этап
     city: Mapped[str | None] = mapped_column(String(100))
+    # Скрытый вес доверия (docs/trust-and-rating-spec.md §2); нигде не отображается
+    weight: Mapped[float] = mapped_column(
+        Float, default=1.0, server_default="1.0", nullable=False
+    )
+    weight_drifted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     role: Mapped[UserRole] = mapped_column(
         Enum(UserRole, name="user_role", values_callable=lambda e: [x.value for x in e]),
         default=UserRole.user,
@@ -157,6 +173,16 @@ class Report(Base):
     # Поле под проверку геолокации на следующем этапе; сейчас не заполняется
     lat: Mapped[float | None] = mapped_column(Float)
     lng: Mapped[float | None] = mapped_column(Float)
+    channel: Mapped[ReportChannel] = mapped_column(
+        Enum(
+            ReportChannel,
+            name="report_channel",
+            values_callable=lambda e: [x.value for x in e],
+        ),
+        default=ReportChannel.on_site,
+        server_default="on_site",
+        nullable=False,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -183,6 +209,92 @@ class ReportItem(Base):
 
     report: Mapped["Report"] = relationship(back_populates="items")
     promotion_item: Mapped["PromotionItem"] = relationship()
+
+
+class ReportVerdict(Base):
+    """Дозревший вердикт отчёта: подтверждён/опровергнут консенсусом или нейтрален.
+
+    Единственный источник для пересчёта весов и начисления бонусных очков.
+    """
+
+    __tablename__ = "report_verdicts"
+    __table_args__ = (Index("ix_report_verdicts_user_id", "user_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    report_id: Mapped[int] = mapped_column(
+        ForeignKey("reports.id", ondelete="CASCADE"), unique=True, nullable=False
+    )
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    verdict: Mapped[VerdictOutcome] = mapped_column(
+        Enum(
+            VerdictOutcome,
+            name="verdict_outcome",
+            values_callable=lambda e: [x.value for x in e],
+        ),
+        nullable=False,
+    )
+    is_pioneer: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    confirmed_items: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    refuted_items: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    neutral_items: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    matured_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    report: Mapped["Report"] = relationship()
+
+
+class RatingEvent(Base):
+    """Журнал публичного рейтинга: одна строка — одно начисление/штраф."""
+
+    __tablename__ = "rating_events"
+    __table_args__ = (
+        Index("ix_rating_events_user_created", "user_id", "created_at"),
+        Index("ix_rating_events_city_created", "city", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    city: Mapped[str | None] = mapped_column(String(100))
+    # report_base | report_confirmed | pioneer | scout | suggestion_approved |
+    # report_refuted | suggestion_spam
+    type: Mapped[str] = mapped_column(String(32), nullable=False)
+    points: Mapped[int] = mapped_column(Integer, nullable=False)
+    report_id: Mapped[int | None] = mapped_column(
+        ForeignKey("reports.id", ondelete="SET NULL")
+    )
+    suggestion_id: Mapped[int | None] = mapped_column(
+        ForeignKey("promotion_suggestions.id", ondelete="SET NULL")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    user: Mapped["User"] = relationship()
+
+
+class ItemStatusState(Base):
+    """Последний устойчивый статус пары (точка, товар) — память направления
+    для переходных статусов «возможно кончилось / возможно появилось»."""
+
+    __tablename__ = "item_status_states"
+
+    restaurant_id: Mapped[int] = mapped_column(
+        ForeignKey("restaurants.id", ondelete="CASCADE"), primary_key=True
+    )
+    promotion_item_id: Mapped[int] = mapped_column(
+        ForeignKey("promotion_items.id", ondelete="CASCADE"), primary_key=True
+    )
+    stable: Mapped[str] = mapped_column(
+        String(16), default="unknown", nullable=False
+    )  # available | unavailable | unknown
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
 
 
 class PromotionSuggestion(Base):

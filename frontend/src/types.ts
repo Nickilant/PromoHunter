@@ -71,7 +71,15 @@ export interface AdminRestaurant extends RestaurantShort {
   created_at: string;
 }
 
-export type ItemStatus = 'available' | 'unavailable' | 'disputed' | 'unknown';
+export type ItemStatus =
+  | 'available'
+  | 'unavailable'
+  | 'maybe_gone'
+  | 'maybe_appeared'
+  | 'disputed'
+  | 'unknown';
+
+export type ReportChannel = 'on_site' | 'delivery';
 
 export interface ItemWithStatus {
   id: number;
@@ -79,6 +87,8 @@ export interface ItemWithStatus {
   status: ItemStatus;
   yes_count: number;
   no_count: number;
+  on_site_count: number;
+  delivery_count: number;
   last_report_at: string | null;
 }
 
@@ -163,4 +173,44 @@ export interface AdminPromotion {
 
 export interface AdminUser extends User {
   reports_count: number;
+}
+
+// --- рейтинг ---
+
+export type RatingPeriod = 'month' | 'year';
+
+export interface RatingEntry {
+  user_id: number;
+  display_name: string;
+  points: number;
+  reports_count: number;
+  pioneers_count: number;
+  position: number;
+}
+
+export interface RatingResponse {
+  entries: RatingEntry[];
+  me: { position: number | null; points: number } | null;
+}
+
+export interface RatingCategory {
+  type: string;
+  count: number;
+  points: number;
+}
+
+export interface RatingEventItem {
+  type: string;
+  points: number;
+  city: string | null;
+  context: string | null;
+  created_at: string;
+}
+
+export interface RatingCard {
+  user_id: number;
+  display_name: string;
+  total_points: number;
+  categories: RatingCategory[];
+  events: RatingEventItem[] | null;
 }

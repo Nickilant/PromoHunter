@@ -24,6 +24,7 @@ export default function AdminSuggestions() {
   } | null>(null);
   const [rejecting, setRejecting] = useState<AdminSuggestion | null>(null);
   const [rejectComment, setRejectComment] = useState('');
+  const [rejectSpam, setRejectSpam] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { refreshPendingCount } = useOutletContext<AdminOutletContext>();
   const toast = useToast();
@@ -88,9 +89,11 @@ export default function AdminSuggestions() {
     try {
       await api.post(`/admin/suggestions/${rejecting.id}/reject`, {
         moderator_comment: rejectComment,
+        is_spam: rejectSpam,
       });
       setRejecting(null);
       setRejectComment('');
+      setRejectSpam(false);
       load();
       refreshPendingCount();
       toast('Заявка отклонена');
@@ -158,6 +161,7 @@ export default function AdminSuggestions() {
                       className="btn btn-danger btn-small"
                       onClick={() => {
                         setRejectComment('');
+                        setRejectSpam(false);
                         setRejecting(s);
                       }}
                     >
@@ -216,6 +220,20 @@ export default function AdminSuggestions() {
                   onChange={(e) => setRejectComment(e.target.value)}
                   placeholder="Например: дубликат, акция уже создана"
                 />
+              </div>
+              <div className="field">
+                <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input
+                    type="checkbox"
+                    checked={rejectSpam}
+                    onChange={(e) => setRejectSpam(e.target.checked)}
+                    style={{ width: 'auto' }}
+                  />
+                  Выдумка / спам — оштрафовать автора в рейтинге (−10)
+                </label>
+                <div className="hint">
+                  Обычный дубликат или неактуальную заявку не штрафуем
+                </div>
               </div>
             </div>
             <div className="modal-footer">

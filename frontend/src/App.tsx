@@ -14,6 +14,7 @@ import FeedPage from './pages/FeedPage';
 import LoginPage from './pages/LoginPage';
 import MapPage from './pages/MapPage';
 import ProfilePage from './pages/ProfilePage';
+import RatingPage from './pages/RatingPage';
 import RegisterPage from './pages/RegisterPage';
 import SuggestPage from './pages/SuggestPage';
 
@@ -47,6 +48,7 @@ export default function App() {
         <Route path="/" element={<FeedPage />} />
         <Route path="/brand/:brandId" element={<BrandPage />} />
         <Route path="/map" element={<MapPage />} />
+        <Route path="/rating" element={<RatingPage />} />
         <Route
           path="/suggest"
           element={

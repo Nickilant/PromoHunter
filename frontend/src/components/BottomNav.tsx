@@ -16,6 +16,10 @@ export default function BottomNav() {
       <Link to="/suggest" className="dock-action" aria-label="Заявить акцию">
         ＋
       </Link>
+      <NavLink to="/rating" className={({ isActive }) => `dock-item ${isActive ? 'active' : ''}`}>
+        <span className="dock-icon">🏆</span>
+        <span>Рейтинг</span>
+      </NavLink>
       <NavLink to="/profile" className={({ isActive }) => `dock-item ${isActive ? 'active' : ''}`}>
         <span className="dock-icon">👤</span>
         <span>Профиль</span>

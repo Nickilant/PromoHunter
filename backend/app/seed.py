@@ -19,6 +19,7 @@ from app.models import (
     PromotionItem,
     PromotionSuggestion,
     Report,
+    ReportChannel,
     ReportItem,
     Restaurant,
     User,
@@ -110,11 +111,13 @@ def add_report(
     promotion: Promotion,
     votes: dict[int, bool],
     created_at: datetime,
+    channel: ReportChannel = ReportChannel.on_site,
 ) -> None:
     report = Report(
         user_id=user.id,
         restaurant_id=restaurant.id,
         promotion_id=promotion.id,
+        channel=channel,
         created_at=created_at,
         items=[
             ReportItem(promotion_item_id=item_id, is_available=is_available)
@@ -273,6 +276,9 @@ def seed(db: Session) -> None:
                     promo,
                     votes,
                     now - timedelta(minutes=rng.randint(10, 48 * 60)),
+                    channel=ReportChannel.delivery
+                    if rng.random() < 0.2
+                    else ReportChannel.on_site,
                 )
                 created += 1
         db.flush()
@@ -322,6 +328,12 @@ def seed(db: Session) -> None:
         )
 
     db.commit()
+
+    # Дозреваем вердикты по старым отчётам: появляются веса, очки рейтинга
+    # и устойчивые статусы (идемпотентно — второй раз ничего не создаст)
+    from app.services.trust import run_trust_pass
+
+    run_trust_pass(db)
 
 
 def main() -> None:

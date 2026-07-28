@@ -7,11 +7,13 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.auth import require_admin
 from app.database import get_db
+from app.config import settings
 from app.models import (
     Brand,
     Promotion,
     PromotionItem,
     PromotionSuggestion,
+    RatingEvent,
     Report,
     Restaurant,
     SuggestionStatus,
@@ -422,6 +424,23 @@ def approve_suggestion(
     suggestion.status = SuggestionStatus.approved
     suggestion.created_promotion_id = promotion.id
     suggestion.reviewed_at = datetime.now(timezone.utc)
+
+    # Рейтинг автору заявки: человек принёс в сервис целую акцию
+    author = db.get(User, suggestion.user_id)
+    restaurant = (
+        db.get(Restaurant, suggestion.restaurant_id)
+        if suggestion.restaurant_id
+        else None
+    )
+    db.add(
+        RatingEvent(
+            user_id=suggestion.user_id,
+            city=restaurant.city if restaurant else (author.city if author else None),
+            type="suggestion_approved",
+            points=settings.rating_suggestion_points,
+            suggestion_id=suggestion.id,
+        )
+    )
     db.commit()
     return _load_promotion(db, promotion.id)
 
@@ -438,6 +457,25 @@ def reject_suggestion(
     suggestion.status = SuggestionStatus.rejected
     suggestion.moderator_comment = payload.moderator_comment.strip()
     suggestion.reviewed_at = datetime.now(timezone.utc)
+
+    # Штраф только за «выдумку/спам» с явной пометкой модератора —
+    # обычный дубликат не наказываем
+    if payload.is_spam:
+        author = db.get(User, suggestion.user_id)
+        restaurant = (
+            db.get(Restaurant, suggestion.restaurant_id)
+            if suggestion.restaurant_id
+            else None
+        )
+        db.add(
+            RatingEvent(
+                user_id=suggestion.user_id,
+                city=restaurant.city if restaurant else (author.city if author else None),
+                type="suggestion_spam",
+                points=settings.rating_spam_points,
+                suggestion_id=suggestion.id,
+            )
+        )
     db.commit()
     suggestion = db.scalar(
         select(PromotionSuggestion)

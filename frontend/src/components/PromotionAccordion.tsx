@@ -37,12 +37,20 @@ export default function PromotionAccordion({
           )}
           {promotion.items.map((item) => {
             const updated = timeAgo(item.last_report_at);
+            const total = item.on_site_count + item.delivery_count;
+            const parts: string[] = [];
+            if (updated) parts.push(`обновлено ${updated}`);
+            if (total > 0 && item.delivery_count > 0) {
+              parts.push(`${item.on_site_count} с точки · ${item.delivery_count} доставка`);
+            }
             return (
               <div className="item-row" key={item.id}>
                 <span className="item-name">{item.name}</span>
                 <span className="item-meta">
                   <StatusBadge status={item.status} />
-                  {updated && <span className="updated">обновлено {updated}</span>}
+                  {parts.length > 0 && (
+                    <span className="updated">{parts.join(' · ')}</span>
+                  )}
                 </span>
               </div>
             );

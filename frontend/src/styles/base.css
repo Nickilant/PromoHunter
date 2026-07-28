@@ -301,10 +301,12 @@ input, textarea, select {
   white-space: nowrap;
 }
 
-.status-badge.available   { background: var(--status-available); }
-.status-badge.unavailable { background: var(--status-unavailable); }
-.status-badge.disputed    { background: var(--status-disputed); }
-.status-badge.unknown     { background: var(--status-unknown); }
+.status-badge.available      { background: var(--status-available); }
+.status-badge.unavailable    { background: var(--status-unavailable); }
+.status-badge.disputed       { background: var(--status-disputed); }
+.status-badge.maybe_gone     { background: var(--status-maybe-gone); }
+.status-badge.maybe_appeared { background: var(--status-maybe-appeared); }
+.status-badge.unknown        { background: var(--status-unknown); }
 
 /* ---------- кнопки ---------- */
 
@@ -547,6 +549,138 @@ input, textarea, select {
   background: var(--text-muted);
   border-color: var(--text-muted);
   color: #fff;
+}
+
+/* ---------- канал отчёта ---------- */
+
+.channel-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.channel-toggle button {
+  min-height: 44px;
+  border-radius: var(--radius-control);
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 14px;
+  transition: opacity 0.15s, transform 0.15s;
+}
+
+.channel-toggle button.on {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+.channel-hint {
+  background: var(--primary-soft);
+  color: var(--primary);
+  border-radius: var(--radius-control);
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
+/* ---------- рейтинг ---------- */
+
+.period-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.period-toggle button {
+  min-height: 40px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.period-toggle button.on {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+.rating-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  background: var(--surface);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-soft);
+  padding: 12px 16px;
+  text-align: left;
+  transition: transform 0.15s;
+}
+
+.rating-row:active {
+  transform: scale(0.985);
+}
+
+.rating-row.me {
+  outline: 2px solid var(--primary);
+}
+
+.rating-pos {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--surface-alt);
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rating-pos.top {
+  background: var(--accent);
+  color: #fff;
+}
+
+.rating-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.rating-points {
+  font-weight: 600;
+  font-size: 16px;
+  color: var(--primary);
+  flex-shrink: 0;
+}
+
+.rating-points.neg {
+  color: var(--status-unavailable);
+}
+
+.rating-me {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 14px;
+  background: var(--surface-alt);
+  border-radius: var(--radius-control);
+  padding: 10px 12px;
+}
+
+select.city-chip {
+  appearance: none;
+  -webkit-appearance: none;
+  max-width: 180px;
+  text-overflow: ellipsis;
 }
 
 /* ---------- тост ---------- */
