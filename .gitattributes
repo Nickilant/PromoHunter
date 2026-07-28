@@ -1,0 +1,5 @@
+# Шелл-скрипты обязаны быть с LF: с CRLF ломается шебанг внутри контейнера
+# (exec /entrypoint.sh: no such file or directory)
+* text=auto
+*.sh text eol=lf
+Makefile text eol=lf
