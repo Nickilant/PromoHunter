@@ -53,6 +53,10 @@ def _trust_loop() -> None:
 async def lifespan(app: FastAPI):
     if settings.trust_job_interval_seconds > 0:
         threading.Thread(target=_trust_loop, daemon=True, name="trust-job").start()
+    # Бот: подтверждение номера через отправку контакта
+    from app.services.telegram_bot import start_polling_thread
+
+    start_polling_thread()
     yield
 
 

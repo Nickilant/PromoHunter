@@ -203,6 +203,11 @@ export interface AdminUser extends User {
   reports_count: number;
 }
 
+export interface TelegramInfo {
+  enabled: boolean;
+  bot_username: string | null;
+}
+
 // --- подписки ---
 
 export interface PromotionShort {

@@ -49,7 +49,13 @@ export default function AdminUsers() {
                 <tr key={u.id}>
                   <td>
                     {u.phone}
-                    {isSelf && ' (вы)'}
+                    {isSelf && ' (вы)'}{' '}
+                    <span
+                      className={`tag ${u.is_phone_verified ? 'ok' : 'warn'}`}
+                      title="Подтверждение номера через Telegram"
+                    >
+                      {u.is_phone_verified ? '✓' : '?'}
+                    </span>
                   </td>
                   <td>{u.display_name}</td>
                   <td>

@@ -66,10 +66,16 @@ def get_current_user_optional(
 
 
 def require_not_blocked(user: User = Depends(get_current_user)) -> User:
-    """Для write-эндпоинтов: заблокированный пользователь может только читать."""
+    """Для write-эндпоинтов: заблокирован — только чтение; при включённом
+    REQUIRE_PHONE_VERIFICATION дополнительно нужен подтверждённый номер."""
     if user.is_blocked:
         raise HTTPException(
             status.HTTP_403_FORBIDDEN, detail="Ваш аккаунт заблокирован"
+        )
+    if settings.require_phone_verification and not user.is_phone_verified:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            detail="Сначала подтвердите номер через Telegram-бота — кнопка в профиле",
         )
     return user
 

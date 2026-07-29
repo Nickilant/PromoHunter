@@ -985,6 +985,15 @@ select.city-chip {
   color: var(--text-muted);
 }
 
+.verify-block {
+  background: #F7EBD9;
+  color: #A87B33;
+  border-radius: var(--radius-control);
+  padding: 12px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 .section-title {
   font-size: 15px;
   font-weight: 600;

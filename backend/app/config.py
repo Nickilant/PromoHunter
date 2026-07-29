@@ -47,8 +47,12 @@ class Settings(BaseSettings):
     # --- фоновый пересчёт ---
     trust_job_interval_seconds: int = 300  # 0 — выключить фоновую джобу
 
-    # --- Telegram (WebApp-авторизация и бот-уведомления) ---
+    # --- Telegram (WebApp-авторизация, бот-уведомления, подтверждение номера) ---
     telegram_bot_token: str = ""  # пусто — телеграм-функции выключены
+    telegram_polling_enabled: bool = True  # бот слушает сообщения (подтверждение номера)
+    # Требовать подтверждённый номер для отчётов/заявок/подписок.
+    # По умолчанию выключено — локальная разработка работает без Telegram.
+    require_phone_verification: bool = False
 
 
 settings = Settings()

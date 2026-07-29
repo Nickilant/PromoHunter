@@ -35,6 +35,8 @@ services:
       REPORT_COOLDOWN_MINUTES: ${REPORT_COOLDOWN_MINUTES}
       SEED_ON_START: ${SEED_ON_START}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_POLLING_ENABLED: ${TELEGRAM_POLLING_ENABLED:-true}
+      REQUIRE_PHONE_VERIFICATION: ${REQUIRE_PHONE_VERIFICATION:-false}
     volumes:
       # Живая правка кода. Зависимости стоят в /opt/venv (вне /app),
       # поэтому bind-mount их не затирает.

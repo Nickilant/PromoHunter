@@ -69,6 +69,17 @@ def list_brands(db: Session = Depends(get_db)):
     return db.scalars(select(Brand).order_by(Brand.name)).all()
 
 
+@router.get("/telegram/info")
+def telegram_info():
+    """Доступность телеграм-функций и username бота (для ссылки t.me/...)."""
+    from app import telegram
+
+    return {
+        "enabled": telegram.enabled(),
+        "bot_username": telegram.bot_username(),
+    }
+
+
 @router.get("/cities", response_model=list[CityOut])
 def list_cities(db: Session = Depends(get_db)):
     """Города, где есть активные точки, — для выбора города при входе."""

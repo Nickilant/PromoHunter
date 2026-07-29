@@ -54,8 +54,8 @@ export default function RegisterPage() {
             required
           />
           <div className="hint">
-            Подтверждение номера кодом в Telegram появится позже — сейчас
-            регистрация без проверки
+            После регистрации номер можно подтвердить через Telegram-бота
+            (кнопка в профиле) — подтверждённым отчётам больше доверия
           </div>
         </div>
         <div className="field">

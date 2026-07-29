@@ -70,13 +70,16 @@ def validate_contact(contact_response: str) -> dict | None:
     return contact if isinstance(contact, dict) else None
 
 
-def send_message(chat_id: int, text: str) -> bool:
+def send_message(chat_id: int, text: str, reply_markup: dict | None = None) -> bool:
     if not enabled():
         return False
+    payload: dict = {"chat_id": chat_id, "text": text, "parse_mode": "HTML"}
+    if reply_markup is not None:
+        payload["reply_markup"] = reply_markup
     try:
         resp = httpx.post(
             f"{API_BASE}/bot{settings.telegram_bot_token}/sendMessage",
-            json={"chat_id": chat_id, "text": text, "parse_mode": "HTML"},
+            json=payload,
             timeout=5,
         )
         if resp.status_code != 200:
@@ -85,6 +88,43 @@ def send_message(chat_id: int, text: str) -> bool:
     except Exception:
         logger.exception("sendMessage failed for chat %s", chat_id)
         return False
+
+
+def get_updates(offset: int | None = None, timeout: int = 25) -> list[dict]:
+    """Long-polling входящих сообщений бота."""
+    if not enabled():
+        return []
+    params: dict = {"timeout": timeout, "allowed_updates": '["message"]'}
+    if offset is not None:
+        params["offset"] = offset
+    resp = httpx.get(
+        f"{API_BASE}/bot{settings.telegram_bot_token}/getUpdates",
+        params=params,
+        timeout=timeout + 10,
+    )
+    data = resp.json()
+    return data.get("result", []) if data.get("ok") else []
+
+
+_bot_username: str | None = None
+
+
+def bot_username() -> str | None:
+    """Username бота (кэшируется) — для ссылки t.me/... в интерфейсе."""
+    global _bot_username
+    if not enabled():
+        return None
+    if _bot_username is None:
+        try:
+            resp = httpx.get(
+                f"{API_BASE}/bot{settings.telegram_bot_token}/getMe", timeout=5
+            )
+            data = resp.json()
+            if data.get("ok"):
+                _bot_username = data["result"].get("username")
+        except Exception:
+            logger.exception("getMe failed")
+    return _bot_username
 
 
 def send_batch_async(messages: list[tuple[int, str]]) -> None:

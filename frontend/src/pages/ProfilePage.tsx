@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
 import { useSubscriptions } from '../hooks/useSubscriptions';
-import type { Report, RestaurantSuggestion, Suggestion } from '../types';
+import type { Report, RestaurantSuggestion, Suggestion, TelegramInfo } from '../types';
 import { formatDateTime } from '../utils/time';
 
 const SUGGESTION_LABELS: Record<Suggestion['status'], { text: string; cls: string }> = {
@@ -18,6 +18,7 @@ export default function ProfilePage() {
   const [reports, setReports] = useState<Report[]>([]);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [restSuggestions, setRestSuggestions] = useState<RestaurantSuggestion[]>([]);
+  const [tgInfo, setTgInfo] = useState<TelegramInfo | null>(null);
   const { subscriptions, remove } = useSubscriptions();
   const navigate = useNavigate();
 
@@ -29,6 +30,9 @@ export default function ProfilePage() {
       .get<RestaurantSuggestion[]>('/restaurant-suggestions/mine')
       .then(setRestSuggestions)
       .catch(() => {});
+    if (!user.is_phone_verified) {
+      api.get<TelegramInfo>('/telegram/info').then(setTgInfo).catch(() => {});
+    }
   }, [user]);
 
   if (!user) return null;
@@ -49,12 +53,37 @@ export default function ProfilePage() {
         </div>
         <div className="row">
           <span className="muted">Телефон</span>
-          <span>{user.phone}</span>
+          <span>
+            {user.phone}{' '}
+            {user.is_phone_verified ? (
+              <span className="tag ok">подтверждён</span>
+            ) : (
+              <span className="tag warn">не подтверждён</span>
+            )}
+          </span>
         </div>
         <div className="row">
           <span className="muted">Город</span>
           <span>{user.city ?? '—'}</span>
         </div>
+        {!user.is_phone_verified && (
+          <div className="verify-block">
+            Подтвердите номер через Telegram-бота: нажмите Start и кнопку
+            «📱 Подтвердить номер» — подтверждённым отчётам больше доверия,
+            а бот сможет присылать уведомления по подпискам.
+            {tgInfo?.bot_username && (
+              <a
+                className="btn btn-primary btn-block"
+                style={{ marginTop: 8 }}
+                href={`https://t.me/${tgInfo.bot_username}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Открыть бота
+              </a>
+            )}
+          </div>
+        )}
         <div className="row">
           <span className="muted">Отчётов отправлено</span>
           <span>{reports.length >= 100 ? '100+' : reports.length}</span>

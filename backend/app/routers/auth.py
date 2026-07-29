@@ -30,9 +30,9 @@ def register(payload: RegisterIn, db: Session = Depends(get_db)):
     users_count = db.scalar(select(func.count(User.id))) or 0
     user = User(
         phone=payload.phone,
-        # Проверка номера кодом через Telegram — следующий этап.
-        # Пока регистрируем без проверки и сразу считаем номер подтверждённым.
-        is_phone_verified=True,
+        # Подтверждение — через Telegram-бота (отправка контакта) или вход
+        # через Telegram WebApp; см. app/services/telegram_bot.py
+        is_phone_verified=False,
         password_hash=hash_password(payload.password),
         display_name=payload.display_name,
         # Город из сессии становится городом по умолчанию
