@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 
 import { api } from '../api/client';
 import type { CityInfo } from '../types';
+import { reverseGeocodeCity } from '../utils/geocode';
 
 interface Props {
   current: string | null;
@@ -13,10 +14,44 @@ interface Props {
 export default function CityPicker({ current, onSelect, onClose }: Props) {
   const [cities, setCities] = useState<CityInfo[]>([]);
   const [query, setQuery] = useState('');
+  const [detecting, setDetecting] = useState(false);
+  const [geoError, setGeoError] = useState<string | null>(null);
 
   useEffect(() => {
     api.get<CityInfo[]>('/cities').then(setCities).catch(() => {});
   }, []);
+
+  // Координаты уходят напрямую в геокодер OSM, на наш сервер — только город
+  const detect = () => {
+    if (!navigator.geolocation) {
+      setGeoError('Геолокация недоступна — выберите город вручную');
+      return;
+    }
+    setGeoError(null);
+    setDetecting(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const name = await reverseGeocodeCity(
+          pos.coords.latitude,
+          pos.coords.longitude,
+        );
+        setDetecting(false);
+        if (!name) {
+          setGeoError('Не получилось определить город — выберите вручную');
+          return;
+        }
+        const known = cities.find(
+          (c) => c.name.toLowerCase() === name.toLowerCase(),
+        );
+        onSelect(known ? known.name : name);
+      },
+      () => {
+        setDetecting(false);
+        setGeoError('Нет доступа к геолокации — выберите город вручную');
+      },
+      { timeout: 10000 },
+    );
+  };
 
   const trimmed = query.trim();
   const filtered = cities.filter((c) =>
@@ -40,13 +75,20 @@ export default function CityPicker({ current, onSelect, onClose }: Props) {
             </button>
           )}
         </div>
+        <button
+          className="btn btn-primary btn-block"
+          onClick={detect}
+          disabled={detecting}
+        >
+          {detecting ? 'Определяем…' : '📍 Определить мой город'}
+        </button>
+        {geoError && <div className="form-error">{geoError}</div>}
         <input
           className="search-input"
           type="search"
-          placeholder="Найти город…"
+          placeholder="Или найдите вручную…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          autoFocus
         />
         <div className="city-list">
           {filtered.map((c) => (

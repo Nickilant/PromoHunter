@@ -8,6 +8,26 @@ export interface GeoPoint {
   label: string;
 }
 
+/** Город по координатам (обратный геокодинг) — для «определить мой город» */
+export async function reverseGeocodeCity(
+  lat: number,
+  lng: number,
+): Promise<string | null> {
+  try {
+    const resp = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=10&accept-language=ru`,
+    );
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    const address = data.address ?? {};
+    return (
+      address.city || address.town || address.village || address.municipality || null
+    );
+  } catch {
+    return null;
+  }
+}
+
 /** Координаты города (кэшируются в localStorage) — для центрирования карты */
 export async function geocodeCity(city: string): Promise<GeoPoint | null> {
   const key = `promohunter_city_geo:${city.toLowerCase()}`;
