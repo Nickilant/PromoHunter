@@ -22,6 +22,7 @@ from app.models import (
     ReportChannel,
     ReportItem,
     Restaurant,
+    RestaurantSuggestion,
     User,
     UserRole,
 )
@@ -325,6 +326,45 @@ def seed(db: Session) -> None:
         suggest(
             users[1], rostics, None, "Кружка Rostic's",
             "Красная кружка при покупке большого кофе.", ["Кружка красная"], 2,
+        )
+
+    # --- заявки на рестораны (2 по одному бренду — для проверки группировки) ---
+    rest_suggestions_exist = (
+        db.scalar(select(func.count(RestaurantSuggestion.id))) or 0
+    ) > 0
+    if not rest_suggestions_exist:
+        db.add_all(
+            [
+                RestaurantSuggestion(
+                    user_id=users[0].id,
+                    brand_id=bk.id,
+                    city="Санкт-Петербург",
+                    address="Комендантский пр., 9",
+                    lat=60.0080,
+                    lng=30.2590,
+                    comment="Открылся в ТРК «Атмосфера», на карте его нет.",
+                    created_at=now - timedelta(days=1),
+                ),
+                RestaurantSuggestion(
+                    user_id=users[2].id,
+                    brand_id=bk.id,
+                    city="Санкт-Петербург",
+                    address="Комендантский проспект 9, ТРК Атмосфера",
+                    lat=60.0081,
+                    lng=30.2588,
+                    created_at=now - timedelta(days=2),
+                ),
+                RestaurantSuggestion(
+                    user_id=users[3].id,
+                    brand_id=vit.id,
+                    city="Москва",
+                    address="Земляной Вал, 33",
+                    lat=55.7570,
+                    lng=37.6590,
+                    comment="В ТЦ «Атриум» у Курского вокзала.",
+                    created_at=now - timedelta(hours=10),
+                ),
+            ]
         )
 
     db.commit()

@@ -204,6 +204,54 @@ class SuggestionOut(ORMModel):
     reviewed_at: datetime | None = None
 
 
+# --- restaurant suggestions ---
+
+class RestaurantSuggestionIn(BaseModel):
+    brand_id: int  # бренд — только из списка
+    title: str | None = Field(default=None, max_length=200)
+    city: str = Field(min_length=1, max_length=100)
+    address: str = Field(min_length=1, max_length=300)
+    lat: float
+    lng: float
+    comment: str | None = None
+
+
+class RestaurantSuggestionOut(ORMModel):
+    id: int
+    brand: BrandShort
+    title: str | None = None
+    city: str
+    address: str
+    lat: float
+    lng: float
+    comment: str | None = None
+    status: SuggestionStatus
+    moderator_comment: str | None = None
+    created_restaurant_id: int | None = None
+    created_at: datetime
+    reviewed_at: datetime | None = None
+
+
+class AdminRestaurantSuggestionOut(RestaurantSuggestionOut):
+    user: UserOut
+
+
+class RestaurantSuggestionGroupOut(BaseModel):
+    brand_id: int
+    brand_name: str
+    brand_color: str
+    suggestions: list[AdminRestaurantSuggestionOut]
+
+
+class RestaurantSuggestionApproveIn(BaseModel):
+    brand_id: int
+    title: str | None = Field(default=None, max_length=200)
+    city: str = Field(min_length=1, max_length=100)
+    address: str = Field(min_length=1, max_length=300)
+    lat: float
+    lng: float
+
+
 # --- admin: brands ---
 
 class BrandIn(BaseModel):

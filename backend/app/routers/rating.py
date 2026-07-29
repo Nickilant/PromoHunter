@@ -7,7 +7,13 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.auth import get_current_user_optional
 from app.database import get_db
-from app.models import PromotionSuggestion, RatingEvent, Report, User
+from app.models import (
+    PromotionSuggestion,
+    RatingEvent,
+    Report,
+    RestaurantSuggestion,
+    User,
+)
 from app.schemas import (
     RatingCardOut,
     RatingCategoryOut,
@@ -86,8 +92,10 @@ TYPE_ORDER = [
     "scout",
     "report_base",
     "suggestion_approved",
+    "restaurant_approved",
     "report_refuted",
     "suggestion_spam",
+    "restaurant_spam",
 ]
 
 
@@ -161,6 +169,17 @@ def player_card(
                 )
             )
         } if suggestion_ids else {}
+        rest_suggestion_ids = [
+            e.restaurant_suggestion_id for e in event_rows if e.restaurant_suggestion_id
+        ]
+        rest_suggestions = {
+            s.id: s
+            for s in db.scalars(
+                select(RestaurantSuggestion).where(
+                    RestaurantSuggestion.id.in_(rest_suggestion_ids)
+                )
+            )
+        } if rest_suggestion_ids else {}
 
         events = []
         for e in event_rows:
@@ -171,6 +190,13 @@ def player_card(
             suggestion = suggestions.get(e.suggestion_id) if e.suggestion_id else None
             if suggestion is not None:
                 context = f"Заявка «{suggestion.title}»"
+            rest_suggestion = (
+                rest_suggestions.get(e.restaurant_suggestion_id)
+                if e.restaurant_suggestion_id
+                else None
+            )
+            if rest_suggestion is not None:
+                context = f"Ресторан «{rest_suggestion.address}»"
             events.append(
                 RatingEventOut(
                     type=e.type,

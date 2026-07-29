@@ -270,6 +270,9 @@ class RatingEvent(Base):
     suggestion_id: Mapped[int | None] = mapped_column(
         ForeignKey("promotion_suggestions.id", ondelete="SET NULL")
     )
+    restaurant_suggestion_id: Mapped[int | None] = mapped_column(
+        ForeignKey("restaurant_suggestions.id", ondelete="SET NULL")
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -295,6 +298,46 @@ class ItemStatusState(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
+
+
+class RestaurantSuggestion(Base):
+    """Заявка пользователя на добавление точки. Бренд — только из списка."""
+
+    __tablename__ = "restaurant_suggestions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    brand_id: Mapped[int] = mapped_column(
+        ForeignKey("brands.id", ondelete="CASCADE"), nullable=False
+    )
+    title: Mapped[str | None] = mapped_column(String(200))
+    city: Mapped[str] = mapped_column(String(100), nullable=False)
+    address: Mapped[str] = mapped_column(String(300), nullable=False)
+    lat: Mapped[float] = mapped_column(Float, nullable=False)
+    lng: Mapped[float] = mapped_column(Float, nullable=False)
+    comment: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[SuggestionStatus] = mapped_column(
+        Enum(
+            SuggestionStatus,
+            name="suggestion_status",
+            values_callable=lambda e: [x.value for x in e],
+        ),
+        default=SuggestionStatus.pending,
+        nullable=False,
+    )
+    moderator_comment: Mapped[str | None] = mapped_column(Text)
+    created_restaurant_id: Mapped[int | None] = mapped_column(
+        ForeignKey("restaurants.id", ondelete="SET NULL")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    user: Mapped["User"] = relationship()
+    brand: Mapped["Brand"] = relationship()
 
 
 class PromotionSuggestion(Base):

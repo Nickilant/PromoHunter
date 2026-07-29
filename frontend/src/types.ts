@@ -153,6 +153,33 @@ export interface SuggestionGroup {
   suggestions: AdminSuggestion[];
 }
 
+export interface RestaurantSuggestion {
+  id: number;
+  brand: BrandShort;
+  title: string | null;
+  city: string;
+  address: string;
+  lat: number;
+  lng: number;
+  comment: string | null;
+  status: SuggestionStatus;
+  moderator_comment: string | null;
+  created_restaurant_id: number | null;
+  created_at: string;
+  reviewed_at: string | null;
+}
+
+export interface AdminRestaurantSuggestion extends RestaurantSuggestion {
+  user: User;
+}
+
+export interface RestaurantSuggestionGroup {
+  brand_id: number;
+  brand_name: string;
+  brand_color: string;
+  suggestions: AdminRestaurantSuggestion[];
+}
+
 export interface PromotionItemAdmin {
   id: number;
   name: string;

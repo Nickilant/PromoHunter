@@ -83,6 +83,21 @@
   background: var(--surface);
 }
 
+/* группировка по брендам */
+
+.admin-group {
+  margin-bottom: 20px;
+}
+
+.admin-group-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 15px;
+  padding: 0 2px 8px;
+}
+
 /* таблицы */
 
 .admin-table-wrap {

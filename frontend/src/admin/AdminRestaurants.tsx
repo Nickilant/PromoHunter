@@ -1,23 +1,11 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { api } from '../api/client';
-import { LocationPickerMap } from '../components/MapView';
 import { useToast } from '../components/Toast';
 import type { AdminBrand, AdminRestaurant } from '../types';
+import RestaurantForm, { RestaurantFormValue } from './RestaurantForm';
 
-interface RestForm {
-  id: number | null;
-  brand_id: string;
-  title: string;
-  city: string;
-  address: string;
-  lat: string;
-  lng: string;
-  is_active: boolean;
-}
-
-const emptyForm: RestForm = {
-  id: null,
+const emptyForm: RestaurantFormValue = {
   brand_id: '',
   title: '',
   city: '',
@@ -31,7 +19,9 @@ export default function AdminRestaurants() {
   const [restaurants, setRestaurants] = useState<AdminRestaurant[]>([]);
   const [brands, setBrands] = useState<AdminBrand[]>([]);
   const [brandFilter, setBrandFilter] = useState('');
-  const [form, setForm] = useState<RestForm | null>(null);
+  const [form, setForm] = useState<{ id: number | null; value: RestaurantFormValue } | null>(
+    null,
+  );
   const [error, setError] = useState<string | null>(null);
   const toast = useToast();
 
@@ -49,25 +39,23 @@ export default function AdminRestaurants() {
 
   useEffect(() => load(brandFilter), [brandFilter]);
 
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!form) return;
+  const save = async (value: RestaurantFormValue) => {
     setError(null);
     const body = {
-      brand_id: Number(form.brand_id),
-      title: form.title || null,
-      city: form.city,
-      address: form.address,
-      lat: Number(form.lat),
-      lng: Number(form.lng),
-      is_active: form.is_active,
+      brand_id: Number(value.brand_id),
+      title: value.title || null,
+      city: value.city,
+      address: value.address,
+      lat: Number(value.lat),
+      lng: Number(value.lng),
+      is_active: value.is_active,
     };
     if (Number.isNaN(body.lat) || Number.isNaN(body.lng)) {
-      setError('Укажите координаты: кликните по карте или введите вручную');
+      setError('Укажите координаты: найдите адрес и кликните по карте');
       return;
     }
     try {
-      if (form.id === null) await api.post('/admin/restaurants', body);
+      if (form?.id == null) await api.post('/admin/restaurants', body);
       else await api.patch(`/admin/restaurants/${form.id}`, body);
       setForm(null);
       load(brandFilter);
@@ -88,6 +76,14 @@ export default function AdminRestaurants() {
     }
   };
 
+  // Группировка по брендам, чтобы не искать по общему списку
+  const groups = new Map<number, AdminRestaurant[]>();
+  for (const r of restaurants) {
+    const list = groups.get(r.brand.id) ?? [];
+    list.push(r);
+    groups.set(r.brand.id, list);
+  }
+
   return (
     <div>
       <h1>Рестораны</h1>
@@ -96,7 +92,7 @@ export default function AdminRestaurants() {
           className="btn btn-primary btn-small"
           onClick={() => {
             setError(null);
-            setForm(emptyForm);
+            setForm({ id: null, value: emptyForm });
           }}
         >
           + Новая точка
@@ -111,67 +107,76 @@ export default function AdminRestaurants() {
         </select>
       </div>
 
-      <div className="admin-table-wrap">
-        <table className="admin-table">
-          <thead>
-            <tr>
-              <th>Бренд</th>
-              <th>Название</th>
-              <th>Город</th>
-              <th>Адрес</th>
-              <th>Координаты</th>
-              <th>Статус</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {restaurants.map((r) => (
-              <tr key={r.id}>
-                <td>
-                  <span className="color-dot" style={{ background: r.brand.color }} />
-                  {r.brand.name}
-                </td>
-                <td>{r.title || '—'}</td>
-                <td>{r.city}</td>
-                <td>{r.address}</td>
-                <td>
-                  {r.lat.toFixed(4)}, {r.lng.toFixed(4)}
-                </td>
-                <td>
-                  <span className={`tag ${r.is_active ? 'ok' : 'error'}`}>
-                    {r.is_active ? 'Активна' : 'Скрыта'}
-                  </span>
-                </td>
-                <td>
-                  <div className="actions">
-                    <button
-                      className="btn btn-ghost btn-small"
-                      onClick={() => {
-                        setError(null);
-                        setForm({
-                          id: r.id,
-                          brand_id: String(r.brand.id),
-                          title: r.title ?? '',
-                          city: r.city,
-                          address: r.address,
-                          lat: String(r.lat),
-                          lng: String(r.lng),
-                          is_active: r.is_active,
-                        });
-                      }}
-                    >
-                      Изменить
-                    </button>
-                    <button className="btn btn-danger btn-small" onClick={() => remove(r)}>
-                      Удалить
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {[...groups.entries()].map(([brandId, list]) => (
+        <div className="admin-group" key={brandId}>
+          <div className="admin-group-head">
+            <span className="color-dot" style={{ background: list[0].brand.color }} />
+            {list[0].brand.name}
+            <span className="tag">{list.length}</span>
+          </div>
+          <div className="admin-table-wrap">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>Название</th>
+                  <th>Город</th>
+                  <th>Адрес</th>
+                  <th>Координаты</th>
+                  <th>Статус</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {list.map((r) => (
+                  <tr key={r.id}>
+                    <td>{r.title || '—'}</td>
+                    <td>{r.city}</td>
+                    <td>{r.address}</td>
+                    <td>
+                      {r.lat.toFixed(4)}, {r.lng.toFixed(4)}
+                    </td>
+                    <td>
+                      <span className={`tag ${r.is_active ? 'ok' : 'error'}`}>
+                        {r.is_active ? 'Активна' : 'Скрыта'}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="actions">
+                        <button
+                          className="btn btn-ghost btn-small"
+                          onClick={() => {
+                            setError(null);
+                            setForm({
+                              id: r.id,
+                              value: {
+                                brand_id: String(r.brand.id),
+                                title: r.title ?? '',
+                                city: r.city,
+                                address: r.address,
+                                lat: String(r.lat),
+                                lng: String(r.lng),
+                                is_active: r.is_active,
+                              },
+                            });
+                          }}
+                        >
+                          Изменить
+                        </button>
+                        <button
+                          className="btn btn-danger btn-small"
+                          onClick={() => remove(r)}
+                        >
+                          Удалить
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ))}
 
       {form && (
         <div className="modal-overlay" onClick={() => setForm(null)}>
@@ -183,98 +188,13 @@ export default function AdminRestaurants() {
               </button>
             </div>
             <div className="modal-body">
-              <form onSubmit={submit}>
-                <div className="restaurant-editor">
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    <div className="field">
-                      <label>Бренд</label>
-                      <select
-                        value={form.brand_id}
-                        onChange={(e) => setForm({ ...form, brand_id: e.target.value })}
-                        required
-                      >
-                        <option value="" disabled>
-                          Выберите…
-                        </option>
-                        {brands.map((b) => (
-                          <option key={b.id} value={b.id}>
-                            {b.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="field">
-                      <label>Название точки (необязательно)</label>
-                      <input
-                        value={form.title}
-                        onChange={(e) => setForm({ ...form, title: e.target.value })}
-                        placeholder="ТЦ Галерея, 2 этаж"
-                      />
-                    </div>
-                    <div className="field">
-                      <label>Город</label>
-                      <input
-                        value={form.city}
-                        onChange={(e) => setForm({ ...form, city: e.target.value })}
-                        placeholder="Санкт-Петербург"
-                        required
-                      />
-                    </div>
-                    <div className="field">
-                      <label>Адрес</label>
-                      <input
-                        value={form.address}
-                        onChange={(e) => setForm({ ...form, address: e.target.value })}
-                        required
-                      />
-                    </div>
-                    <div className="field">
-                      <label>Широта</label>
-                      <input
-                        value={form.lat}
-                        onChange={(e) => setForm({ ...form, lat: e.target.value })}
-                        required
-                      />
-                    </div>
-                    <div className="field">
-                      <label>Долгота</label>
-                      <input
-                        value={form.lng}
-                        onChange={(e) => setForm({ ...form, lng: e.target.value })}
-                        required
-                      />
-                    </div>
-                    <div className="field">
-                      <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                        <input
-                          type="checkbox"
-                          checked={form.is_active}
-                          onChange={(e) =>
-                            setForm({ ...form, is_active: e.target.checked })
-                          }
-                          style={{ width: 'auto' }}
-                        />
-                        Точка активна
-                      </label>
-                    </div>
-                    {error && <div className="form-error">{error}</div>}
-                    <button className="btn btn-primary">Сохранить</button>
-                  </div>
-                  <div className="map-picker">
-                    <LocationPickerMap
-                      lat={form.lat ? Number(form.lat) : null}
-                      lng={form.lng ? Number(form.lng) : null}
-                      onPick={(lat, lng) =>
-                        setForm((prev) =>
-                          prev
-                            ? { ...prev, lat: lat.toFixed(6), lng: lng.toFixed(6) }
-                            : prev,
-                        )
-                      }
-                    />
-                  </div>
-                </div>
-              </form>
+              <RestaurantForm
+                brands={brands}
+                initial={form.value}
+                submitLabel="Сохранить"
+                onSubmit={save}
+                error={error}
+              />
             </div>
           </div>
         </div>

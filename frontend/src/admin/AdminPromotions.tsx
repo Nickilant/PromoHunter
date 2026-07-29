@@ -134,56 +134,67 @@ export default function AdminPromotions() {
         </select>
       </div>
 
-      <div className="admin-table-wrap">
-        <table className="admin-table">
-          <thead>
-            <tr>
-              <th>Бренд</th>
-              <th>Название</th>
-              <th>Товаров</th>
-              <th>Период</th>
-              <th>Статус</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {promotions.map((p) => (
-              <tr key={p.id}>
-                <td>
-                  <span className="color-dot" style={{ background: p.brand.color }} />
-                  {p.brand.name}
-                </td>
-                <td>{p.title}</td>
-                <td>{p.items.length}</td>
-                <td>
-                  {formatDate(p.starts_at)} — {formatDate(p.ends_at)}
-                </td>
-                <td>
-                  <span className={`tag ${p.is_active ? 'ok' : 'error'}`}>
-                    {p.is_active ? 'Активна' : 'Выключена'}
-                  </span>
-                </td>
-                <td>
-                  <div className="actions">
-                    <button
-                      className="btn btn-ghost btn-small"
-                      onClick={() => openEdit(p)}
-                    >
-                      Изменить
-                    </button>
-                    <button
-                      className="btn btn-danger btn-small"
-                      onClick={() => remove(p)}
-                    >
-                      Удалить
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {[...promotions
+        .reduce((map, p) => {
+          const list = map.get(p.brand.id) ?? [];
+          list.push(p);
+          map.set(p.brand.id, list);
+          return map;
+        }, new Map<number, AdminPromotion[]>())
+        .entries()].map(([brandId, list]) => (
+        <div className="admin-group" key={brandId}>
+          <div className="admin-group-head">
+            <span className="color-dot" style={{ background: list[0].brand.color }} />
+            {list[0].brand.name}
+            <span className="tag">{list.length}</span>
+          </div>
+          <div className="admin-table-wrap">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>Название</th>
+                  <th>Товаров</th>
+                  <th>Период</th>
+                  <th>Статус</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {list.map((p) => (
+                  <tr key={p.id}>
+                    <td>{p.title}</td>
+                    <td>{p.items.length}</td>
+                    <td>
+                      {formatDate(p.starts_at)} — {formatDate(p.ends_at)}
+                    </td>
+                    <td>
+                      <span className={`tag ${p.is_active ? 'ok' : 'error'}`}>
+                        {p.is_active ? 'Активна' : 'Выключена'}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="actions">
+                        <button
+                          className="btn btn-ghost btn-small"
+                          onClick={() => openEdit(p)}
+                        >
+                          Изменить
+                        </button>
+                        <button
+                          className="btn btn-danger btn-small"
+                          onClick={() => remove(p)}
+                        >
+                          Удалить
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ))}
 
       {form && (
         <div className="modal-overlay" onClick={() => setForm(null)}>

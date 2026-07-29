@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 
 import { api } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
-import type { Report, Suggestion } from '../types';
+import type { Report, RestaurantSuggestion, Suggestion } from '../types';
 import { formatDateTime } from '../utils/time';
 
 const SUGGESTION_LABELS: Record<Suggestion['status'], { text: string; cls: string }> = {
@@ -16,12 +16,17 @@ export default function ProfilePage() {
   const { user, logout } = useAuth();
   const [reports, setReports] = useState<Report[]>([]);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [restSuggestions, setRestSuggestions] = useState<RestaurantSuggestion[]>([]);
   const navigate = useNavigate();
 
   useEffect(() => {
     if (!user) return;
     api.get<Report[]>('/reports/mine?limit=100').then(setReports).catch(() => {});
     api.get<Suggestion[]>('/suggestions/mine').then(setSuggestions).catch(() => {});
+    api
+      .get<RestaurantSuggestion[]>('/restaurant-suggestions/mine')
+      .then(setRestSuggestions)
+      .catch(() => {});
   }, [user]);
 
   if (!user) return null;
@@ -89,7 +94,7 @@ export default function ProfilePage() {
         </div>
       ))}
 
-      <div className="section-title">Мои заявки</div>
+      <div className="section-title">Мои заявки на акции</div>
       {suggestions.length === 0 && (
         <div className="list-item muted">Заявок пока нет</div>
       )}
@@ -99,6 +104,28 @@ export default function ProfilePage() {
           <div className="list-item" key={s.id}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
               <strong>{s.title}</strong>
+              <span className={`tag ${label.cls}`}>{label.text}</span>
+            </div>
+            {s.moderator_comment && (
+              <div className="muted">Комментарий модератора: {s.moderator_comment}</div>
+            )}
+            <div className="muted">{formatDateTime(s.created_at)}</div>
+          </div>
+        );
+      })}
+
+      <div className="section-title">Мои заявки на рестораны</div>
+      {restSuggestions.length === 0 && (
+        <div className="list-item muted">Заявок пока нет</div>
+      )}
+      {restSuggestions.map((s) => {
+        const label = SUGGESTION_LABELS[s.status];
+        return (
+          <div className="list-item" key={s.id}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+              <strong>
+                {s.brand.name} — {s.city}, {s.address}
+              </strong>
               <span className={`tag ${label.cls}`}>{label.text}</span>
             </div>
             {s.moderator_comment && (

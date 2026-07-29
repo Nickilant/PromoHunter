@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 import { api } from '../api/client';
 import type { Brand, RestaurantListItem } from '../types';
@@ -16,6 +16,7 @@ export default function SuggestPage() {
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [done, setDone] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     api.get<Brand[]>('/brands').then(setBrands).catch(() => {});
@@ -76,6 +77,9 @@ export default function SuggestPage() {
   return (
     <div className="page">
       <div className="page-header">
+        <button className="back-btn" onClick={() => navigate(-1)} aria-label="Назад">
+          ‹
+        </button>
         <h1>Заявить акцию</h1>
       </div>
       <form

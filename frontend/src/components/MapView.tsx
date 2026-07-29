@@ -132,9 +132,11 @@ interface LocationPickerProps {
   lat: number | null;
   lng: number | null;
   onPick: (lat: number, lng: number) => void;
+  /** Точка из поиска по адресу — карта подлетает к ней */
+  focus?: MapFocus | null;
 }
 
-export function LocationPickerMap({ lat, lng, onPick }: LocationPickerProps) {
+export function LocationPickerMap({ lat, lng, onPick, focus = null }: LocationPickerProps) {
   const hasPoint = lat !== null && lng !== null && !(lat === 0 && lng === 0);
   return (
     <MapContainer
@@ -143,6 +145,7 @@ export function LocationPickerMap({ lat, lng, onPick }: LocationPickerProps) {
     >
       <TileLayer url={TILE_URL} attribution={TILE_ATTRIBUTION} />
       <ClickHandler onPick={onPick} />
+      <FlyTo focus={focus} />
       {hasPoint && (
         <CircleMarker
           center={[lat!, lng!]}

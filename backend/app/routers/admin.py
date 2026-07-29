@@ -16,6 +16,7 @@ from app.models import (
     RatingEvent,
     Report,
     Restaurant,
+    RestaurantSuggestion,
     SuggestionStatus,
     User,
 )
@@ -23,6 +24,7 @@ from app.schemas import (
     AdminBrandOut,
     AdminPromotionOut,
     AdminRestaurantOut,
+    AdminRestaurantSuggestionOut,
     AdminSuggestionOut,
     AdminUserOut,
     BrandIn,
@@ -31,6 +33,8 @@ from app.schemas import (
     PromotionPatch,
     RestaurantIn,
     RestaurantPatch,
+    RestaurantSuggestionApproveIn,
+    RestaurantSuggestionGroupOut,
     SuggestionApproveIn,
     SuggestionGroupOut,
     SuggestionRejectIn,
@@ -385,6 +389,125 @@ def admin_suggestions(
             groups[key] = group
         group.suggestions.append(AdminSuggestionOut.model_validate(s))
     return list(groups.values())
+
+
+@router.get(
+    "/restaurant-suggestions", response_model=list[RestaurantSuggestionGroupOut]
+)
+def admin_restaurant_suggestions(
+    status_filter: SuggestionStatus | None = Query(default=None, alias="status"),
+    db: Session = Depends(get_db),
+):
+    stmt = (
+        select(RestaurantSuggestion)
+        .options(
+            joinedload(RestaurantSuggestion.user),
+            joinedload(RestaurantSuggestion.brand),
+        )
+        .order_by(RestaurantSuggestion.created_at.desc())
+    )
+    if status_filter is not None:
+        stmt = stmt.where(RestaurantSuggestion.status == status_filter)
+    suggestions = db.scalars(stmt).unique().all()
+
+    groups: dict[int, RestaurantSuggestionGroupOut] = {}
+    for s in suggestions:
+        group = groups.get(s.brand_id)
+        if group is None:
+            group = RestaurantSuggestionGroupOut(
+                brand_id=s.brand_id,
+                brand_name=s.brand.name,
+                brand_color=s.brand.color,
+                suggestions=[],
+            )
+            groups[s.brand_id] = group
+        group.suggestions.append(AdminRestaurantSuggestionOut.model_validate(s))
+    return list(groups.values())
+
+
+@router.post(
+    "/restaurant-suggestions/{suggestion_id}/approve",
+    response_model=AdminRestaurantOut,
+)
+def approve_restaurant_suggestion(
+    suggestion_id: int,
+    payload: RestaurantSuggestionApproveIn,
+    db: Session = Depends(get_db),
+):
+    suggestion = db.get(RestaurantSuggestion, suggestion_id)
+    if suggestion is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Заявка не найдена")
+    if suggestion.status != SuggestionStatus.pending:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail="Заявка уже рассмотрена")
+    if db.get(Brand, payload.brand_id) is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Бренд не найден")
+
+    restaurant = Restaurant(
+        brand_id=payload.brand_id,
+        title=(payload.title or "").strip() or None,
+        city=payload.city.strip(),
+        address=payload.address.strip(),
+        lat=payload.lat,
+        lng=payload.lng,
+    )
+    db.add(restaurant)
+    db.flush()
+
+    suggestion.status = SuggestionStatus.approved
+    suggestion.created_restaurant_id = restaurant.id
+    suggestion.reviewed_at = datetime.now(timezone.utc)
+    db.add(
+        RatingEvent(
+            user_id=suggestion.user_id,
+            city=restaurant.city,
+            type="restaurant_approved",
+            points=settings.rating_suggestion_points,
+            restaurant_suggestion_id=suggestion.id,
+        )
+    )
+    db.commit()
+    restaurant = db.scalar(
+        select(Restaurant)
+        .options(joinedload(Restaurant.brand))
+        .where(Restaurant.id == restaurant.id)
+    )
+    return restaurant
+
+
+@router.post(
+    "/restaurant-suggestions/{suggestion_id}/reject",
+    response_model=AdminRestaurantSuggestionOut,
+)
+def reject_restaurant_suggestion(
+    suggestion_id: int, payload: SuggestionRejectIn, db: Session = Depends(get_db)
+):
+    suggestion = db.get(RestaurantSuggestion, suggestion_id)
+    if suggestion is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Заявка не найдена")
+    if suggestion.status != SuggestionStatus.pending:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail="Заявка уже рассмотрена")
+    suggestion.status = SuggestionStatus.rejected
+    suggestion.moderator_comment = payload.moderator_comment.strip()
+    suggestion.reviewed_at = datetime.now(timezone.utc)
+    if payload.is_spam:
+        db.add(
+            RatingEvent(
+                user_id=suggestion.user_id,
+                city=suggestion.city,
+                type="restaurant_spam",
+                points=settings.rating_spam_points,
+                restaurant_suggestion_id=suggestion.id,
+            )
+        )
+    db.commit()
+    return db.scalar(
+        select(RestaurantSuggestion)
+        .options(
+            joinedload(RestaurantSuggestion.user),
+            joinedload(RestaurantSuggestion.brand),
+        )
+        .where(RestaurantSuggestion.id == suggestion_id)
+    )
 
 
 @router.post("/suggestions/{suggestion_id}/approve", response_model=AdminPromotionOut)

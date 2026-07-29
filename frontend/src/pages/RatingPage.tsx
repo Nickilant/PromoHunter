@@ -16,9 +16,11 @@ const TYPE_LABELS: Record<string, string> = {
   report_confirmed: 'Подтверждённые отчёты',
   pioneer: 'Первопроходства',
   scout: 'Разведка новых точек',
-  suggestion_approved: 'Одобренные заявки',
+  suggestion_approved: 'Одобренные акции',
+  restaurant_approved: 'Добавленные рестораны',
   report_refuted: 'Опровергнутые отчёты',
   suggestion_spam: 'Заявки-спам',
+  restaurant_spam: 'Заявки на рестораны — спам',
 };
 
 export default function RatingPage() {
