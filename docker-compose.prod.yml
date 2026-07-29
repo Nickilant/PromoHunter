@@ -16,7 +16,9 @@ services:
     # !reset: иначе compose домёрживает bind-mount'ы и порты из базового файла
     volumes: !reset []
     ports: !reset []
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
+    # Число воркеров настраивается в .env (UVICORN_WORKERS);
+    # 2 достаточно для MVP и не съедает память маленького VPS
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers ${UVICORN_WORKERS:-2}
 
   frontend:
     build:
