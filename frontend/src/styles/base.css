@@ -866,6 +866,19 @@ select.city-chip {
 
 /* ---------- карта ---------- */
 
+/* Атрибуция OSM (обязательна по условиям тайлов) — минимально заметная */
+.leaflet-control-attribution {
+  font-size: 9px !important;
+  background: rgba(255, 255, 255, 0.5) !important;
+  color: var(--text-muted) !important;
+  padding: 1px 5px !important;
+}
+
+.leaflet-control-attribution a {
+  color: var(--text-muted) !important;
+  text-decoration: none;
+}
+
 .map-page {
   position: fixed;
   inset: 0;

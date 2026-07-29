@@ -16,7 +16,19 @@ import type { RestaurantListItem } from '../types';
 const DEFAULT_CENTER: [number, number] = [59.935, 30.325]; // Санкт-Петербург
 const DEFAULT_ZOOM = 12;
 const TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-const TILE_ATTRIBUTION = '&copy; OpenStreetMap contributors';
+// Копирайт OSM обязателен по условиям бесплатных тайлов — оставляем его,
+// но без префикса «Leaflet» и в максимально ненавязчивом виде (см. CSS)
+const TILE_ATTRIBUTION =
+  '<a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">© OpenStreetMap</a>';
+
+/** Убирает префикс «🇺🇦 Leaflet» из плашки атрибуции */
+function CleanAttribution() {
+  const map = useMap();
+  useEffect(() => {
+    map.attributionControl?.setPrefix('');
+  }, [map]);
+  return null;
+}
 
 export interface MapFocus {
   lat: number;
@@ -88,6 +100,7 @@ export function RestaurantsMap({
   return (
     <MapContainer center={DEFAULT_CENTER} zoom={DEFAULT_ZOOM} zoomControl={false}>
       <TileLayer url={TILE_URL} attribution={TILE_ATTRIBUTION} />
+      <CleanAttribution />
       <FitToMarkers points={restaurants.map((r) => [r.lat, r.lng])} />
       <FlyTo focus={focus} />
       {searchPoint && (
@@ -144,6 +157,7 @@ export function LocationPickerMap({ lat, lng, onPick, focus = null }: LocationPi
       zoom={hasPoint ? 15 : DEFAULT_ZOOM}
     >
       <TileLayer url={TILE_URL} attribution={TILE_ATTRIBUTION} />
+      <CleanAttribution />
       <ClickHandler onPick={onPick} />
       <FlyTo focus={focus} />
       {hasPoint && (
