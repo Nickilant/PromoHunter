@@ -4,6 +4,7 @@ import { api, ApiError } from '../api/client';
 import type { PromotionWithStatuses, ReportChannel, RestaurantShort } from '../types';
 import { useToast } from './Toast';
 import Icon from './Icon';
+import { useEscape } from '../hooks/useEscape';
 
 type Choice = 'yes' | 'no' | 'skip';
 
@@ -22,6 +23,8 @@ export default function ReportModal({ restaurant, promotion, onClose, onReported
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const toast = useToast();
+
+  useEscape(onClose);
 
   const marked = promotion.items.filter((i) => choices[i.id] !== 'skip');
 

@@ -12,6 +12,7 @@ import type {
 import PromotionAccordion from './PromotionAccordion';
 import ReportModal from './ReportModal';
 import Icon from './Icon';
+import { useEscape } from '../hooks/useEscape';
 
 interface Props {
   restaurantId: number;
@@ -28,6 +29,8 @@ export default function RestaurantModal({ restaurantId, onClose }: Props) {
   const { user } = useAuth();
   const { isSubscribedToRestaurant, toggleRestaurant } = useSubscriptions();
   const navigate = useNavigate();
+
+  useEscape(onClose);
 
   const load = useCallback(() => {
     api.get<RestaurantDetail>(`/restaurants/${restaurantId}`).then(setDetail).catch(() => {});

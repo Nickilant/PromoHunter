@@ -60,7 +60,7 @@ h1, h2, h3, h4 {
 }
 
 a {
-  color: var(--primary);
+  color: var(--primary-ink);
   text-decoration: none;
 }
 
@@ -109,8 +109,14 @@ input, textarea, select {
   gap: 12px;
 }
 
+.page-header > * {
+  min-width: 0;
+}
+
 .page-header h1 {
   font-size: 22px;
+  flex: 1;
+  min-width: 0;
 }
 
 /* ---------- плавающий док (навигация одним большим пальцем) ---------- */
@@ -257,6 +263,10 @@ input, textarea, select {
   padding: 4px 10px;
   border-radius: 999px;
   white-space: nowrap;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 0;
 }
 
 .rest-card-titles {
@@ -294,9 +304,14 @@ input, textarea, select {
   background: var(--surface-alt);
 }
 
+.promo-toggle > div {
+  min-width: 0;
+}
+
 .promo-toggle .promo-title {
   font-weight: 600;
   font-size: 15px;
+  overflow-wrap: anywhere;
 }
 
 .promo-toggle .promo-sub {
@@ -340,6 +355,7 @@ input, textarea, select {
 .item-row .item-name {
   font-size: 14px;
   min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .item-row .item-meta {
@@ -379,6 +395,7 @@ input, textarea, select {
 .status-badge.disputed       { background: #F8EDD8; color: #97702B; }
 .status-badge.maybe_gone     { background: #F9E9D8; color: #9A6330; }
 .status-badge.maybe_appeared { background: #E3EFEA; color: #3E7A64; }
+.rating-points { color: var(--primary-ink); }
 .status-badge.unknown        { background: var(--surface-alt); color: var(--text-muted); }
 
 /* ---------- кнопки ---------- */
@@ -475,7 +492,7 @@ input, textarea, select {
   box-shadow: 0 0 0 3px var(--primary-soft);
 }
 
-.field .hint {
+.hint {
   font-size: 12px;
   color: var(--text-muted);
 }
@@ -815,6 +832,7 @@ input, textarea, select {
 
 .map-picker-search-bar .search-input {
   flex: 1;
+  min-width: 0;
 }
 
 .map-picker-search-bar .btn {
@@ -887,7 +905,7 @@ input, textarea, select {
 }
 
 .period-toggle button {
-  min-height: 40px;
+  min-height: 44px;
   border-radius: 999px;
   background: var(--surface);
   border: 1px solid var(--border);
@@ -1084,6 +1102,7 @@ select.city-chip {
 
 .map-search .search-input {
   flex: 1;
+  min-width: 0;
   box-shadow: var(--shadow-soft);
 }
 
@@ -1179,13 +1198,14 @@ select.city-chip {
 
 .code-row input {
   flex: 1;
+  min-width: 0;
   letter-spacing: 4px;
   font-size: 18px;
   text-align: center;
 }
 
 .link-btn {
-  color: var(--primary);
+  color: var(--primary-ink);
   text-decoration: underline;
   font-size: inherit;
   padding: 0;
@@ -1263,7 +1283,8 @@ select.city-chip {
 .city-picker-inner {
   max-width: 480px;
   margin: 0 auto;
-  padding: calc(24px + env(safe-area-inset-top)) 16px 32px;
+  padding: calc(24px + env(safe-area-inset-top)) 16px
+    calc(32px + env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -1331,6 +1352,7 @@ select.city-chip {
   display: inline-flex;
   align-items: center;
   gap: 5px;
+  min-height: 44px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 999px;
@@ -1650,4 +1672,13 @@ select.city-chip {
 .bottom-sheet-scroll {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+}
+
+/* Заметный фокус на полях при работе с клавиатуры */
+.search-input:focus-visible,
+.field input:focus-visible,
+.field textarea:focus-visible,
+.field select:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
 }

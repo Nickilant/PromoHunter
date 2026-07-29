@@ -21,6 +21,11 @@ export default function TelegramGate() {
     if (!webApp || !webApp.initData) return; // открыто не из Telegram
     webApp.ready();
     webApp.expand();
+    // Свайп по списку/карте не должен закрывать мини-апп
+    webApp.disableVerticalSwipes?.();
+    // Шапка Telegram в тон приложения
+    webApp.setHeaderColor?.('#F7F5F2');
+    webApp.setBackgroundColor?.('#F7F5F2');
 
     if (loading || user || getToken() || attempted.current) return;
     attempted.current = true;

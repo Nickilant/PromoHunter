@@ -4,6 +4,7 @@ import { api } from '../api/client';
 import type { CityInfo } from '../types';
 import { reverseGeocodeCity } from '../utils/geocode';
 import Icon from './Icon';
+import { useEscape } from '../hooks/useEscape';
 
 interface Props {
   current: string | null;
@@ -17,6 +18,8 @@ export default function CityPicker({ current, onSelect, onClose }: Props) {
   const [query, setQuery] = useState('');
   const [detecting, setDetecting] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(null);
+
+  useEscape(onClose);
 
   useEffect(() => {
     api.get<CityInfo[]>('/cities').then(setCities).catch(() => {});
