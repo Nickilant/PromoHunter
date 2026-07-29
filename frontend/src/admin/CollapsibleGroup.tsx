@@ -1,4 +1,5 @@
 import { ReactNode, useState } from 'react';
+import Icon from '../components/Icon';
 
 interface Props {
   title: string;
@@ -18,7 +19,9 @@ export default function CollapsibleGroup({ title, color, count, badge, children 
         <span className="admin-group-title">{title}</span>
         {badge}
         <span className="tag">{count}</span>
-        <span className={`chevron ${open ? 'open' : ''}`}>▾</span>
+        <span className={`chevron ${open ? 'open' : ''}`}>
+        <Icon name="chevronDown" size={20} />
+      </span>
       </button>
       {open && <div className="admin-group-body">{children}</div>}
     </div>

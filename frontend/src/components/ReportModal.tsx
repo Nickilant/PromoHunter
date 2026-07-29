@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { api, ApiError } from '../api/client';
 import type { PromotionWithStatuses, ReportChannel, RestaurantShort } from '../types';
 import { useToast } from './Toast';
+import Icon from './Icon';
 
 type Choice = 'yes' | 'no' | 'skip';
 
@@ -65,7 +66,7 @@ export default function ReportModal({ restaurant, promotion, onClose, onReported
             </div>
           </div>
           <button className="modal-close" onClick={onClose} aria-label="Закрыть">
-            ✕
+            <Icon name="close" size={20} />
           </button>
         </div>
         <div className="modal-body">
@@ -74,13 +75,15 @@ export default function ReportModal({ restaurant, promotion, onClose, onReported
               className={channel === 'on_site' ? 'on' : ''}
               onClick={() => setChannel('on_site')}
             >
-              🏪 Я на точке
+              <Icon name="store" size={18} />
+              Я на точке
             </button>
             <button
               className={channel === 'delivery' ? 'on' : ''}
               onClick={() => setChannel('delivery')}
             >
-              🛵 Заказывал доставку
+              <Icon name="truck" size={18} />
+              Заказывал доставку
             </button>
           </div>
           {channel === 'delivery' && (

@@ -1,6 +1,7 @@
 import { FormEvent, useState } from 'react';
 
 import type { AdminBrand } from '../types';
+import Icon from '../components/Icon';
 
 export interface PromotionFormValue {
   brand_id: string;
@@ -150,10 +151,10 @@ export default function PromotionForm({
                 required
               />
               <button type="button" onClick={() => moveItem(i, -1)} title="Вверх">
-                ↑
+                <Icon name="arrowUp" size={16} />
               </button>
               <button type="button" onClick={() => moveItem(i, 1)} title="Вниз">
-                ↓
+                <Icon name="arrowDown" size={16} />
               </button>
               <button
                 type="button"
@@ -161,7 +162,7 @@ export default function PromotionForm({
                 title="Удалить"
                 disabled={value.items.length <= 1}
               >
-                ✕
+                <Icon name="close" size={20} />
               </button>
             </div>
           ))}

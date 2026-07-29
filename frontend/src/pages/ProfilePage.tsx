@@ -6,6 +6,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useSubscriptions } from '../hooks/useSubscriptions';
 import type { Report, RestaurantSuggestion, Suggestion, TelegramInfo } from '../types';
 import { formatDateTime } from '../utils/time';
+import Icon from '../components/Icon';
 
 const SUGGESTION_LABELS: Record<Suggestion['status'], { text: string; cls: string }> = {
   pending: { text: 'На модерации', cls: 'warn' },
@@ -42,7 +43,8 @@ export default function ProfilePage() {
       <div className="page-header">
         <h1>Профиль</h1>
         <Link to="/suggest" className="btn btn-accent btn-small">
-          + Заявить акцию
+          <Icon name="plus" size={16} strokeWidth={2.2} />
+          Заявить акцию
         </Link>
       </div>
 
@@ -113,16 +115,19 @@ export default function ProfilePage() {
       )}
       {user.has_telegram && subscriptions.length === 0 && (
         <div className="list-item muted">
-          Подписок пока нет — жмите 🔕 у акции или точки
+          Подписок пока нет — включите колокольчик у акции или точки
         </div>
       )}
       {subscriptions.map((s) => (
         <div className="list-item" key={s.id}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
             <span>
-              {s.restaurant
-                ? `📍 ${s.restaurant.title || s.restaurant.brand.name}, ${s.restaurant.address}`
-                : `🏷️ ${s.promotion?.title} (${s.promotion?.brand.name})`}
+              <span className="sub-item">
+                <Icon name={s.restaurant ? 'pin' : 'tag'} size={16} />
+                {s.restaurant
+                  ? `${s.restaurant.title || s.restaurant.brand.name}, ${s.restaurant.address}`
+                  : `${s.promotion?.title} (${s.promotion?.brand.name})`}
+              </span>
             </span>
             <button className="btn btn-ghost btn-small" onClick={() => remove(s.id)}>
               Отписаться
@@ -144,7 +149,12 @@ export default function ProfilePage() {
           <div>
             {r.items.map((i) => (
               <span key={i.promotion_item_id} style={{ marginRight: 8 }}>
-                {i.is_available ? '✅' : '❌'} {i.name}
+                <Icon
+                  name={i.is_available ? 'checkCircle' : 'crossCircle'}
+                  size={15}
+                  className={i.is_available ? 'ico-yes' : 'ico-no'}
+                />
+                {i.name}
               </span>
             ))}
           </div>

@@ -10,6 +10,7 @@ import type {
   RatingResponse,
 } from '../types';
 import { formatDateTime } from '../utils/time';
+import Icon from '../components/Icon';
 
 const TYPE_LABELS: Record<string, string> = {
   report_base: 'Отчёты',
@@ -87,11 +88,17 @@ export default function RatingPage() {
         </button>
       </div>
 
-      {data === null && <div className="empty-state">Загружаем…</div>}
+      {data === null && (
+        <div className="skeleton-list" aria-label="Загружаем рейтинг" aria-busy="true">
+          {[0, 1, 2, 3, 4].map((i) => (
+            <div className="skeleton skeleton-row" style={{ height: 62 }} key={i} />
+          ))}
+        </div>
+      )}
 
       {data !== null && data.entries.length === 0 && (
         <div className="empty-state">
-          <div className="big">🏆</div>
+          <div className="big"><Icon name="trophy" size={44} strokeWidth={1.4} /></div>
           <div>
             В городе {city} пока никто не набрал очков. Отмечайте наличие
             товаров — и откроете этот рейтинг!
@@ -143,7 +150,7 @@ export default function RatingPage() {
                 </div>
               </div>
               <button className="modal-close" onClick={() => setCard(null)}>
-                ✕
+                <Icon name="close" size={20} />
               </button>
             </div>
             <div className="modal-body" style={{ paddingBottom: 16 }}>

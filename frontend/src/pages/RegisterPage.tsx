@@ -5,6 +5,7 @@ import { api } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
 import { useCity } from '../hooks/useCity';
 import type { TelegramInfo } from '../types';
+import Icon, { LogoMark } from '../components/Icon';
 
 interface CodeRequestResponse {
   delivery: 'sent' | 'await_contact';
@@ -93,7 +94,7 @@ export default function RegisterPage() {
 
   return (
     <div className="auth-page">
-      <div className="logo">🏷️</div>
+      <div className="logo"><LogoMark size={68} /></div>
       <h1>Регистрация</h1>
       <form onSubmit={submit}>
         <div className="field">
@@ -108,7 +109,10 @@ export default function RegisterPage() {
             disabled={verified}
           />
           {tgEnabled && verified && (
-            <div className="form-success">✓ Номер подтверждён</div>
+            <div className="form-success">
+              <Icon name="checkCircle" size={17} />
+              Номер подтверждён
+            </div>
           )}
         </div>
 

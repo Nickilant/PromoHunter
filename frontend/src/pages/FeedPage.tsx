@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { useCity } from '../hooks/useCity';
 import type { CatalogBrand } from '../types';
+import Icon from '../components/Icon';
 
 // Главный экран: сети-категории выбранного города.
 // Тап по сети -> список её адресов -> модалка точки с акциями.
@@ -44,7 +45,8 @@ export default function FeedPage() {
       <div className="page-header">
         <h1>Акции</h1>
         <button className="city-chip" onClick={openPicker}>
-          📍 {city}
+          <Icon name="pin" size={15} />
+          {city}
         </button>
       </div>
       <input
@@ -55,11 +57,17 @@ export default function FeedPage() {
         onChange={(e) => onQueryChange(e.target.value)}
       />
 
-      {brands === null && <div className="empty-state">Загружаем…</div>}
+      {brands === null && (
+        <div className="skeleton-grid" aria-label="Загружаем сети" aria-busy="true">
+          {[0, 1, 2, 3, 4, 5].map((i) => (
+            <div className="skeleton skeleton-tile" key={i} />
+          ))}
+        </div>
+      )}
 
       {brands !== null && brands.length === 0 && (
         <div className="empty-state">
-          <div className="big">🔍</div>
+          <div className="big"><Icon name="search" size={44} strokeWidth={1.4} /></div>
           <div>
             {query.trim()
               ? 'Ничего не нашлось. Попробуйте другой запрос — или заявите акцию сами.'

@@ -5,6 +5,7 @@ import { useToast } from '../components/Toast';
 import { useAuth } from '../hooks/useAuth';
 import type { AdminUser, Role } from '../types';
 import { formatDate } from '../utils/time';
+import Icon from '../components/Icon';
 
 export default function AdminUsers() {
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -33,7 +34,7 @@ export default function AdminUsers() {
         <table className="admin-table">
           <thead>
             <tr>
-              <th>Email</th>
+              <th>Телефон</th>
               <th>Имя</th>
               <th>Роль</th>
               <th>Статус</th>
@@ -54,7 +55,7 @@ export default function AdminUsers() {
                       className={`tag ${u.is_phone_verified ? 'ok' : 'warn'}`}
                       title="Подтверждение номера через Telegram"
                     >
-                      {u.is_phone_verified ? '✓' : '?'}
+                      <Icon name={u.is_phone_verified ? 'check' : 'question'} size={13} />
                     </span>
                   </td>
                   <td>{u.display_name}</td>

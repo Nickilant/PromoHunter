@@ -2,6 +2,13 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Серая вспышка Android/WebView по тапу — из-за неё подсветка «мигала»
+   на нажатой кнопке дока раньше, чем приезжал индикатор */
+html {
+  -webkit-tap-highlight-color: transparent;
 }
 
 html,
@@ -17,6 +24,34 @@ body {
   font-size: 16px;
   line-height: 1.45;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Обводку показываем только при навигации с клавиатуры */
+:focus {
+  outline: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* Иконки всегда выровнены по тексту */
+svg {
+  display: block;
+  flex-shrink: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 h1, h2, h3, h4 {
@@ -90,16 +125,18 @@ input, textarea, select {
   grid-template-columns: repeat(5, 1fr);
   align-items: center;
   padding: 8px 10px;
-  background: rgba(255, 255, 255, 0.82);
-  backdrop-filter: blur(16px) saturate(1.4);
-  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(12px) saturate(1.3);
+  -webkit-backdrop-filter: blur(12px) saturate(1.3);
   border: 1px solid var(--border);
   border-radius: 20px;
   box-shadow: 0 10px 30px rgba(46, 42, 38, 0.16);
   z-index: 500;
 }
 
-/* Подсветка активного пункта: плавно переезжает между колонками */
+/* Подсветка активного пункта: плавно переезжает между колонками.
+   Переход включается только после монтирования (класс animated),
+   иначе индикатор «прилетал» бы слева при открытии страницы */
 .dock-indicator {
   position: absolute;
   top: 8px;
@@ -108,8 +145,12 @@ input, textarea, select {
   width: calc((100% - 20px) / 5);
   border-radius: 14px;
   background: var(--primary-soft);
-  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s;
   pointer-events: none;
+  will-change: transform;
+}
+
+.dock-indicator.animated {
+  transition: transform 0.3s cubic-bezier(0.32, 1.1, 0.4, 1), opacity 0.18s ease;
 }
 
 .dock-item {
@@ -118,7 +159,7 @@ input, textarea, select {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1px;
+  gap: 3px;
   min-width: 0;
   min-height: 48px;
   justify-content: center;
@@ -126,21 +167,32 @@ input, textarea, select {
   color: var(--text-muted);
   font-size: clamp(10px, 2.9vw, 11px);
   font-weight: 600;
+  letter-spacing: 0.1px;
   white-space: nowrap;
-  transition: color 0.2s, transform 0.15s;
+  /* никакого фона: подсветку рисует только индикатор */
+  background: none;
+  transition: color 0.24s ease 0.08s, transform 0.14s ease;
 }
 
 .dock-item:active {
   transform: scale(0.94);
+  transition: transform 0.1s ease;
 }
 
-.dock-item.active {
+/* .lit — колонка, куда едет плашка (ставится сразу по нажатию) */
+.dock-item.lit {
   color: var(--primary);
 }
 
-.dock-icon {
-  font-size: 20px;
-  line-height: 1.1;
+.dock-item.lit svg {
+  animation: icon-pop 0.24s ease 0.12s both;
+}
+
+/* Без провала в начале: иконка чуть подрастает в момент прибытия плашки */
+@keyframes icon-pop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.12); }
+  100% { transform: scale(1); }
 }
 
 .dock-action {
@@ -176,11 +228,12 @@ input, textarea, select {
   background: var(--surface);
   color: var(--text);
   outline: none;
-  transition: opacity 0.15s;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
 }
 
 .search-input:focus {
   border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-soft);
 }
 
 /* ---------- карточки ресторанов ---------- */
@@ -255,8 +308,9 @@ input, textarea, select {
 
 .promo-toggle .chevron {
   color: var(--text-muted);
-  transition: transform 0.2s;
+  transition: transform 0.24s cubic-bezier(0.4, 0, 0.2, 1);
   flex-shrink: 0;
+  display: flex;
 }
 
 .promo-toggle .chevron.open {
@@ -300,7 +354,8 @@ input, textarea, select {
 
 .item-row .updated {
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: 12px;
+  line-height: 1.35;
 }
 
 /* ---------- бейджи статусов ---------- */
@@ -308,21 +363,25 @@ input, textarea, select {
 .status-badge {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   font-size: 12px;
   font-weight: 600;
-  padding: 3px 9px;
+  padding: 4px 10px 4px 8px;
   border-radius: 999px;
-  color: #fff;
   white-space: nowrap;
+  letter-spacing: 0.1px;
 }
 
-.status-badge.available      { background: var(--status-available); }
-.status-badge.unavailable    { background: var(--status-unavailable); }
-.status-badge.disputed       { background: var(--status-disputed); }
-.status-badge.maybe_gone     { background: var(--status-maybe-gone); }
-.status-badge.maybe_appeared { background: var(--status-maybe-appeared); }
-.status-badge.unknown        { background: var(--status-unknown); }
+.status-badge svg {
+  opacity: 0.9;
+}
+
+.status-badge.available      { background: #E4F0E3; color: #3F7A3E; }
+.status-badge.unavailable    { background: #F9E5E5; color: #A34F4F; }
+.status-badge.disputed       { background: #F8EDD8; color: #97702B; }
+.status-badge.maybe_gone     { background: #F9E9D8; color: #9A6330; }
+.status-badge.maybe_appeared { background: #E3EFEA; color: #3E7A64; }
+.status-badge.unknown        { background: var(--surface-alt); color: var(--text-muted); }
 
 /* ---------- кнопки ---------- */
 
@@ -405,10 +464,17 @@ input, textarea, select {
   width: 100%;
 }
 
+.field input,
+.field textarea,
+.field select {
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
 .field input:focus,
 .field textarea:focus,
 .field select:focus {
   border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-soft);
 }
 
 .field .hint {
@@ -425,11 +491,15 @@ input, textarea, select {
 }
 
 .form-success {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   background: var(--primary-soft);
   color: var(--primary);
   border-radius: var(--radius-control);
   padding: 10px 12px;
   font-size: 14px;
+  font-weight: 600;
 }
 
 /* ---------- модалки ---------- */
@@ -449,7 +519,7 @@ input, textarea, select {
   background: var(--surface);
   width: 100%;
   max-width: 560px;
-  max-height: 92vh;
+  max-height: min(92vh, 92dvh);
   border-radius: var(--radius-card) var(--radius-card) 0 0;
   display: flex;
   flex-direction: column;
@@ -485,12 +555,25 @@ input, textarea, select {
 }
 
 .modal-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: var(--text-muted);
-  font-size: 22px;
-  line-height: 1;
-  padding: 4px 8px;
+  border-radius: 12px;
   min-width: 44px;
-  min-height: 34px;
+  min-height: 44px;
+  margin: -2px -6px 0 0;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s;
+}
+
+.modal-close:hover {
+  background: var(--surface-alt);
+  color: var(--text);
+}
+
+.modal-close:active {
+  transform: scale(0.92);
 }
 
 .modal-body {
@@ -511,7 +594,7 @@ input, textarea, select {
 }
 
 @keyframes slide-up {
-  from { transform: translateY(24px); opacity: 0.6; }
+  from { transform: translateY(18px); opacity: 0; }
   to   { transform: translateY(0); opacity: 1; }
 }
 
@@ -535,14 +618,15 @@ input, textarea, select {
 }
 
 .tri-toggle button {
-  min-height: 44px;
+  min-height: 46px;
   border-radius: var(--radius-control);
   background: var(--surface-alt);
   color: var(--text-muted);
   font-weight: 600;
   font-size: 14px;
   border: 1px solid var(--border);
-  transition: opacity 0.15s, transform 0.15s;
+  transition: background-color 0.16s ease, border-color 0.16s ease,
+    color 0.16s ease, transform 0.14s ease;
 }
 
 .tri-toggle button:active {
@@ -638,16 +722,28 @@ input, textarea, select {
   font-size: 18px;
 }
 
+.bell-btn {
+  transition: background-color 0.18s ease, border-color 0.18s ease,
+    color 0.18s ease, transform 0.14s ease;
+}
+
+.bell-btn:active {
+  transform: scale(0.92);
+}
+
 .bell-btn.on {
   background: var(--primary-soft);
   border-color: var(--primary);
+  color: var(--primary);
 }
 
 /* Подписка на точку: аккуратная строка под шапкой шторки/модалки */
 .sub-row {
-  display: block;
-  width: calc(100% - 28px);
-  margin: 0 14px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: calc(100% - 32px);
+  margin: 0 16px 12px;
   padding: 10px 12px;
   border-radius: 12px;
   background: var(--surface-alt);
@@ -660,6 +756,10 @@ input, textarea, select {
 
 .sub-row:active {
   transform: scale(0.985);
+}
+
+.sub-row {
+  transition: background-color 0.18s ease, color 0.18s ease, transform 0.15s ease;
 }
 
 .sub-row.on {
@@ -699,7 +799,7 @@ input, textarea, select {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 24px;
+  color: #fff;
 }
 
 /* ---------- пикер координат с поиском ---------- */
@@ -747,14 +847,24 @@ input, textarea, select {
 }
 
 .channel-toggle button {
-  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 46px;
+  padding: 6px 8px;
   border-radius: var(--radius-control);
   background: var(--surface-alt);
   border: 1px solid var(--border);
   color: var(--text-muted);
   font-weight: 600;
-  font-size: 14px;
-  transition: opacity 0.15s, transform 0.15s;
+  font-size: clamp(12.5px, 3.5vw, 14px);
+  line-height: 1.2;
+  transition: background 0.18s, border-color 0.18s, color 0.18s, transform 0.15s;
+}
+
+.channel-toggle button:active {
+  transform: scale(0.97);
 }
 
 .channel-toggle button.on {
@@ -901,7 +1011,19 @@ select.city-chip {
 }
 
 .empty-state .big {
-  font-size: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 76px;
+  height: 76px;
+  border-radius: 24px;
+  background: var(--surface-alt);
+  color: var(--text-muted);
+}
+
+.empty-state .big.success {
+  background: var(--primary-soft);
+  color: var(--primary);
 }
 
 /* ---------- карта ---------- */
@@ -932,17 +1054,23 @@ select.city-chip {
 .locate-btn {
   position: absolute;
   right: 12px;
-  bottom: calc(96px + env(safe-area-inset-bottom));
+  top: calc(70px + env(safe-area-inset-top));
   z-index: 400;
   background: var(--surface);
-  border-radius: 999px;
-  width: 48px;
-  height: 48px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  width: 46px;
+  height: 46px;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: var(--shadow-soft);
-  font-size: 20px;
+  color: var(--primary);
+  box-shadow: 0 4px 14px rgba(46, 42, 38, 0.12);
+  transition: transform 0.15s;
+}
+
+.locate-btn:active {
+  transform: scale(0.93);
 }
 
 .map-search {
@@ -1000,7 +1128,7 @@ select.city-chip {
   background: var(--surface);
   width: calc(100% - 16px);
   max-width: 560px;
-  max-height: 56vh;
+  max-height: min(56vh, 56dvh);
   border-radius: var(--radius-card);
   box-shadow: 0 -4px 24px rgba(46, 42, 38, 0.18);
   overflow-y: auto;
@@ -1108,8 +1236,8 @@ select.city-chip {
 }
 
 .auth-page .logo {
-  text-align: center;
-  font-size: 42px;
+  display: flex;
+  justify-content: center;
 }
 
 .auth-page form {
@@ -1205,7 +1333,7 @@ select.city-chip {
 .city-chip {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 999px;
@@ -1274,6 +1402,7 @@ select.city-chip {
 .brand-card-title {
   font-weight: 600;
   font-size: 15px;
+  overflow-wrap: anywhere;
 }
 
 .brand-card-meta {
@@ -1290,26 +1419,36 @@ select.city-chip {
 }
 
 .chevron-right {
+  display: flex;
   color: var(--text-muted);
-  font-size: 22px;
   flex-shrink: 0;
+  transition: transform 0.18s ease;
+}
+
+.brand-card:active .chevron-right,
+.address-card:active .chevron-right,
+.suggest-hub-card:active .chevron-right {
+  transform: translateX(3px);
 }
 
 .back-btn {
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   flex-shrink: 0;
-  border-radius: 50%;
+  border-radius: 12px;
   background: var(--surface);
   border: 1px solid var(--border);
   box-shadow: var(--shadow-soft);
-  font-size: 24px;
-  line-height: 1;
   color: var(--text);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding-bottom: 3px;
+  transition: transform 0.15s, background 0.15s;
+}
+
+.back-btn:active {
+  transform: scale(0.93);
+  background: var(--surface-alt);
 }
 
 .promo-in-modal {
@@ -1320,4 +1459,198 @@ select.city-chip {
 
 .promo-in-modal .promo-block {
   border-top: none;
+}
+
+/* Внутри модалки фон уже серый — строки товаров делаем белыми */
+.promo-in-modal .item-row {
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px rgba(229, 224, 216, 0.9);
+}
+
+/* ---------- иконки в тексте и мелкие состояния ---------- */
+
+.sub-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.ico-yes {
+  color: var(--status-available);
+  display: inline-block;
+  vertical-align: -2px;
+  margin-right: 3px;
+}
+
+.ico-no {
+  color: var(--status-unavailable);
+  display: inline-block;
+  vertical-align: -2px;
+  margin-right: 3px;
+}
+
+.tag svg {
+  display: inline-block;
+  vertical-align: -2px;
+}
+
+/* Спиннер вместо многоточия у кнопок в процессе */
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  display: inline-block;
+  animation: spin 0.7s linear infinite;
+  opacity: 0.8;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ---------- скелетоны загрузки ---------- */
+
+.skeleton-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--surface);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-soft);
+}
+
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(46, 42, 38, 0.05) 45%,
+    rgba(46, 42, 38, 0.07) 55%,
+    transparent
+  );
+  transform: translateX(-100%);
+  animation: shimmer 1.4s infinite;
+}
+
+@keyframes shimmer {
+  100% { transform: translateX(100%); }
+}
+
+.skeleton-tile {
+  height: 110px;
+}
+
+.skeleton-row {
+  height: 74px;
+}
+
+.skeleton-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+/* ---------- появление списков ---------- */
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+.brand-grid > *,
+.address-card,
+.rating-row,
+.suggest-hub-card {
+  animation: rise 0.26s ease both;
+}
+
+/* Лёгкая каскадность первых элементов списка */
+.brand-grid > *:nth-child(2),
+.address-card:nth-child(2) { animation-delay: 0.03s; }
+.brand-grid > *:nth-child(3),
+.address-card:nth-child(3) { animation-delay: 0.06s; }
+.brand-grid > *:nth-child(4),
+.address-card:nth-child(4) { animation-delay: 0.09s; }
+.brand-grid > *:nth-child(n + 5) { animation-delay: 0.12s; }
+
+/* ---------- микро-полиш ---------- */
+
+.btn:disabled {
+  cursor: default;
+}
+
+.btn-primary:not(:disabled):hover,
+.btn-accent:not(:disabled):hover {
+  filter: brightness(1.04);
+}
+
+.brand-card:hover,
+.address-card:hover,
+.rating-row:hover,
+.suggest-hub-card:hover,
+.city-item:hover {
+  box-shadow: 0 4px 14px rgba(46, 42, 38, 0.1);
+}
+
+.item-row {
+  transition: background 0.2s;
+}
+
+/* Свежие данные читаются лучше, чем «протухшие» */
+.item-row .updated {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Липкая шапка страницы с поиском — удобнее на длинных списках */
+.page-header {
+  min-height: 44px;
+}
+
+.page-header h1 {
+  letter-spacing: -0.2px;
+}
+
+/* Фолбэк для WebView без backdrop-filter: сплошной фон вместо мутного стекла */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .dock {
+    background: var(--surface);
+  }
+}
+
+/* Раскрытие акции: тело появляется, а не возникает рывком */
+@keyframes accordion-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.promo-body {
+  animation: accordion-in 0.2s ease;
+}
+
+/* Шторка карты: шапка и подписка закреплены, скроллится только список акций */
+.bottom-sheet-inner {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.bottom-sheet-inner .bottom-sheet-grip,
+.bottom-sheet-inner .rest-card-head,
+.bottom-sheet-inner .sub-row {
+  flex-shrink: 0;
+}
+
+.bottom-sheet-scroll {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }

@@ -12,6 +12,7 @@ import {
 } from 'react-leaflet';
 
 import type { RestaurantListItem } from '../types';
+import Icon from './Icon';
 
 const DEFAULT_CENTER: [number, number] = [59.935, 30.325]; // Санкт-Петербург
 const DEFAULT_ZOOM = 12;
@@ -54,8 +55,9 @@ function LocateButton() {
         locate();
       }}
       aria-label="Найти меня"
+      title="Найти меня"
     >
-      📍
+      <Icon name="pin" size={21} />
     </button>
   );
 }

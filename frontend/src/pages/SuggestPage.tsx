@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 
 import { api } from '../api/client';
 import type { Brand, RestaurantListItem } from '../types';
+import Icon from '../components/Icon';
 
 export default function SuggestPage() {
   const [brands, setBrands] = useState<Brand[]>([]);
@@ -60,7 +61,7 @@ export default function SuggestPage() {
     return (
       <div className="page">
         <div className="empty-state">
-          <div className="big">📮</div>
+          <div className="big success"><Icon name="send" size={44} strokeWidth={1.4} /></div>
           <h2>Отправлено на модерацию</h2>
           <div>
             Спасибо! Модератор проверит заявку, статус можно смотреть в профиле.
@@ -78,7 +79,7 @@ export default function SuggestPage() {
     <div className="page">
       <div className="page-header">
         <button className="back-btn" onClick={() => navigate(-1)} aria-label="Назад">
-          ‹
+          <Icon name="chevronLeft" size={22} />
         </button>
         <h1>Заявить акцию</h1>
       </div>

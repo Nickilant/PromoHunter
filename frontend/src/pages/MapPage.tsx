@@ -15,6 +15,7 @@ import type {
   RestaurantListItem,
   RestaurantShort,
 } from '../types';
+import Icon from '../components/Icon';
 
 export default function MapPage() {
   const [restaurants, setRestaurants] = useState<RestaurantListItem[]>([]);
@@ -111,7 +112,7 @@ export default function MapPage() {
           }}
         />
         <button className="btn btn-primary" disabled={searching} aria-label="Найти">
-          {searching ? '…' : '🔍'}
+          {searching ? <span className="spinner" /> : <Icon name="search" size={18} />}
         </button>
       </form>
       {searchError && <div className="map-search-error">{searchError}</div>}
@@ -148,7 +149,7 @@ export default function MapPage() {
                 }}
                 aria-label="Закрыть"
               >
-                ✕
+                <Icon name="close" size={20} />
               </button>
             </div>
             {selected && selectedId !== null && (
@@ -162,25 +163,32 @@ export default function MapPage() {
                   toggleRestaurant(selectedId);
                 }}
               >
+                <Icon
+                  name={isSubscribedToRestaurant(selectedId) ? 'bell' : 'bellOff'}
+                  size={17}
+                />
                 {isSubscribedToRestaurant(selectedId)
-                  ? '🔔 Вы подписаны на новые акции точки — отключить'
-                  : '🔕 Сообщать о новых акциях этой точки'}
+                  ? 'Вы подписаны на новые акции точки — отключить'
+                  : 'Сообщать о новых акциях этой точки'}
               </button>
             )}
-            {selected && selected.promotions.length === 0 && (
-              <div className="empty-state" style={{ padding: '16px 24px 24px' }}>
-                Сейчас в этой точке нет действующих акций
-              </div>
-            )}
-            {selected?.promotions.map((promo) => (
-              <PromotionAccordion
-                key={promo.id}
-                restaurant={selected}
-                promotion={promo}
-                onReport={openReport}
-                defaultOpen={selected.promotions.length === 1}
-              />
-            ))}
+            {/* скроллится только список акций — шапка и подписка закреплены */}
+            <div className="bottom-sheet-scroll">
+              {selected && selected.promotions.length === 0 && (
+                <div className="empty-state" style={{ padding: '16px 24px 24px' }}>
+                  Сейчас в этой точке нет действующих акций
+                </div>
+              )}
+              {selected?.promotions.map((promo) => (
+                <PromotionAccordion
+                  key={promo.id}
+                  restaurant={selected}
+                  promotion={promo}
+                  onReport={openReport}
+                  defaultOpen={selected.promotions.length === 1}
+                />
+              ))}
+            </div>
           </div>
         </div>
       )}

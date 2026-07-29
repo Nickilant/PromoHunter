@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet } from 'react-router-dom';
 
 import { api } from '../api/client';
 import type { RestaurantSuggestionGroup, SuggestionGroup } from '../types';
+import Icon from '../components/Icon';
 
 export interface AdminOutletContext {
   refreshPendingCount: () => void;
@@ -65,7 +66,10 @@ export default function AdminLayout() {
           </NavLink>
         ))}
         <div className="spacer" />
-        <Link to="/">← В приложение</Link>
+        <Link to="/" className="admin-back">
+          <Icon name="arrowLeft" size={16} />
+          В приложение
+        </Link>
       </aside>
       <main className="admin-content">
         <Outlet context={{ refreshPendingCount } satisfies AdminOutletContext} />

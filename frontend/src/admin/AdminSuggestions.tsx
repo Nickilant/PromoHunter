@@ -8,6 +8,7 @@ import { formatDateTime } from '../utils/time';
 import type { AdminOutletContext } from './AdminLayout';
 import CollapsibleGroup from './CollapsibleGroup';
 import PromotionForm, { fromLocalInput, PromotionFormValue } from './PromotionForm';
+import Icon from '../components/Icon';
 
 const STATUS_LABELS: Record<string, { text: string; cls: string }> = {
   pending: { text: 'Ожидает', cls: 'warn' },
@@ -117,7 +118,7 @@ export default function AdminSuggestions() {
 
       {groups.length === 0 && (
         <div className="empty-state">
-          <div className="big">📭</div>
+          <div className="big"><Icon name="inbox" size={44} strokeWidth={1.4} /></div>
           <div>Заявок нет</div>
         </div>
       )}
@@ -191,7 +192,7 @@ export default function AdminSuggestions() {
                 </div>
               </div>
               <button className="modal-close" onClick={() => setApproving(null)}>
-                ✕
+                <Icon name="close" size={20} />
               </button>
             </div>
             <div className="modal-body">
@@ -213,7 +214,7 @@ export default function AdminSuggestions() {
             <div className="modal-head">
               <h2>Отклонить заявку</h2>
               <button className="modal-close" onClick={() => setRejecting(null)}>
-                ✕
+                <Icon name="close" size={20} />
               </button>
             </div>
             <div className="modal-body">

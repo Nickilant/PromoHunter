@@ -11,6 +11,7 @@ import type {
 } from '../types';
 import PromotionAccordion from './PromotionAccordion';
 import ReportModal from './ReportModal';
+import Icon from './Icon';
 
 interface Props {
   restaurantId: number;
@@ -61,7 +62,7 @@ export default function RestaurantModal({ restaurantId, onClose }: Props) {
               <div className="subtitle">Загружаем…</div>
             )}
             <button className="modal-close" onClick={onClose} aria-label="Закрыть">
-              ✕
+              <Icon name="close" size={20} />
             </button>
           </div>
           {detail && (
@@ -75,9 +76,13 @@ export default function RestaurantModal({ restaurantId, onClose }: Props) {
                 toggleRestaurant(restaurantId);
               }}
             >
+              <Icon
+                name={isSubscribedToRestaurant(restaurantId) ? 'bell' : 'bellOff'}
+                size={17}
+              />
               {isSubscribedToRestaurant(restaurantId)
-                ? '🔔 Вы подписаны на новые акции точки — отключить'
-                : '🔕 Сообщать о новых акциях этой точки'}
+                ? 'Вы подписаны на новые акции точки — отключить'
+                : 'Сообщать о новых акциях этой точки'}
             </button>
           )}
           <div className="modal-body" style={{ paddingBottom: 16 }}>

@@ -5,6 +5,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useSubscriptions } from '../hooks/useSubscriptions';
 import type { PromotionWithStatuses, RestaurantShort } from '../types';
 import { formatDate, timeAgo } from '../utils/time';
+import Icon from './Icon';
 import StatusBadge from './StatusBadge';
 
 interface Props {
@@ -36,14 +37,16 @@ export default function PromotionAccordion({
 
   return (
     <div className="promo-block">
-      <button className="promo-toggle" onClick={() => setOpen(!open)}>
+      <button className="promo-toggle" onClick={() => setOpen(!open)} aria-expanded={open}>
         <div>
           <div className="promo-title">{promotion.title}</div>
           {promotion.ends_at && (
             <div className="promo-sub">до {formatDate(promotion.ends_at)}</div>
           )}
         </div>
-        <span className={`chevron ${open ? 'open' : ''}`}>▾</span>
+        <span className={`chevron ${open ? 'open' : ''}`}>
+          <Icon name="chevronDown" size={20} />
+        </span>
       </button>
       {open && (
         <div className="promo-body">
@@ -87,8 +90,9 @@ export default function PromotionAccordion({
                   : 'Подписаться на новости акции'
               }
               aria-label="Подписка на акцию"
+              aria-pressed={subscribed}
             >
-              {subscribed ? '🔔' : '🔕'}
+              <Icon name={subscribed ? 'bell' : 'bellOff'} size={20} />
             </button>
           </div>
         </div>

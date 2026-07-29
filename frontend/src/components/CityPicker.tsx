@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import type { CityInfo } from '../types';
 import { reverseGeocodeCity } from '../utils/geocode';
+import Icon from './Icon';
 
 interface Props {
   current: string | null;
@@ -71,7 +72,7 @@ export default function CityPicker({ current, onSelect, onClose }: Props) {
           </div>
           {onClose && (
             <button className="modal-close" onClick={onClose} aria-label="Закрыть">
-              ✕
+              <Icon name="close" size={20} />
             </button>
           )}
         </div>
@@ -80,7 +81,8 @@ export default function CityPicker({ current, onSelect, onClose }: Props) {
           onClick={detect}
           disabled={detecting}
         >
-          {detecting ? 'Определяем…' : '📍 Определить мой город'}
+          <Icon name="pin" size={18} />
+          {detecting ? 'Определяем…' : 'Определить мой город'}
         </button>
         {geoError && <div className="form-error">{geoError}</div>}
         <input

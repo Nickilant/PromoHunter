@@ -5,6 +5,7 @@ import { useToast } from '../components/Toast';
 import type { AdminBrand, AdminRestaurant } from '../types';
 import CollapsibleGroup from './CollapsibleGroup';
 import RestaurantForm, { RestaurantFormValue } from './RestaurantForm';
+import Icon from '../components/Icon';
 
 const emptyForm: RestaurantFormValue = {
   brand_id: '',
@@ -185,7 +186,7 @@ export default function AdminRestaurants() {
             <div className="modal-head">
               <h2>{form.id === null ? 'Новая точка' : 'Редактировать точку'}</h2>
               <button className="modal-close" onClick={() => setForm(null)}>
-                ✕
+                <Icon name="close" size={20} />
               </button>
             </div>
             <div className="modal-body">

@@ -186,6 +186,7 @@
 
 .tag {
   display: inline-block;
+  white-space: nowrap;
   font-size: 12px;
   font-weight: 600;
   border-radius: 999px;
@@ -354,4 +355,53 @@
   display: flex;
   gap: 8px;
   margin-top: 4px;
+}
+
+/* ---------- иконки в админке ---------- */
+
+.admin-group-toggle .chevron {
+  display: flex;
+  transition: transform 0.24s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.admin-back {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start !important;
+  gap: 6px;
+  color: var(--text-muted) !important;
+  font-size: 13px;
+}
+
+.admin-back:hover {
+  color: var(--text) !important;
+}
+
+.items-editor .item-line button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 38px;
+  transition: background 0.15s, color 0.15s;
+}
+
+.items-editor .item-line button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* тег со значком (подтверждение номера) */
+.admin-table .tag svg {
+  display: block;
+}
+
+.admin-table .tag {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+  padding: 3px 6px;
+}
+
+.admin-modal .modal-head {
+  align-items: flex-start;
 }

@@ -10,6 +10,7 @@ import PromotionForm, {
   PromotionFormValue,
   toLocalInput,
 } from './PromotionForm';
+import Icon from '../components/Icon';
 
 export default function AdminPromotions() {
   const [promotions, setPromotions] = useState<AdminPromotion[]>([]);
@@ -203,7 +204,7 @@ export default function AdminPromotions() {
             <div className="modal-head">
               <h2>{form.id === null ? 'Новая акция' : 'Редактировать акцию'}</h2>
               <button className="modal-close" onClick={() => setForm(null)}>
-                ✕
+                <Icon name="close" size={20} />
               </button>
             </div>
             <div className="modal-body">

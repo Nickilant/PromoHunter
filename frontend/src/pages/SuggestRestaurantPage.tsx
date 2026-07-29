@@ -5,6 +5,7 @@ import { api } from '../api/client';
 import MapPickerWithSearch from '../components/MapPickerWithSearch';
 import { useCity } from '../hooks/useCity';
 import type { Brand } from '../types';
+import Icon from '../components/Icon';
 
 export default function SuggestRestaurantPage() {
   const [brands, setBrands] = useState<Brand[]>([]);
@@ -55,7 +56,7 @@ export default function SuggestRestaurantPage() {
     return (
       <div className="page">
         <div className="empty-state">
-          <div className="big">📮</div>
+          <div className="big success"><Icon name="send" size={44} strokeWidth={1.4} /></div>
           <h2>Отправлено на модерацию</h2>
           <div>Проверим и добавим точку на карту. Статус — в профиле.</div>
           <Link to="/profile" className="btn btn-primary">
@@ -71,7 +72,7 @@ export default function SuggestRestaurantPage() {
     <div className="page">
       <div className="page-header">
         <button className="back-btn" onClick={() => navigate(-1)} aria-label="Назад">
-          ‹
+          <Icon name="chevronLeft" size={22} />
         </button>
         <h1>Добавить ресторан</h1>
       </div>

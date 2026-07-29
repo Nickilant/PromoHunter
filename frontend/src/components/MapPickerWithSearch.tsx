@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 
 import { geocodeAddress, geocodeCity } from '../utils/geocode';
 import { LocationPickerMap, MapFocus } from './MapView';
+import Icon from './Icon';
 
 interface Props {
   lat: number | null;
@@ -73,7 +74,7 @@ export default function MapPickerWithSearch({ lat, lng, city, onPick }: Props) {
           onClick={search}
           aria-label="Найти адрес"
         >
-          {searching ? '…' : '🔍'}
+          {searching ? <span className="spinner" /> : <Icon name="search" size={18} />}
         </button>
       </div>
       {error && <div className="form-error">{error}</div>}
