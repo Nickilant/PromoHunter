@@ -4,11 +4,13 @@ import { api } from '../api/client';
 import { useToast } from '../components/Toast';
 import type { AdminBrand, AdminPromotion } from '../types';
 import { formatDate } from '../utils/time';
+import CollapsibleGroup from './CollapsibleGroup';
 import PromotionForm, {
   fromLocalInput,
   PromotionFormValue,
   toLocalInput,
 } from './PromotionForm';
+import Icon from '../components/Icon';
 
 export default function AdminPromotions() {
   const [promotions, setPromotions] = useState<AdminPromotion[]>([]);
@@ -134,64 +136,75 @@ export default function AdminPromotions() {
         </select>
       </div>
 
-      <div className="admin-table-wrap">
-        <table className="admin-table">
-          <thead>
-            <tr>
-              <th>Бренд</th>
-              <th>Название</th>
-              <th>Товаров</th>
-              <th>Период</th>
-              <th>Статус</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {promotions.map((p) => (
-              <tr key={p.id}>
-                <td>
-                  <span className="color-dot" style={{ background: p.brand.color }} />
-                  {p.brand.name}
-                </td>
-                <td>{p.title}</td>
-                <td>{p.items.length}</td>
-                <td>
-                  {formatDate(p.starts_at)} — {formatDate(p.ends_at)}
-                </td>
-                <td>
-                  <span className={`tag ${p.is_active ? 'ok' : 'error'}`}>
-                    {p.is_active ? 'Активна' : 'Выключена'}
-                  </span>
-                </td>
-                <td>
-                  <div className="actions">
-                    <button
-                      className="btn btn-ghost btn-small"
-                      onClick={() => openEdit(p)}
-                    >
-                      Изменить
-                    </button>
-                    <button
-                      className="btn btn-danger btn-small"
-                      onClick={() => remove(p)}
-                    >
-                      Удалить
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {[...promotions
+        .reduce((map, p) => {
+          const list = map.get(p.brand.id) ?? [];
+          list.push(p);
+          map.set(p.brand.id, list);
+          return map;
+        }, new Map<number, AdminPromotion[]>())
+        .entries()].map(([brandId, list]) => (
+        <CollapsibleGroup
+          key={brandId}
+          title={list[0].brand.name}
+          color={list[0].brand.color}
+          count={list.length}
+        >
+          <div className="admin-table-wrap">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>Название</th>
+                  <th>Товаров</th>
+                  <th>Период</th>
+                  <th>Статус</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {list.map((p) => (
+                  <tr key={p.id}>
+                    <td>{p.title}</td>
+                    <td>{p.items.length}</td>
+                    <td>
+                      {formatDate(p.starts_at)} — {formatDate(p.ends_at)}
+                    </td>
+                    <td>
+                      <span className={`tag ${p.is_active ? 'ok' : 'error'}`}>
+                        {p.is_active ? 'Активна' : 'Выключена'}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="actions">
+                        <button
+                          className="btn btn-ghost btn-small"
+                          onClick={() => openEdit(p)}
+                        >
+                          Изменить
+                        </button>
+                        <button
+                          className="btn btn-danger btn-small"
+                          onClick={() => remove(p)}
+                        >
+                          Удалить
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CollapsibleGroup>
+      ))}
 
       {form && (
         <div className="modal-overlay" onClick={() => setForm(null)}>
           <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
               <h2>{form.id === null ? 'Новая акция' : 'Редактировать акцию'}</h2>
-              <button className="modal-close" onClick={() => setForm(null)}>
-                ✕
+              <button className="modal-close" onClick={() => setForm(null)} aria-label="Закрыть">
+                <Icon name="close" size={20} />
               </button>
             </div>
             <div className="modal-body">

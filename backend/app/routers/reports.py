@@ -2,15 +2,24 @@ import math
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.auth import get_current_user, require_not_blocked
 from app.config import settings
 from app.database import get_db
-from app.models import Promotion, Report, ReportItem, Restaurant, User
+from app.models import (
+    Promotion,
+    RatingEvent,
+    Report,
+    ReportItem,
+    Restaurant,
+    User,
+)
 from app.routers.public import active_promotion_clause
 from app.schemas import ReportIn, ReportItemOut, ReportOut, RestaurantShort
+from app.services.notify import notify_status_flips
+from app.services.status import refresh_stable_statuses
 
 router = APIRouter(prefix="/reports", tags=["reports"])
 
@@ -92,10 +101,23 @@ def create_report(
             ),
         )
 
+    # «Разведка тёмной точки»: по этой паре свежих данных не было вообще
+    window_start = now - timedelta(hours=settings.status_window_hours)
+    had_fresh_data = db.scalar(
+        select(Report.id)
+        .where(
+            Report.restaurant_id == restaurant.id,
+            Report.promotion_id == promotion.id,
+            Report.created_at >= window_start,
+        )
+        .limit(1)
+    )
+
     report = Report(
         user_id=user.id,
         restaurant_id=restaurant.id,
         promotion_id=promotion.id,
+        channel=payload.channel,
         lat=payload.lat,
         lng=payload.lng,
         items=[
@@ -107,7 +129,64 @@ def create_report(
         ],
     )
     db.add(report)
+    db.flush()
+
+    # --- очки рейтинга, начисляемые сразу (бонусы приходят после дозревания) ---
+    day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    base_today = db.scalar(
+        select(func.count(RatingEvent.id)).where(
+            RatingEvent.user_id == user.id,
+            RatingEvent.type == "report_base",
+            RatingEvent.created_at >= day_start,
+        )
+    ) or 0
+    same_restaurant_today = db.scalar(
+        select(func.count(Report.id)).where(
+            Report.user_id == user.id,
+            Report.restaurant_id == restaurant.id,
+            Report.created_at >= day_start,
+            Report.id != report.id,
+        )
+    ) or 0
+    # Анти-фарм: дневной потолок базы + без базы за повторы по той же точке
+    if base_today < settings.rating_daily_base_cap and same_restaurant_today == 0:
+        db.add(
+            RatingEvent(
+                user_id=user.id,
+                city=restaurant.city,
+                type="report_base",
+                points=settings.rating_base_points,
+                report_id=report.id,
+            )
+        )
+    if had_fresh_data is None:
+        db.add(
+            RatingEvent(
+                user_id=user.id,
+                city=restaurant.city,
+                type="scout",
+                points=settings.rating_scout_points,
+                report_id=report.id,
+            )
+        )
+
+    # Мгновенное табло: пересчёт устойчивых статусов затронутых товаров
+    flips = refresh_stable_statuses(db, restaurant.id, [promotion.id], now)
     db.commit()
+
+    # Подписчикам акции — о переключениях статусов (после коммита, в фоне)
+    if flips:
+        item_names = {item.id: item.name for item in promotion.items}
+        notify_status_flips(
+            db,
+            restaurant,
+            promotion,
+            [
+                (item_names[item_id], new)
+                for item_id, _, new in flips
+                if item_id in item_names and new in ("available", "unavailable")
+            ],
+        )
 
     report = db.scalar(
         select(Report)

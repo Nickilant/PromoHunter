@@ -2,7 +2,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app.models import SuggestionStatus, UserRole
+from app.models import ReportChannel, SuggestionStatus, UserRole
 from app.phone import normalize_phone
 
 
@@ -27,10 +27,41 @@ class PhoneMixin(BaseModel):
 class RegisterIn(PhoneMixin):
     password: str = Field(min_length=6, max_length=128)
     display_name: str = Field(min_length=1, max_length=100)
+    # Город из сессии — станет городом по умолчанию в профиле
+    city: str | None = Field(default=None, max_length=100)
 
 
 class LoginIn(PhoneMixin):
     password: str
+
+
+class PhoneVerificationRequestIn(PhoneMixin):
+    pass
+
+
+class PhoneVerificationRequestOut(BaseModel):
+    # sent — код уже улетел в Telegram; await_contact — сначала нужно
+    # отправить боту свой контакт, тогда он пришлёт код
+    delivery: str
+    bot_username: str | None = None
+
+
+class PhoneVerificationConfirmIn(PhoneMixin):
+    code: str = Field(min_length=1, max_length=8)
+
+
+class PhoneVerificationConfirmOut(BaseModel):
+    verified: bool
+
+
+class TelegramAuthIn(BaseModel):
+    init_data: str
+    city: str | None = Field(default=None, max_length=100)
+
+
+class TelegramContactIn(TelegramAuthIn):
+    # строка response из Telegram.WebApp.requestContact — подписана ботом
+    contact_response: str
 
 
 class UserOut(ORMModel):
@@ -38,9 +69,16 @@ class UserOut(ORMModel):
     phone: str
     is_phone_verified: bool
     display_name: str
+    city: str | None = None
+    has_telegram: bool = Field(default=False, validation_alias="telegram_id")
     role: UserRole
     is_blocked: bool
     created_at: datetime
+
+    @field_validator("has_telegram", mode="before")
+    @classmethod
+    def _from_telegram_id(cls, value):
+        return bool(value)
 
 
 class TokenOut(BaseModel):
@@ -69,10 +107,31 @@ class RestaurantListItem(ORMModel):
     id: int
     brand: BrandShort
     title: str | None = None
+    city: str
     address: str
     lat: float
     lng: float
     active_promotions_count: int
+    last_report_at: datetime | None = None
+
+
+class CityOut(BaseModel):
+    name: str
+    restaurants_count: int
+
+
+class CatalogPromo(BaseModel):
+    id: int
+    title: str
+
+
+class CatalogBrand(BaseModel):
+    id: int
+    name: str
+    color: str
+    logo_url: str | None = None
+    restaurants_count: int
+    promotions: list[CatalogPromo]
 
 
 # --- статусы товаров ---
@@ -80,9 +139,12 @@ class RestaurantListItem(ORMModel):
 class ItemStatusOut(BaseModel):
     id: int
     name: str
-    status: str  # available | unavailable | disputed | unknown
+    # available | unavailable | maybe_gone | maybe_appeared | disputed | unknown
+    status: str
     yes_count: int
     no_count: int
+    on_site_count: int = 0
+    delivery_count: int = 0
     last_report_at: datetime | None = None
 
 
@@ -99,6 +161,7 @@ class RestaurantShort(ORMModel):
     id: int
     brand: BrandShort
     title: str | None = None
+    city: str
     address: str
     lat: float
     lng: float
@@ -108,6 +171,7 @@ class RestaurantDetail(BaseModel):
     id: int
     brand: BrandShort
     title: str | None = None
+    city: str
     address: str
     lat: float
     lng: float
@@ -130,6 +194,7 @@ class ReportIn(BaseModel):
     restaurant_id: int
     promotion_id: int
     items: list[ReportItemIn] = Field(min_length=1)
+    channel: ReportChannel = ReportChannel.on_site
     lat: float | None = None
     lng: float | None = None
 
@@ -174,6 +239,54 @@ class SuggestionOut(ORMModel):
     reviewed_at: datetime | None = None
 
 
+# --- restaurant suggestions ---
+
+class RestaurantSuggestionIn(BaseModel):
+    brand_id: int  # бренд — только из списка
+    title: str | None = Field(default=None, max_length=200)
+    city: str = Field(min_length=1, max_length=100)
+    address: str = Field(min_length=1, max_length=300)
+    lat: float
+    lng: float
+    comment: str | None = None
+
+
+class RestaurantSuggestionOut(ORMModel):
+    id: int
+    brand: BrandShort
+    title: str | None = None
+    city: str
+    address: str
+    lat: float
+    lng: float
+    comment: str | None = None
+    status: SuggestionStatus
+    moderator_comment: str | None = None
+    created_restaurant_id: int | None = None
+    created_at: datetime
+    reviewed_at: datetime | None = None
+
+
+class AdminRestaurantSuggestionOut(RestaurantSuggestionOut):
+    user: UserOut
+
+
+class RestaurantSuggestionGroupOut(BaseModel):
+    brand_id: int
+    brand_name: str
+    brand_color: str
+    suggestions: list[AdminRestaurantSuggestionOut]
+
+
+class RestaurantSuggestionApproveIn(BaseModel):
+    brand_id: int
+    title: str | None = Field(default=None, max_length=200)
+    city: str = Field(min_length=1, max_length=100)
+    address: str = Field(min_length=1, max_length=300)
+    lat: float
+    lng: float
+
+
 # --- admin: brands ---
 
 class BrandIn(BaseModel):
@@ -200,6 +313,7 @@ class AdminBrandOut(BrandOut):
 class RestaurantIn(BaseModel):
     brand_id: int
     title: str | None = Field(default=None, max_length=200)
+    city: str = Field(min_length=1, max_length=100)
     address: str = Field(min_length=1, max_length=300)
     lat: float
     lng: float
@@ -209,6 +323,7 @@ class RestaurantIn(BaseModel):
 class RestaurantPatch(BaseModel):
     brand_id: int | None = None
     title: str | None = Field(default=None, max_length=200)
+    city: str | None = Field(default=None, min_length=1, max_length=100)
     address: str | None = Field(default=None, min_length=1, max_length=300)
     lat: float | None = None
     lng: float | None = None
@@ -219,6 +334,7 @@ class AdminRestaurantOut(ORMModel):
     id: int
     brand: BrandShort
     title: str | None = None
+    city: str
     address: str
     lat: float
     lng: float
@@ -308,3 +424,70 @@ class SuggestionApproveIn(BaseModel):
 
 class SuggestionRejectIn(BaseModel):
     moderator_comment: str = Field(min_length=1)
+    # Пометка «выдумка/спам» — штраф автору в рейтинге;
+    # обычный дубликат штрафовать нельзя
+    is_spam: bool = False
+
+
+# --- subscriptions ---
+
+class PromotionShort(ORMModel):
+    id: int
+    title: str
+    brand: BrandShort
+
+
+class SubscriptionIn(BaseModel):
+    restaurant_id: int | None = None
+    promotion_id: int | None = None
+
+
+class SubscriptionOut(ORMModel):
+    id: int
+    restaurant: RestaurantShort | None = None
+    promotion: PromotionShort | None = None
+    created_at: datetime
+
+
+# --- rating ---
+
+class RatingEntryOut(BaseModel):
+    user_id: int
+    display_name: str
+    points: int
+    reports_count: int
+    pioneers_count: int
+    position: int
+
+
+class RatingMeOut(BaseModel):
+    position: int | None = None
+    points: int
+
+
+class RatingOut(BaseModel):
+    entries: list[RatingEntryOut]
+    me: RatingMeOut | None = None
+
+
+class RatingCategoryOut(BaseModel):
+    type: str
+    count: int
+    points: int
+
+
+class RatingEventOut(BaseModel):
+    type: str
+    points: int
+    city: str | None = None
+    context: str | None = None
+    created_at: datetime
+
+
+class RatingCardOut(BaseModel):
+    user_id: int
+    display_name: str
+    total_points: int
+    categories: list[RatingCategoryOut]
+    # Полная лента — только владельцу карточки
+    events: list[RatingEventOut] | None = None

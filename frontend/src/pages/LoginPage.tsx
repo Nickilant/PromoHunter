@@ -2,6 +2,7 @@ import { FormEvent, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
 import { useAuth } from '../hooks/useAuth';
+import { LogoMark } from '../components/Icon';
 
 export default function LoginPage() {
   const [phone, setPhone] = useState('');
@@ -27,7 +28,7 @@ export default function LoginPage() {
 
   return (
     <div className="auth-page">
-      <div className="logo">🏷️</div>
+      <div className="logo"><LogoMark size={68} /></div>
       <h1>Вход</h1>
       <form onSubmit={submit}>
         <div className="field">

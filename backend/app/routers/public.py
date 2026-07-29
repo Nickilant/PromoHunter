@@ -8,6 +8,9 @@ from app.database import get_db
 from app.models import Brand, Promotion, Report, Restaurant
 from app.schemas import (
     BrandOut,
+    CatalogBrand,
+    CatalogPromo,
+    CityOut,
     FeedEntry,
     ItemStatusOut,
     PromotionWithStatuses,
@@ -66,9 +69,125 @@ def list_brands(db: Session = Depends(get_db)):
     return db.scalars(select(Brand).order_by(Brand.name)).all()
 
 
+@router.get("/telegram/info")
+def telegram_info():
+    """Доступность телеграм-функций и username бота (для ссылки t.me/...)."""
+    from app import telegram
+
+    return {
+        "enabled": telegram.enabled(),
+        "bot_username": telegram.bot_username(),
+    }
+
+
+@router.get("/cities", response_model=list[CityOut])
+def list_cities(db: Session = Depends(get_db)):
+    """Города, где есть активные точки, — для выбора города при входе."""
+    rows = db.execute(
+        select(Restaurant.city, func.count(Restaurant.id))
+        .where(Restaurant.is_active.is_(True))
+        .group_by(Restaurant.city)
+        .order_by(func.count(Restaurant.id).desc(), Restaurant.city)
+    ).all()
+    return [CityOut(name=city, restaurants_count=count) for city, count in rows]
+
+
+@router.get("/catalog", response_model=list[CatalogBrand])
+def catalog(
+    city: str, q: str | None = None, db: Session = Depends(get_db)
+):
+    """Каталог: сети с действующими акциями в выбранном городе.
+
+    Поиск q матчит название сети, акции и товара. Если совпала акция —
+    в карточке сети остаются только совпавшие акции.
+    """
+    now = datetime.now(timezone.utc)
+
+    counts = dict(
+        db.execute(
+            select(Restaurant.brand_id, func.count(Restaurant.id))
+            .where(Restaurant.is_active.is_(True), Restaurant.city == city)
+            .group_by(Restaurant.brand_id)
+        ).all()
+    )
+    if not counts:
+        return []
+
+    brands = db.scalars(
+        select(Brand).where(Brand.id.in_(counts.keys())).order_by(Brand.name)
+    ).all()
+    promotions = (
+        db.scalars(
+            select(Promotion)
+            .options(selectinload(Promotion.items))
+            .where(Promotion.brand_id.in_(counts.keys()), active_promotion_clause(now))
+            .order_by(Promotion.created_at.desc())
+        )
+        .unique()
+        .all()
+    )
+    promos_by_brand: dict[int, list[Promotion]] = {}
+    for p in promotions:
+        promos_by_brand.setdefault(p.brand_id, []).append(p)
+
+    query = (q or "").strip().lower()
+    matched_promo_ids: set[int] = set()
+    if query:
+        for p in promotions:
+            if query in p.title.lower() or any(
+                query in item.name.lower() for item in p.items
+            ):
+                matched_promo_ids.add(p.id)
+
+    # Свежесть отчётов по сетям в этом городе — для сортировки
+    last_report_by_brand = dict(
+        db.execute(
+            select(Restaurant.brand_id, func.max(Report.created_at))
+            .join(Report, Report.restaurant_id == Restaurant.id)
+            .where(Restaurant.city == city)
+            .group_by(Restaurant.brand_id)
+        ).all()
+    )
+
+    entries: list[tuple[datetime | None, CatalogBrand]] = []
+    for brand in brands:
+        brand_promos = promos_by_brand.get(brand.id, [])
+        if not brand_promos:
+            continue
+        if query:
+            if query in brand.name.lower():
+                shown = brand_promos
+            else:
+                shown = [p for p in brand_promos if p.id in matched_promo_ids]
+                if not shown:
+                    continue
+        else:
+            shown = brand_promos
+        entries.append(
+            (
+                last_report_by_brand.get(brand.id),
+                CatalogBrand(
+                    id=brand.id,
+                    name=brand.name,
+                    color=brand.color,
+                    logo_url=brand.logo_url,
+                    restaurants_count=counts[brand.id],
+                    promotions=[CatalogPromo(id=p.id, title=p.title) for p in shown],
+                ),
+            )
+        )
+
+    epoch = datetime.fromtimestamp(0, tz=timezone.utc)
+    entries.sort(key=lambda pair: pair[0] or epoch, reverse=True)
+    return [entry for _, entry in entries]
+
+
 @router.get("/restaurants", response_model=list[RestaurantListItem])
 def list_restaurants(
-    q: str | None = None, brand_id: int | None = None, db: Session = Depends(get_db)
+    q: str | None = None,
+    brand_id: int | None = None,
+    city: str | None = None,
+    db: Session = Depends(get_db),
 ):
     now = datetime.now(timezone.utc)
     active_count = (
@@ -77,8 +196,14 @@ def list_restaurants(
         .correlate(Restaurant)
         .scalar_subquery()
     )
+    last_report = (
+        select(func.max(Report.created_at))
+        .where(Report.restaurant_id == Restaurant.id)
+        .correlate(Restaurant)
+        .scalar_subquery()
+    )
     stmt = (
-        select(Restaurant, active_count)
+        select(Restaurant, active_count, last_report)
         .join(Brand)
         .options(joinedload(Restaurant.brand))
         .where(Restaurant.is_active.is_(True))
@@ -86,6 +211,8 @@ def list_restaurants(
     )
     if brand_id is not None:
         stmt = stmt.where(Restaurant.brand_id == brand_id)
+    if city:
+        stmt = stmt.where(Restaurant.city == city)
     if q:
         like = f"%{q.strip()}%"
         stmt = stmt.where(
@@ -96,18 +223,24 @@ def list_restaurants(
             )
         )
     rows = db.execute(stmt).unique().all()
-    return [
+    items = [
         RestaurantListItem(
             id=r.id,
             brand=r.brand,
             title=r.title,
+            city=r.city,
             address=r.address,
             lat=r.lat,
             lng=r.lng,
             active_promotions_count=count,
+            last_report_at=last_report_at,
         )
-        for r, count in rows
+        for r, count, last_report_at in rows
     ]
+    # Свежие точки — первыми (для списка адресов внутри сети)
+    epoch = datetime.fromtimestamp(0, tz=timezone.utc)
+    items.sort(key=lambda item: item.last_report_at or epoch, reverse=True)
+    return items
 
 
 @router.get("/restaurants/{restaurant_id}", response_model=RestaurantDetail)
@@ -133,6 +266,7 @@ def restaurant_detail(restaurant_id: int, db: Session = Depends(get_db)):
         id=restaurant.id,
         brand=restaurant.brand,
         title=restaurant.title,
+        city=restaurant.city,
         address=restaurant.address,
         lat=restaurant.lat,
         lng=restaurant.lng,
@@ -141,19 +275,18 @@ def restaurant_detail(restaurant_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/feed", response_model=list[FeedEntry])
-def feed(q: str | None = None, db: Session = Depends(get_db)):
-    """Главный поисковый эндпоинт: карточки ресторанов с вложенными акциями."""
+def feed(q: str | None = None, city: str | None = None, db: Session = Depends(get_db)):
+    """Поисковый эндпоинт: карточки ресторанов с вложенными акциями."""
     now = datetime.now(timezone.utc)
 
-    restaurants = (
-        db.scalars(
-            select(Restaurant)
-            .options(joinedload(Restaurant.brand))
-            .where(Restaurant.is_active.is_(True))
-        )
-        .unique()
-        .all()
+    restaurants_stmt = (
+        select(Restaurant)
+        .options(joinedload(Restaurant.brand))
+        .where(Restaurant.is_active.is_(True))
     )
+    if city:
+        restaurants_stmt = restaurants_stmt.where(Restaurant.city == city)
+    restaurants = db.scalars(restaurants_stmt).unique().all()
     promotions = (
         db.scalars(
             select(Promotion)

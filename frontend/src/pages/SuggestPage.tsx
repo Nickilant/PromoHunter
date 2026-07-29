@@ -1,8 +1,9 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 import { api } from '../api/client';
 import type { Brand, RestaurantListItem } from '../types';
+import Icon from '../components/Icon';
 
 export default function SuggestPage() {
   const [brands, setBrands] = useState<Brand[]>([]);
@@ -16,6 +17,7 @@ export default function SuggestPage() {
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [done, setDone] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     api.get<Brand[]>('/brands').then(setBrands).catch(() => {});
@@ -59,7 +61,7 @@ export default function SuggestPage() {
     return (
       <div className="page">
         <div className="empty-state">
-          <div className="big">📮</div>
+          <div className="big success"><Icon name="send" size={44} strokeWidth={1.4} /></div>
           <h2>Отправлено на модерацию</h2>
           <div>
             Спасибо! Модератор проверит заявку, статус можно смотреть в профиле.
@@ -76,6 +78,9 @@ export default function SuggestPage() {
   return (
     <div className="page">
       <div className="page-header">
+        <button className="back-btn" onClick={() => navigate(-1)} aria-label="Назад">
+          <Icon name="chevronLeft" size={22} />
+        </button>
         <h1>Заявить акцию</h1>
       </div>
       <form
@@ -165,7 +170,12 @@ export default function SuggestPage() {
 
         {error && <div className="form-error">{error}</div>}
 
-        <button className="btn btn-accent btn-block" disabled={sending}>
+        <button
+          className={`btn btn-accent btn-block${sending ? ' is-busy' : ''}`}
+          disabled={sending}
+          aria-busy={sending}
+        >
+          {sending && <span className="spinner" />}
           {sending ? 'Отправляем…' : 'Отправить на модерацию'}
         </button>
       </form>

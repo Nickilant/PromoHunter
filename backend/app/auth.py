@@ -49,11 +49,33 @@ def get_current_user(
     return user
 
 
+def get_current_user_optional(
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+    db: Session = Depends(get_db),
+) -> User | None:
+    """Для эндпоинтов, где авторизация желательна, но не обязательна."""
+    if credentials is None:
+        return None
+    try:
+        payload = jwt.decode(
+            credentials.credentials, settings.jwt_secret, algorithms=[ALGORITHM]
+        )
+        return db.get(User, int(payload["sub"]))
+    except (JWTError, KeyError, ValueError):
+        return None
+
+
 def require_not_blocked(user: User = Depends(get_current_user)) -> User:
-    """Для write-эндпоинтов: заблокированный пользователь может только читать."""
+    """Для write-эндпоинтов: заблокирован — только чтение; при включённом
+    REQUIRE_PHONE_VERIFICATION дополнительно нужен подтверждённый номер."""
     if user.is_blocked:
         raise HTTPException(
             status.HTTP_403_FORBIDDEN, detail="Ваш аккаунт заблокирован"
+        )
+    if settings.require_phone_verification and not user.is_phone_verified:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            detail="Сначала подтвердите номер через Telegram-бота — кнопка в профиле",
         )
     return user
 

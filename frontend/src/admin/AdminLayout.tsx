@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, NavLink, Outlet } from 'react-router-dom';
 
 import { api } from '../api/client';
-import type { SuggestionGroup } from '../types';
+import type { RestaurantSuggestionGroup, SuggestionGroup } from '../types';
+import Icon from '../components/Icon';
 
 export interface AdminOutletContext {
   refreshPendingCount: () => void;
@@ -13,17 +14,31 @@ const links = [
   { to: 'restaurants', label: 'Рестораны' },
   { to: 'promotions', label: 'Акции' },
   { to: 'users', label: 'Пользователи' },
-  { to: 'suggestions', label: 'Заявки' },
+  { to: 'suggestions', label: 'Заявки: акции', counter: 'promo' as const },
+  {
+    to: 'restaurant-suggestions',
+    label: 'Заявки: рестораны',
+    counter: 'restaurant' as const,
+  },
 ];
 
 export default function AdminLayout() {
-  const [pending, setPending] = useState(0);
+  const [pendingPromo, setPendingPromo] = useState(0);
+  const [pendingRestaurant, setPendingRestaurant] = useState(0);
 
   const refreshPendingCount = useCallback(() => {
     api
       .get<SuggestionGroup[]>('/admin/suggestions?status=pending')
       .then((groups) =>
-        setPending(groups.reduce((sum, g) => sum + g.suggestions.length, 0)),
+        setPendingPromo(groups.reduce((sum, g) => sum + g.suggestions.length, 0)),
+      )
+      .catch(() => {});
+    api
+      .get<RestaurantSuggestionGroup[]>('/admin/restaurant-suggestions?status=pending')
+      .then((groups) =>
+        setPendingRestaurant(
+          groups.reduce((sum, g) => sum + g.suggestions.length, 0),
+        ),
       )
       .catch(() => {});
   }, []);
@@ -31,6 +46,8 @@ export default function AdminLayout() {
   useEffect(() => {
     refreshPendingCount();
   }, [refreshPendingCount]);
+
+  const counters = { promo: pendingPromo, restaurant: pendingRestaurant };
 
   return (
     <div className="admin-shell">
@@ -43,13 +60,16 @@ export default function AdminLayout() {
             className={({ isActive }) => (isActive ? 'active' : '')}
           >
             <span>{l.label}</span>
-            {l.to === 'suggestions' && pending > 0 && (
-              <span className="counter">{pending}</span>
+            {l.counter && counters[l.counter] > 0 && (
+              <span className="counter">{counters[l.counter]}</span>
             )}
           </NavLink>
         ))}
         <div className="spacer" />
-        <Link to="/">← В приложение</Link>
+        <Link to="/" className="admin-back">
+          <Icon name="arrowLeft" size={16} />
+          В приложение
+        </Link>
       </aside>
       <main className="admin-content">
         <Outlet context={{ refreshPendingCount } satisfies AdminOutletContext} />

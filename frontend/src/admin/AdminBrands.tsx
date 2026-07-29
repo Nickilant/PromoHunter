@@ -3,6 +3,7 @@ import { FormEvent, useEffect, useState } from 'react';
 import { api } from '../api/client';
 import { useToast } from '../components/Toast';
 import type { AdminBrand } from '../types';
+import Icon from '../components/Icon';
 
 interface BrandForm {
   id: number | null;
@@ -89,7 +90,15 @@ export default function AdminBrands() {
                 </td>
                 <td>{b.slug}</td>
                 <td>{b.restaurants_count}</td>
-                <td>{b.logo_url ? '✓' : '—'}</td>
+                <td>
+                  {b.logo_url ? (
+                    <span role="img" aria-label="Логотип загружен">
+                      <Icon name="check" size={16} />
+                    </span>
+                  ) : (
+                    '—'
+                  )}
+                </td>
                 <td>
                   <div className="actions">
                     <button
@@ -122,8 +131,8 @@ export default function AdminBrands() {
           <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
               <h2>{form.id === null ? 'Новый бренд' : 'Редактировать бренд'}</h2>
-              <button className="modal-close" onClick={() => setForm(null)}>
-                ✕
+              <button className="modal-close" onClick={() => setForm(null)} aria-label="Закрыть">
+                <Icon name="close" size={20} />
               </button>
             </div>
             <div className="modal-body">

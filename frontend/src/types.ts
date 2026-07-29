@@ -5,6 +5,8 @@ export interface User {
   phone: string;
   is_phone_verified: boolean;
   display_name: string;
+  city: string | null;
+  has_telegram: boolean;
   role: Role;
   is_blocked: boolean;
   created_at: string;
@@ -35,6 +37,7 @@ export interface RestaurantShort {
   id: number;
   brand: BrandShort;
   title: string | null;
+  city: string;
   address: string;
   lat: number;
   lng: number;
@@ -42,6 +45,26 @@ export interface RestaurantShort {
 
 export interface RestaurantListItem extends RestaurantShort {
   active_promotions_count: number;
+  last_report_at: string | null;
+}
+
+export interface CityInfo {
+  name: string;
+  restaurants_count: number;
+}
+
+export interface CatalogPromo {
+  id: number;
+  title: string;
+}
+
+export interface CatalogBrand {
+  id: number;
+  name: string;
+  color: string;
+  logo_url: string | null;
+  restaurants_count: number;
+  promotions: CatalogPromo[];
 }
 
 export interface AdminRestaurant extends RestaurantShort {
@@ -49,7 +72,15 @@ export interface AdminRestaurant extends RestaurantShort {
   created_at: string;
 }
 
-export type ItemStatus = 'available' | 'unavailable' | 'disputed' | 'unknown';
+export type ItemStatus =
+  | 'available'
+  | 'unavailable'
+  | 'maybe_gone'
+  | 'maybe_appeared'
+  | 'disputed'
+  | 'unknown';
+
+export type ReportChannel = 'on_site' | 'delivery';
 
 export interface ItemWithStatus {
   id: number;
@@ -57,6 +88,8 @@ export interface ItemWithStatus {
   status: ItemStatus;
   yes_count: number;
   no_count: number;
+  on_site_count: number;
+  delivery_count: number;
   last_report_at: string | null;
 }
 
@@ -121,6 +154,33 @@ export interface SuggestionGroup {
   suggestions: AdminSuggestion[];
 }
 
+export interface RestaurantSuggestion {
+  id: number;
+  brand: BrandShort;
+  title: string | null;
+  city: string;
+  address: string;
+  lat: number;
+  lng: number;
+  comment: string | null;
+  status: SuggestionStatus;
+  moderator_comment: string | null;
+  created_restaurant_id: number | null;
+  created_at: string;
+  reviewed_at: string | null;
+}
+
+export interface AdminRestaurantSuggestion extends RestaurantSuggestion {
+  user: User;
+}
+
+export interface RestaurantSuggestionGroup {
+  brand_id: number;
+  brand_name: string;
+  brand_color: string;
+  suggestions: AdminRestaurantSuggestion[];
+}
+
 export interface PromotionItemAdmin {
   id: number;
   name: string;
@@ -141,4 +201,64 @@ export interface AdminPromotion {
 
 export interface AdminUser extends User {
   reports_count: number;
+}
+
+export interface TelegramInfo {
+  enabled: boolean;
+  bot_username: string | null;
+}
+
+// --- подписки ---
+
+export interface PromotionShort {
+  id: number;
+  title: string;
+  brand: BrandShort;
+}
+
+export interface Subscription {
+  id: number;
+  restaurant: RestaurantShort | null;
+  promotion: PromotionShort | null;
+  created_at: string;
+}
+
+// --- рейтинг ---
+
+export type RatingPeriod = 'month' | 'year';
+
+export interface RatingEntry {
+  user_id: number;
+  display_name: string;
+  points: number;
+  reports_count: number;
+  pioneers_count: number;
+  position: number;
+}
+
+export interface RatingResponse {
+  entries: RatingEntry[];
+  me: { position: number | null; points: number } | null;
+}
+
+export interface RatingCategory {
+  type: string;
+  count: number;
+  points: number;
+}
+
+export interface RatingEventItem {
+  type: string;
+  points: number;
+  city: string | null;
+  context: string | null;
+  created_at: string;
+}
+
+export interface RatingCard {
+  user_id: number;
+  display_name: string;
+  total_points: number;
+  categories: RatingCategory[];
+  events: RatingEventItem[] | null;
 }

@@ -3,8 +3,10 @@ import { Link, useNavigate } from 'react-router-dom';
 
 import { api } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
-import type { Report, Suggestion } from '../types';
+import { useSubscriptions } from '../hooks/useSubscriptions';
+import type { Report, RestaurantSuggestion, Suggestion, TelegramInfo } from '../types';
 import { formatDateTime } from '../utils/time';
+import Icon from '../components/Icon';
 
 const SUGGESTION_LABELS: Record<Suggestion['status'], { text: string; cls: string }> = {
   pending: { text: 'На модерации', cls: 'warn' },
@@ -16,12 +18,22 @@ export default function ProfilePage() {
   const { user, logout } = useAuth();
   const [reports, setReports] = useState<Report[]>([]);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [restSuggestions, setRestSuggestions] = useState<RestaurantSuggestion[]>([]);
+  const [tgInfo, setTgInfo] = useState<TelegramInfo | null>(null);
+  const { subscriptions, remove } = useSubscriptions();
   const navigate = useNavigate();
 
   useEffect(() => {
     if (!user) return;
     api.get<Report[]>('/reports/mine?limit=100').then(setReports).catch(() => {});
     api.get<Suggestion[]>('/suggestions/mine').then(setSuggestions).catch(() => {});
+    api
+      .get<RestaurantSuggestion[]>('/restaurant-suggestions/mine')
+      .then(setRestSuggestions)
+      .catch(() => {});
+    if (!user.is_phone_verified) {
+      api.get<TelegramInfo>('/telegram/info').then(setTgInfo).catch(() => {});
+    }
   }, [user]);
 
   if (!user) return null;
@@ -31,7 +43,8 @@ export default function ProfilePage() {
       <div className="page-header">
         <h1>Профиль</h1>
         <Link to="/suggest" className="btn btn-accent btn-small">
-          + Заявить акцию
+          <Icon name="plus" size={16} strokeWidth={2.2} />
+          Заявить акцию
         </Link>
       </div>
 
@@ -42,8 +55,37 @@ export default function ProfilePage() {
         </div>
         <div className="row">
           <span className="muted">Телефон</span>
-          <span>{user.phone}</span>
+          <span>
+            {user.phone}{' '}
+            {user.is_phone_verified ? (
+              <span className="tag ok">подтверждён</span>
+            ) : (
+              <span className="tag warn">не подтверждён</span>
+            )}
+          </span>
         </div>
+        <div className="row">
+          <span className="muted">Город</span>
+          <span>{user.city ?? '—'}</span>
+        </div>
+        {!user.is_phone_verified && (
+          <div className="verify-block">
+            Подтвердите номер через Telegram-бота: нажмите Start и кнопку
+            «📱 Подтвердить номер» — подтверждённым отчётам больше доверия,
+            а бот сможет присылать уведомления по подпискам.
+            {tgInfo?.bot_username && (
+              <a
+                className="btn btn-primary btn-block"
+                style={{ marginTop: 8 }}
+                href={`https://t.me/${tgInfo.bot_username}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Открыть бота
+              </a>
+            )}
+          </div>
+        )}
         <div className="row">
           <span className="muted">Отчётов отправлено</span>
           <span>{reports.length >= 100 ? '100+' : reports.length}</span>
@@ -60,9 +102,40 @@ export default function ProfilePage() {
             navigate('/');
           }}
         >
+          <Icon name="logout" size={17} />
           Выйти
         </button>
       </div>
+
+      <div className="section-title">Мои подписки</div>
+      {!user.has_telegram && (
+        <div className="list-item muted">
+          Подписки работают через Telegram-бота — откройте сервис из Telegram,
+          чтобы получать уведомления о новых акциях и статусах
+        </div>
+      )}
+      {user.has_telegram && subscriptions.length === 0 && (
+        <div className="list-item muted">
+          Подписок пока нет — включите колокольчик у акции или точки
+        </div>
+      )}
+      {subscriptions.map((s) => (
+        <div className="list-item" key={s.id}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+            <span>
+              <span className="sub-item">
+                <Icon name={s.restaurant ? 'pin' : 'tag'} size={16} />
+                {s.restaurant
+                  ? `${s.restaurant.title || s.restaurant.brand.name}, ${s.restaurant.address}`
+                  : `${s.promotion?.title} (${s.promotion?.brand.name})`}
+              </span>
+            </span>
+            <button className="btn btn-ghost btn-small" onClick={() => remove(s.id)}>
+              Отписаться
+            </button>
+          </div>
+        </div>
+      ))}
 
       <div className="section-title">Мои отчёты</div>
       {reports.length === 0 && (
@@ -77,7 +150,12 @@ export default function ProfilePage() {
           <div>
             {r.items.map((i) => (
               <span key={i.promotion_item_id} style={{ marginRight: 8 }}>
-                {i.is_available ? '✅' : '❌'} {i.name}
+                <Icon
+                  name={i.is_available ? 'checkCircle' : 'crossCircle'}
+                  size={15}
+                  className={i.is_available ? 'ico-yes' : 'ico-no'}
+                />
+                {i.name}
               </span>
             ))}
           </div>
@@ -85,7 +163,7 @@ export default function ProfilePage() {
         </div>
       ))}
 
-      <div className="section-title">Мои заявки</div>
+      <div className="section-title">Мои заявки на акции</div>
       {suggestions.length === 0 && (
         <div className="list-item muted">Заявок пока нет</div>
       )}
@@ -95,6 +173,28 @@ export default function ProfilePage() {
           <div className="list-item" key={s.id}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
               <strong>{s.title}</strong>
+              <span className={`tag ${label.cls}`}>{label.text}</span>
+            </div>
+            {s.moderator_comment && (
+              <div className="muted">Комментарий модератора: {s.moderator_comment}</div>
+            )}
+            <div className="muted">{formatDateTime(s.created_at)}</div>
+          </div>
+        );
+      })}
+
+      <div className="section-title">Мои заявки на рестораны</div>
+      {restSuggestions.length === 0 && (
+        <div className="list-item muted">Заявок пока нет</div>
+      )}
+      {restSuggestions.map((s) => {
+        const label = SUGGESTION_LABELS[s.status];
+        return (
+          <div className="list-item" key={s.id}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+              <strong>
+                {s.brand.name} — {s.city}, {s.address}
+              </strong>
               <span className={`tag ${label.cls}`}>{label.text}</span>
             </div>
             {s.moderator_comment && (

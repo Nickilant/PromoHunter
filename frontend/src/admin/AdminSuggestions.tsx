@@ -6,7 +6,9 @@ import { useToast } from '../components/Toast';
 import type { AdminBrand, AdminSuggestion, SuggestionGroup } from '../types';
 import { formatDateTime } from '../utils/time';
 import type { AdminOutletContext } from './AdminLayout';
+import CollapsibleGroup from './CollapsibleGroup';
 import PromotionForm, { fromLocalInput, PromotionFormValue } from './PromotionForm';
+import Icon from '../components/Icon';
 
 const STATUS_LABELS: Record<string, { text: string; cls: string }> = {
   pending: { text: 'Ожидает', cls: 'warn' },
@@ -24,6 +26,7 @@ export default function AdminSuggestions() {
   } | null>(null);
   const [rejecting, setRejecting] = useState<AdminSuggestion | null>(null);
   const [rejectComment, setRejectComment] = useState('');
+  const [rejectSpam, setRejectSpam] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { refreshPendingCount } = useOutletContext<AdminOutletContext>();
   const toast = useToast();
@@ -88,9 +91,11 @@ export default function AdminSuggestions() {
     try {
       await api.post(`/admin/suggestions/${rejecting.id}/reject`, {
         moderator_comment: rejectComment,
+        is_spam: rejectSpam,
       });
       setRejecting(null);
       setRejectComment('');
+      setRejectSpam(false);
       load();
       refreshPendingCount();
       toast('Заявка отклонена');
@@ -113,21 +118,24 @@ export default function AdminSuggestions() {
 
       {groups.length === 0 && (
         <div className="empty-state">
-          <div className="big">📭</div>
+          <div className="big"><Icon name="inbox" size={44} strokeWidth={1.4} /></div>
           <div>Заявок нет</div>
         </div>
       )}
 
       {groups.map((g) => (
-        <div className="suggestion-group" key={`${g.brand_id ?? 'raw'}-${g.brand_name}`}>
-          <div className="suggestion-group-head">
-            {g.brand_color && (
-              <span className="color-dot" style={{ background: g.brand_color }} />
-            )}
-            {g.brand_name}
-            {g.brand_id === null && <span className="tag warn">бренда нет в базе</span>}
-            <span className="tag">{g.suggestions.length}</span>
-          </div>
+        <CollapsibleGroup
+          key={`${g.brand_id ?? 'raw'}-${g.brand_name}`}
+          title={g.brand_name}
+          color={g.brand_color}
+          count={g.suggestions.length}
+          badge={
+            g.brand_id === null ? (
+              <span className="tag warn">бренда нет в базе</span>
+            ) : undefined
+          }
+        >
+          <div className="suggestion-group">
           {g.suggestions.map((s) => {
             const label = STATUS_LABELS[s.status];
             return (
@@ -158,6 +166,7 @@ export default function AdminSuggestions() {
                       className="btn btn-danger btn-small"
                       onClick={() => {
                         setRejectComment('');
+                        setRejectSpam(false);
                         setRejecting(s);
                       }}
                     >
@@ -168,7 +177,8 @@ export default function AdminSuggestions() {
               </div>
             );
           })}
-        </div>
+          </div>
+        </CollapsibleGroup>
       ))}
 
       {approving && (
@@ -181,8 +191,8 @@ export default function AdminSuggestions() {
                   Проверьте и поправьте данные — они подтянуты из заявки
                 </div>
               </div>
-              <button className="modal-close" onClick={() => setApproving(null)}>
-                ✕
+              <button className="modal-close" onClick={() => setApproving(null)} aria-label="Закрыть">
+                <Icon name="close" size={20} />
               </button>
             </div>
             <div className="modal-body">
@@ -203,8 +213,8 @@ export default function AdminSuggestions() {
           <div className="admin-modal" style={{ maxWidth: 480 }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
               <h2>Отклонить заявку</h2>
-              <button className="modal-close" onClick={() => setRejecting(null)}>
-                ✕
+              <button className="modal-close" onClick={() => setRejecting(null)} aria-label="Закрыть">
+                <Icon name="close" size={20} />
               </button>
             </div>
             <div className="modal-body">
@@ -216,6 +226,20 @@ export default function AdminSuggestions() {
                   onChange={(e) => setRejectComment(e.target.value)}
                   placeholder="Например: дубликат, акция уже создана"
                 />
+              </div>
+              <div className="field">
+                <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input
+                    type="checkbox"
+                    checked={rejectSpam}
+                    onChange={(e) => setRejectSpam(e.target.checked)}
+                    style={{ width: 'auto' }}
+                  />
+                  Выдумка / спам — оштрафовать автора в рейтинге (−10)
+                </label>
+                <div className="hint">
+                  Обычный дубликат или неактуальную заявку не штрафуем
+                </div>
               </div>
             </div>
             <div className="modal-footer">

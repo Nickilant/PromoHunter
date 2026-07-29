@@ -29,7 +29,8 @@ def test_phone_normalization_and_login(client):
     )
     assert resp.status_code == 200
     assert resp.json()["user"]["phone"] == "+79161112233"
-    assert resp.json()["user"]["is_phone_verified"] is True
+    # веб-регистрация не подтверждает номер — это делает Telegram-бот
+    assert resp.json()["user"]["is_phone_verified"] is False
 
     # вход в любом привычном написании номера
     resp = client.post(

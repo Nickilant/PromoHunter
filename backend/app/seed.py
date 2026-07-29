@@ -19,8 +19,10 @@ from app.models import (
     PromotionItem,
     PromotionSuggestion,
     Report,
+    ReportChannel,
     ReportItem,
     Restaurant,
+    RestaurantSuggestion,
     User,
     UserRole,
 )
@@ -37,6 +39,7 @@ def get_or_create_user(db: Session, phone: str, name: str, role: UserRole) -> Us
             is_phone_verified=True,
             password_hash=hash_password(password),
             display_name=name,
+            city="Санкт-Петербург",
             role=role,
         )
         db.add(user)
@@ -54,7 +57,13 @@ def get_or_create_brand(db: Session, name: str, slug: str, color: str) -> Brand:
 
 
 def get_or_create_restaurant(
-    db: Session, brand: Brand, title: str | None, address: str, lat: float, lng: float
+    db: Session,
+    brand: Brand,
+    title: str | None,
+    address: str,
+    lat: float,
+    lng: float,
+    city: str = "Санкт-Петербург",
 ) -> Restaurant:
     restaurant = db.scalar(
         select(Restaurant).where(
@@ -63,7 +72,7 @@ def get_or_create_restaurant(
     )
     if restaurant is None:
         restaurant = Restaurant(
-            brand_id=brand.id, title=title, address=address, lat=lat, lng=lng
+            brand_id=brand.id, title=title, city=city, address=address, lat=lat, lng=lng
         )
         db.add(restaurant)
         db.flush()
@@ -103,11 +112,13 @@ def add_report(
     promotion: Promotion,
     votes: dict[int, bool],
     created_at: datetime,
+    channel: ReportChannel = ReportChannel.on_site,
 ) -> None:
     report = Report(
         user_id=user.id,
         restaurant_id=restaurant.id,
         promotion_id=promotion.id,
+        channel=channel,
         created_at=created_at,
         items=[
             ReportItem(promotion_item_id=item_id, is_available=is_available)
@@ -159,6 +170,18 @@ def seed(db: Session) -> None:
         ),
         get_or_create_restaurant(
             db, rostics, "ТРК Балканский", "Балканская пл., 5", 59.8290, 30.3790
+        ),
+    ]
+    # Москва — чтобы было видно переключение города
+    moscow = [
+        get_or_create_restaurant(
+            db, vit, None, "Тверская ул., 12", 55.7615, 37.6095, city="Москва"
+        ),
+        get_or_create_restaurant(
+            db, bk, None, "Арбат, 30", 55.7495, 37.5905, city="Москва"
+        ),
+        get_or_create_restaurant(
+            db, rostics, None, "Мясницкая ул., 15", 55.7638, 37.6330, city="Москва"
         ),
     ]
 
@@ -223,9 +246,9 @@ def seed(db: Session) -> None:
         add_report(db, admin, r0, cups, {cup_ids[3]: True}, now - timedelta(hours=40))
         # фиолетовый и оранжевый: отчётов нет -> unknown
 
-        # Остальные точки: случайный разброс за последние 48 часов.
+        # Остальные точки (включая Москву): случайный разброс за последние 48 часов.
         pairs = []
-        for restaurant in restaurants[1:]:
+        for restaurant in restaurants[1:] + moscow:
             if restaurant.brand_id == vit.id:
                 promos = [cups, sauce]
             elif restaurant.brand_id == bk.id:
@@ -254,6 +277,9 @@ def seed(db: Session) -> None:
                     promo,
                     votes,
                     now - timedelta(minutes=rng.randint(10, 48 * 60)),
+                    channel=ReportChannel.delivery
+                    if rng.random() < 0.2
+                    else ReportChannel.on_site,
                 )
                 created += 1
         db.flush()
@@ -302,7 +328,52 @@ def seed(db: Session) -> None:
             "Красная кружка при покупке большого кофе.", ["Кружка красная"], 2,
         )
 
+    # --- заявки на рестораны (2 по одному бренду — для проверки группировки) ---
+    rest_suggestions_exist = (
+        db.scalar(select(func.count(RestaurantSuggestion.id))) or 0
+    ) > 0
+    if not rest_suggestions_exist:
+        db.add_all(
+            [
+                RestaurantSuggestion(
+                    user_id=users[0].id,
+                    brand_id=bk.id,
+                    city="Санкт-Петербург",
+                    address="Комендантский пр., 9",
+                    lat=60.0080,
+                    lng=30.2590,
+                    comment="Открылся в ТРК «Атмосфера», на карте его нет.",
+                    created_at=now - timedelta(days=1),
+                ),
+                RestaurantSuggestion(
+                    user_id=users[2].id,
+                    brand_id=bk.id,
+                    city="Санкт-Петербург",
+                    address="Комендантский проспект 9, ТРК Атмосфера",
+                    lat=60.0081,
+                    lng=30.2588,
+                    created_at=now - timedelta(days=2),
+                ),
+                RestaurantSuggestion(
+                    user_id=users[3].id,
+                    brand_id=vit.id,
+                    city="Москва",
+                    address="Земляной Вал, 33",
+                    lat=55.7570,
+                    lng=37.6590,
+                    comment="В ТЦ «Атриум» у Курского вокзала.",
+                    created_at=now - timedelta(hours=10),
+                ),
+            ]
+        )
+
     db.commit()
+
+    # Дозреваем вердикты по старым отчётам: появляются веса, очки рейтинга
+    # и устойчивые статусы (идемпотентно — второй раз ничего не создаст)
+    from app.services.trust import run_trust_pass
+
+    run_trust_pass(db)
 
 
 def main() -> None:

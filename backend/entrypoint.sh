@@ -11,14 +11,16 @@ from sqlalchemy import create_engine, text
 from app.config import settings
 
 engine = create_engine(settings.database_url)
+last_error = None
 for _ in range(60):
     try:
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
         sys.exit(0)
-    except Exception:
+    except Exception as exc:  # noqa: BLE001 — печатаем причину при выходе
+        last_error = exc
         time.sleep(1)
-print("Database is not reachable", file=sys.stderr)
+print(f"Database is not reachable, last error:\n{last_error}", file=sys.stderr)
 sys.exit(1)
 PY
 

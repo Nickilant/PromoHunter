@@ -1,5 +1,8 @@
 # Прод-override: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 services:
+  db:
+    restart: unless-stopped
+
   backend:
     build:
       context: ./backend
@@ -7,18 +10,27 @@ services:
       args:
         UID: ${UID:-1000}
         GID: ${GID:-1000}
+    restart: unless-stopped
     environment:
       SEED_ON_START: "false"
     # !reset: иначе compose домёрживает bind-mount'ы и порты из базового файла
     volumes: !reset []
     ports: !reset []
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
+    # Число воркеров настраивается в .env (UVICORN_WORKERS);
+    # 2 достаточно для MVP и не съедает память маленького VPS
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers ${UVICORN_WORKERS:-2}
 
   frontend:
     build:
       context: ./frontend
       target: prod
+    restart: unless-stopped
+    # nginx на старте резолвит имя backend — контейнер должен уже существовать
+    depends_on:
+      backend:
+        condition: service_started
     volumes: !reset []
     ports: !override
-      - "80:80"
+      # Наружу смотрит хостовый nginx с SSL, он проксирует сюда (см. README)
+      - "127.0.0.1:8080:80"
     command: ["nginx", "-g", "daemon off;"]

@@ -9,14 +9,20 @@ import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import { ToastProvider } from './components/Toast';
 import { AuthProvider } from './hooks/useAuth';
+import { CityProvider } from './hooks/useCity';
+import { SubscriptionsProvider } from './hooks/useSubscriptions';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <BrowserRouter>
       <AuthProvider>
-        <ToastProvider>
-          <App />
-        </ToastProvider>
+        <CityProvider>
+          <ToastProvider>
+            <SubscriptionsProvider>
+              <App />
+            </SubscriptionsProvider>
+          </ToastProvider>
+        </CityProvider>
       </AuthProvider>
     </BrowserRouter>
   </React.StrictMode>,

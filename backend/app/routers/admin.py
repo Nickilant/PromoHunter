@@ -7,13 +7,22 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.auth import require_admin
 from app.database import get_db
+from app.config import settings
+from app.services.notify import (
+    notify_new_promotion,
+    notify_promotion_deleted,
+    notify_promotion_update,
+)
 from app.models import (
     Brand,
     Promotion,
     PromotionItem,
     PromotionSuggestion,
+    RatingEvent,
     Report,
     Restaurant,
+    RestaurantSuggestion,
+    Subscription,
     SuggestionStatus,
     User,
 )
@@ -21,6 +30,7 @@ from app.schemas import (
     AdminBrandOut,
     AdminPromotionOut,
     AdminRestaurantOut,
+    AdminRestaurantSuggestionOut,
     AdminSuggestionOut,
     AdminUserOut,
     BrandIn,
@@ -29,6 +39,8 @@ from app.schemas import (
     PromotionPatch,
     RestaurantIn,
     RestaurantPatch,
+    RestaurantSuggestionApproveIn,
+    RestaurantSuggestionGroupOut,
     SuggestionApproveIn,
     SuggestionGroupOut,
     SuggestionRejectIn,
@@ -246,7 +258,19 @@ def create_promotion(
     )
     db.add(promotion)
     db.commit()
-    return _load_promotion(db, promotion.id)
+    promotion = _load_promotion(db, promotion.id)
+    if _is_currently_active(promotion):
+        notify_new_promotion(db, promotion)
+    return promotion
+
+
+def _is_currently_active(promotion: Promotion) -> bool:
+    now = datetime.now(timezone.utc)
+    return (
+        promotion.is_active
+        and (promotion.starts_at is None or promotion.starts_at <= now)
+        and (promotion.ends_at is None or promotion.ends_at >= now)
+    )
 
 
 @router.patch("/promotions/{promotion_id}", response_model=AdminPromotionOut)
@@ -254,9 +278,14 @@ def update_promotion(
     promotion_id: int, payload: PromotionPatch, db: Session = Depends(get_db)
 ):
     promotion = _load_promotion(db, promotion_id)
+    was_active = _is_currently_active(promotion)
     data = payload.model_dump(exclude_unset=True)
     if "brand_id" in data and db.get(Brand, data["brand_id"]) is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Бренд не найден")
+    changed = any(
+        key in data and getattr(promotion, key) != data[key]
+        for key in ("title", "description", "starts_at", "ends_at", "is_active")
+    ) or payload.items is not None
     for key in ("brand_id", "title", "description", "starts_at", "ends_at", "is_active"):
         if key in data:
             setattr(promotion, key, data[key])
@@ -282,17 +311,45 @@ def update_promotion(
         promotion.items = new_items
 
     db.commit()
-    return _load_promotion(db, promotion_id)
+    promotion = _load_promotion(db, promotion_id)
+
+    # Уведомления подписчикам: акция появилась / изменилась / завершилась
+    is_active_now = _is_currently_active(promotion)
+    if not was_active and is_active_now:
+        notify_new_promotion(db, promotion)
+    elif was_active and not is_active_now:
+        notify_promotion_update(db, promotion, "акция завершена")
+    elif changed and is_active_now:
+        notify_promotion_update(db, promotion, "условия акции обновились")
+    return promotion
 
 
 @router.delete("/promotions/{promotion_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_promotion(promotion_id: int, db: Session = Depends(get_db)):
-    promotion = db.get(Promotion, promotion_id)
+    promotion = db.scalar(
+        select(Promotion)
+        .options(joinedload(Promotion.brand))
+        .where(Promotion.id == promotion_id)
+    )
     if promotion is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Акция не найдена")
-    # Каскадом уходят items и отчёты (FK ondelete=CASCADE)
+    # Чаты подписчиков собираем до каскадного удаления подписок
+    subscriber_chats = list(
+        db.scalars(
+            select(User.telegram_id)
+            .join(Subscription, Subscription.user_id == User.id)
+            .where(
+                Subscription.promotion_id == promotion_id,
+                User.telegram_id.is_not(None),
+                User.is_blocked.is_(False),
+            )
+        )
+    )
+    title, brand_name = promotion.title, promotion.brand.name
+    # Каскадом уходят items, отчёты и подписки (FK ondelete=CASCADE)
     db.delete(promotion)
     db.commit()
+    notify_promotion_deleted(subscriber_chats, title, brand_name)
 
 
 # --- users ---
@@ -385,6 +442,125 @@ def admin_suggestions(
     return list(groups.values())
 
 
+@router.get(
+    "/restaurant-suggestions", response_model=list[RestaurantSuggestionGroupOut]
+)
+def admin_restaurant_suggestions(
+    status_filter: SuggestionStatus | None = Query(default=None, alias="status"),
+    db: Session = Depends(get_db),
+):
+    stmt = (
+        select(RestaurantSuggestion)
+        .options(
+            joinedload(RestaurantSuggestion.user),
+            joinedload(RestaurantSuggestion.brand),
+        )
+        .order_by(RestaurantSuggestion.created_at.desc())
+    )
+    if status_filter is not None:
+        stmt = stmt.where(RestaurantSuggestion.status == status_filter)
+    suggestions = db.scalars(stmt).unique().all()
+
+    groups: dict[int, RestaurantSuggestionGroupOut] = {}
+    for s in suggestions:
+        group = groups.get(s.brand_id)
+        if group is None:
+            group = RestaurantSuggestionGroupOut(
+                brand_id=s.brand_id,
+                brand_name=s.brand.name,
+                brand_color=s.brand.color,
+                suggestions=[],
+            )
+            groups[s.brand_id] = group
+        group.suggestions.append(AdminRestaurantSuggestionOut.model_validate(s))
+    return list(groups.values())
+
+
+@router.post(
+    "/restaurant-suggestions/{suggestion_id}/approve",
+    response_model=AdminRestaurantOut,
+)
+def approve_restaurant_suggestion(
+    suggestion_id: int,
+    payload: RestaurantSuggestionApproveIn,
+    db: Session = Depends(get_db),
+):
+    suggestion = db.get(RestaurantSuggestion, suggestion_id)
+    if suggestion is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Заявка не найдена")
+    if suggestion.status != SuggestionStatus.pending:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail="Заявка уже рассмотрена")
+    if db.get(Brand, payload.brand_id) is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Бренд не найден")
+
+    restaurant = Restaurant(
+        brand_id=payload.brand_id,
+        title=(payload.title or "").strip() or None,
+        city=payload.city.strip(),
+        address=payload.address.strip(),
+        lat=payload.lat,
+        lng=payload.lng,
+    )
+    db.add(restaurant)
+    db.flush()
+
+    suggestion.status = SuggestionStatus.approved
+    suggestion.created_restaurant_id = restaurant.id
+    suggestion.reviewed_at = datetime.now(timezone.utc)
+    db.add(
+        RatingEvent(
+            user_id=suggestion.user_id,
+            city=restaurant.city,
+            type="restaurant_approved",
+            points=settings.rating_suggestion_points,
+            restaurant_suggestion_id=suggestion.id,
+        )
+    )
+    db.commit()
+    restaurant = db.scalar(
+        select(Restaurant)
+        .options(joinedload(Restaurant.brand))
+        .where(Restaurant.id == restaurant.id)
+    )
+    return restaurant
+
+
+@router.post(
+    "/restaurant-suggestions/{suggestion_id}/reject",
+    response_model=AdminRestaurantSuggestionOut,
+)
+def reject_restaurant_suggestion(
+    suggestion_id: int, payload: SuggestionRejectIn, db: Session = Depends(get_db)
+):
+    suggestion = db.get(RestaurantSuggestion, suggestion_id)
+    if suggestion is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Заявка не найдена")
+    if suggestion.status != SuggestionStatus.pending:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail="Заявка уже рассмотрена")
+    suggestion.status = SuggestionStatus.rejected
+    suggestion.moderator_comment = payload.moderator_comment.strip()
+    suggestion.reviewed_at = datetime.now(timezone.utc)
+    if payload.is_spam:
+        db.add(
+            RatingEvent(
+                user_id=suggestion.user_id,
+                city=suggestion.city,
+                type="restaurant_spam",
+                points=settings.rating_spam_points,
+                restaurant_suggestion_id=suggestion.id,
+            )
+        )
+    db.commit()
+    return db.scalar(
+        select(RestaurantSuggestion)
+        .options(
+            joinedload(RestaurantSuggestion.user),
+            joinedload(RestaurantSuggestion.brand),
+        )
+        .where(RestaurantSuggestion.id == suggestion_id)
+    )
+
+
 @router.post("/suggestions/{suggestion_id}/approve", response_model=AdminPromotionOut)
 def approve_suggestion(
     suggestion_id: int,
@@ -422,8 +598,28 @@ def approve_suggestion(
     suggestion.status = SuggestionStatus.approved
     suggestion.created_promotion_id = promotion.id
     suggestion.reviewed_at = datetime.now(timezone.utc)
+
+    # Рейтинг автору заявки: человек принёс в сервис целую акцию
+    author = db.get(User, suggestion.user_id)
+    restaurant = (
+        db.get(Restaurant, suggestion.restaurant_id)
+        if suggestion.restaurant_id
+        else None
+    )
+    db.add(
+        RatingEvent(
+            user_id=suggestion.user_id,
+            city=restaurant.city if restaurant else (author.city if author else None),
+            type="suggestion_approved",
+            points=settings.rating_suggestion_points,
+            suggestion_id=suggestion.id,
+        )
+    )
     db.commit()
-    return _load_promotion(db, promotion.id)
+    promotion = _load_promotion(db, promotion.id)
+    if _is_currently_active(promotion):
+        notify_new_promotion(db, promotion)
+    return promotion
 
 
 @router.post("/suggestions/{suggestion_id}/reject", response_model=AdminSuggestionOut)
@@ -438,6 +634,25 @@ def reject_suggestion(
     suggestion.status = SuggestionStatus.rejected
     suggestion.moderator_comment = payload.moderator_comment.strip()
     suggestion.reviewed_at = datetime.now(timezone.utc)
+
+    # Штраф только за «выдумку/спам» с явной пометкой модератора —
+    # обычный дубликат не наказываем
+    if payload.is_spam:
+        author = db.get(User, suggestion.user_id)
+        restaurant = (
+            db.get(Restaurant, suggestion.restaurant_id)
+            if suggestion.restaurant_id
+            else None
+        )
+        db.add(
+            RatingEvent(
+                user_id=suggestion.user_id,
+                city=restaurant.city if restaurant else (author.city if author else None),
+                type="suggestion_spam",
+                points=settings.rating_spam_points,
+                suggestion_id=suggestion.id,
+            )
+        )
     db.commit()
     suggestion = db.scalar(
         select(PromotionSuggestion)

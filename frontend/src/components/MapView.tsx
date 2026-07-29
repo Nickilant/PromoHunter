@@ -2,6 +2,7 @@
 // чтобы карту можно было заменить (например, на Яндекс.Карты), не трогая остальное.
 import 'leaflet/dist/leaflet.css';
 
+import { useEffect } from 'react';
 import {
   CircleMarker,
   MapContainer,
@@ -11,11 +12,30 @@ import {
 } from 'react-leaflet';
 
 import type { RestaurantListItem } from '../types';
+import Icon from './Icon';
 
 const DEFAULT_CENTER: [number, number] = [59.935, 30.325]; // Санкт-Петербург
 const DEFAULT_ZOOM = 12;
 const TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-const TILE_ATTRIBUTION = '&copy; OpenStreetMap contributors';
+// Копирайт OSM обязателен по условиям бесплатных тайлов — оставляем его,
+// но без префикса «Leaflet» и в максимально ненавязчивом виде (см. CSS)
+const TILE_ATTRIBUTION =
+  '<a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">© OpenStreetMap</a>';
+
+/** Убирает префикс «🇺🇦 Leaflet» из плашки атрибуции */
+function CleanAttribution() {
+  const map = useMap();
+  useEffect(() => {
+    map.attributionControl?.setPrefix('');
+  }, [map]);
+  return null;
+}
+
+export interface MapFocus {
+  lat: number;
+  lng: number;
+  zoom?: number;
+}
 
 function LocateButton() {
   const map = useMap();
@@ -35,22 +55,68 @@ function LocateButton() {
         locate();
       }}
       aria-label="Найти меня"
+      title="Найти меня"
     >
-      📍
+      <Icon name="locate" size={21} />
     </button>
   );
+}
+
+/** Центрирует карту на точке (поиск адреса) */
+function FlyTo({ focus }: { focus: MapFocus | null }) {
+  const map = useMap();
+  useEffect(() => {
+    if (focus) map.flyTo([focus.lat, focus.lng], focus.zoom ?? 16);
+  }, [focus, map]);
+  return null;
+}
+
+/** Вписывает в экран все маркеры города при их смене */
+function FitToMarkers({ points }: { points: [number, number][] }) {
+  const map = useMap();
+  const key = points.map((p) => p.join(',')).join(';');
+  useEffect(() => {
+    if (points.length > 0) {
+      map.fitBounds(points, { padding: [48, 48], maxZoom: 14 });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key, map]);
+  return null;
 }
 
 interface RestaurantsMapProps {
   restaurants: RestaurantListItem[];
   selectedId: number | null;
   onSelect: (id: number) => void;
+  focus: MapFocus | null;
+  searchPoint: MapFocus | null;
 }
 
-export function RestaurantsMap({ restaurants, selectedId, onSelect }: RestaurantsMapProps) {
+export function RestaurantsMap({
+  restaurants,
+  selectedId,
+  onSelect,
+  focus,
+  searchPoint,
+}: RestaurantsMapProps) {
   return (
     <MapContainer center={DEFAULT_CENTER} zoom={DEFAULT_ZOOM} zoomControl={false}>
       <TileLayer url={TILE_URL} attribution={TILE_ATTRIBUTION} />
+      <CleanAttribution />
+      <FitToMarkers points={restaurants.map((r) => [r.lat, r.lng])} />
+      <FlyTo focus={focus} />
+      {searchPoint && (
+        <CircleMarker
+          center={[searchPoint.lat, searchPoint.lng]}
+          radius={9}
+          pathOptions={{
+            color: '#C98B6B',
+            weight: 3,
+            fillColor: '#fff',
+            fillOpacity: 0.9,
+          }}
+        />
+      )}
       {restaurants.map((r) => (
         <CircleMarker
           key={r.id}
@@ -81,9 +147,11 @@ interface LocationPickerProps {
   lat: number | null;
   lng: number | null;
   onPick: (lat: number, lng: number) => void;
+  /** Точка из поиска по адресу — карта подлетает к ней */
+  focus?: MapFocus | null;
 }
 
-export function LocationPickerMap({ lat, lng, onPick }: LocationPickerProps) {
+export function LocationPickerMap({ lat, lng, onPick, focus = null }: LocationPickerProps) {
   const hasPoint = lat !== null && lng !== null && !(lat === 0 && lng === 0);
   return (
     <MapContainer
@@ -91,7 +159,9 @@ export function LocationPickerMap({ lat, lng, onPick }: LocationPickerProps) {
       zoom={hasPoint ? 15 : DEFAULT_ZOOM}
     >
       <TileLayer url={TILE_URL} attribution={TILE_ATTRIBUTION} />
+      <CleanAttribution />
       <ClickHandler onPick={onPick} />
+      <FlyTo focus={focus} />
       {hasPoint && (
         <CircleMarker
           center={[lat!, lng!]}
