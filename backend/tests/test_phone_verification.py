@@ -2,8 +2,17 @@ import pytest
 from sqlalchemy import select
 
 from app.config import settings
-from app.models import User
+from app.models import PhoneVerification, User
 from app.services.telegram_bot import handle_update
+
+
+@pytest.fixture()
+def telegram_on(monkeypatch):
+    old = settings.telegram_bot_token
+    settings.telegram_bot_token = "12345:TEST"
+    monkeypatch.setattr("app.telegram.bot_username", lambda: "promohunter_bot")
+    yield
+    settings.telegram_bot_token = old
 
 
 @pytest.fixture()
@@ -72,6 +81,101 @@ def test_start_shows_keyboard(db, sent, monkeypatch):
     )
     handle_update(db, {"update_id": 1, "message": {"chat": {"id": 1}, "from": {"id": 1}, "text": "/start"}})
     assert keyboards and keyboards[0] and "keyboard" in keyboards[0]
+
+
+def test_registration_code_flow(client, db, telegram_on, sent, monkeypatch):
+    """Полный сценарий из формы регистрации: запрос кода -> контакт боту ->
+    код в Telegram -> подтверждение -> регистрация."""
+    direct: list[tuple[int, str]] = []
+    monkeypatch.setattr(
+        "app.telegram.send_message",
+        lambda chat_id, text, reply_markup=None: direct.append((chat_id, text)),
+    )
+
+    # 1. «Подтвердить номер»: бот этот номер ещё не знает
+    resp = client.post(
+        "/api/auth/phone-verification/request", json={"phone": "+79167770301"}
+    )
+    assert resp.status_code == 200
+    assert resp.json() == {"delivery": "await_contact", "bot_username": "promohunter_bot"}
+
+    # без кода регистрация закрыта
+    resp = client.post(
+        "/api/auth/register",
+        json={"phone": "+79167770301", "password": "secret123", "display_name": "Аня"},
+    )
+    assert resp.status_code == 403
+
+    # повторный запрос сразу — кулдаун
+    resp = client.post(
+        "/api/auth/phone-verification/request", json={"phone": "+79167770301"}
+    )
+    assert resp.status_code == 429
+
+    # 2. Пользователь отправил боту контакт — бот прислал код
+    handle_update(db, contact_update(from_id=505, phone="+79167770301"))
+    code_message = next(text for chat, text in sent if chat == 505)
+    verification = db.scalar(
+        select(PhoneVerification).where(PhoneVerification.phone == "+79167770301")
+    )
+    assert verification.code in code_message
+    assert verification.telegram_id == 505
+
+    # 3. Неверный код — отказ, верный — подтверждение
+    resp = client.post(
+        "/api/auth/phone-verification/confirm",
+        json={"phone": "+79167770301", "code": "9999"},
+    )
+    assert resp.status_code == 400
+    resp = client.post(
+        "/api/auth/phone-verification/confirm",
+        json={"phone": "+79167770301", "code": verification.code},
+    )
+    assert resp.status_code == 200 and resp.json()["verified"] is True
+
+    # 4. Регистрация проходит; номер подтверждён, Telegram привязан
+    resp = client.post(
+        "/api/auth/register",
+        json={"phone": "+7 916 777-03-01", "password": "secret123", "display_name": "Аня"},
+    )
+    assert resp.status_code == 200
+    user = resp.json()["user"]
+    assert user["is_phone_verified"] is True
+    assert user["has_telegram"] is True
+
+    # 5. Повторный запрос кода на занятый номер — 409
+    resp = client.post(
+        "/api/auth/phone-verification/request", json={"phone": "+79167770301"}
+    )
+    assert resp.status_code == 409
+
+
+def test_code_sent_directly_when_telegram_known(client, db, telegram_on, monkeypatch):
+    """Если бот уже знает номер (прошлая заявка) — код уходит сразу."""
+    direct: list[tuple[int, str]] = []
+    monkeypatch.setattr(
+        "app.telegram.send_message",
+        lambda chat_id, text, reply_markup=None: direct.append((chat_id, text)),
+    )
+    from datetime import datetime, timedelta, timezone
+
+    db.add(
+        PhoneVerification(
+            phone="+79167770400",
+            code="1111",
+            telegram_id=606,
+            expires_at=datetime.now(timezone.utc) - timedelta(minutes=1),
+            created_at=datetime.now(timezone.utc) - timedelta(minutes=30),
+        )
+    )
+    db.commit()
+
+    resp = client.post(
+        "/api/auth/phone-verification/request", json={"phone": "+79167770400"}
+    )
+    assert resp.status_code == 200
+    assert resp.json()["delivery"] == "sent"
+    assert direct and direct[0][0] == 606
 
 
 def test_require_verification_flag(client, db, sent):

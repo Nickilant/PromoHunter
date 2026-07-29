@@ -35,6 +35,25 @@ class LoginIn(PhoneMixin):
     password: str
 
 
+class PhoneVerificationRequestIn(PhoneMixin):
+    pass
+
+
+class PhoneVerificationRequestOut(BaseModel):
+    # sent — код уже улетел в Telegram; await_contact — сначала нужно
+    # отправить боту свой контакт, тогда он пришлёт код
+    delivery: str
+    bot_username: str | None = None
+
+
+class PhoneVerificationConfirmIn(PhoneMixin):
+    code: str = Field(min_length=1, max_length=8)
+
+
+class PhoneVerificationConfirmOut(BaseModel):
+    verified: bool
+
+
 class TelegramAuthIn(BaseModel):
     init_data: str
     city: str | None = Field(default=None, max_length=100)

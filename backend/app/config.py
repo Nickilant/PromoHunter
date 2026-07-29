@@ -50,6 +50,9 @@ class Settings(BaseSettings):
     # --- Telegram (WebApp-авторизация, бот-уведомления, подтверждение номера) ---
     telegram_bot_token: str = ""  # пусто — телеграм-функции выключены
     telegram_polling_enabled: bool = True  # бот слушает сообщения (подтверждение номера)
+    phone_code_ttl_minutes: int = 10       # срок жизни кода подтверждения
+    phone_code_resend_seconds: int = 60    # кулдаун повторного запроса кода
+    phone_code_max_attempts: int = 5       # попыток ввода кода
     # Требовать подтверждённый номер для отчётов/заявок/подписок.
     # По умолчанию выключено — локальная разработка работает без Telegram.
     require_phone_verification: bool = False

@@ -11,11 +11,12 @@ user_id владельца -> номер сверяется с аккаунто�
 
 import logging
 import time
+from datetime import datetime, timezone
 
 from sqlalchemy import func, select
 
 from app.database import SessionLocal
-from app.models import User
+from app.models import PhoneVerification, User
 from app.phone import normalize_phone
 from app.telegram import enabled, get_updates, send_message
 
@@ -32,8 +33,9 @@ REMOVE_KEYBOARD = {"remove_keyboard": True}
 
 WELCOME = (
     "Привет! Это бот PromoHunter.\n\n"
-    "Чтобы подтвердить номер телефона из вашего аккаунта, нажмите кнопку "
-    "«📱 Подтвердить номер» ниже и разрешите отправку контакта.\n\n"
+    "Нажмите кнопку «📱 Подтвердить номер» ниже и разрешите отправку "
+    "контакта: если вы регистрируетесь — пришлю код для формы на сайте, "
+    "если аккаунт уже есть — сразу подтвержу номер.\n\n"
     "Открыть само приложение можно кнопкой меню рядом с полем ввода."
 )
 HINT = (
@@ -56,11 +58,32 @@ def _handle_contact(db, chat_id: int, from_id: int, contact: dict) -> None:
 
     user = db.scalar(select(User).where(User.phone == phone))
     if user is None:
+        # Идёт регистрация на сайте? Привязываем чат и отправляем код
+        pending = db.scalar(
+            select(PhoneVerification)
+            .where(
+                PhoneVerification.phone == phone,
+                PhoneVerification.is_confirmed.is_(False),
+                PhoneVerification.expires_at >= datetime.now(timezone.utc),
+            )
+            .order_by(PhoneVerification.id.desc())
+        )
+        if pending is not None:
+            pending.telegram_id = from_id
+            db.commit()
+            send_message(
+                chat_id,
+                f"Ваш код подтверждения PromoHunter: <b>{pending.code}</b>\n"
+                "Введите его в форме регистрации на сайте.",
+                reply_markup=REMOVE_KEYBOARD,
+            )
+            return
         send_message(
             chat_id,
-            f"Аккаунт с номером {phone} не найден. Зарегистрируйтесь на сайте "
-            "с этим номером — или откройте приложение кнопкой меню, вход "
-            "через Telegram создаст аккаунт автоматически.",
+            f"Аккаунт с номером {phone} не найден. Начните регистрацию на "
+            "сайте и нажмите «Подтвердить номер» — затем вернитесь сюда. "
+            "Или откройте приложение кнопкой меню: вход через Telegram "
+            "создаст аккаунт автоматически.",
             reply_markup=REMOVE_KEYBOARD,
         )
         return

@@ -304,6 +304,28 @@ class ItemStatusState(Base):
     )
 
 
+class PhoneVerification(Base):
+    """Код подтверждения номера при регистрации.
+
+    Код доставляет телеграм-бот: если чат с этим номером уже знаком боту —
+    сразу, иначе после того, как человек отправит боту свой контакт.
+    """
+
+    __tablename__ = "phone_verifications"
+    __table_args__ = (Index("ix_phone_verifications_phone", "phone"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    phone: Mapped[str] = mapped_column(String(20), nullable=False)
+    code: Mapped[str] = mapped_column(String(8), nullable=False)
+    telegram_id: Mapped[int | None] = mapped_column(BigInteger)
+    is_confirmed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
 class Subscription(Base):
     """Подписка на точку (новые акции) или на акцию (изменения и статусы).
 

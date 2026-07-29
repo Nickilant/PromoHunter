@@ -82,8 +82,21 @@ def test_telegram_bad_signature_rejected(client):
     assert resp.status_code == 401
 
 
-def test_telegram_links_existing_phone_account(client):
-    # обычная регистрация по номеру
+def test_telegram_links_existing_phone_account(client, db):
+    # обычная регистрация по номеру (токен включён -> нужен подтверждённый код)
+    from datetime import datetime, timedelta, timezone
+
+    from app.models import PhoneVerification
+
+    db.add(
+        PhoneVerification(
+            phone="+79167654321",
+            code="0000",
+            is_confirmed=True,
+            expires_at=datetime.now(timezone.utc) + timedelta(minutes=10),
+        )
+    )
+    db.commit()
     client.post(
         "/api/auth/register",
         json={"phone": "+79167654321", "password": "secret123", "display_name": "Пётр"},

@@ -994,6 +994,25 @@ select.city-chip {
   line-height: 1.45;
 }
 
+.code-row {
+  display: flex;
+  gap: 8px;
+}
+
+.code-row input {
+  flex: 1;
+  letter-spacing: 4px;
+  font-size: 18px;
+  text-align: center;
+}
+
+.link-btn {
+  color: var(--primary);
+  text-decoration: underline;
+  font-size: inherit;
+  padding: 0;
+}
+
 .section-title {
   font-size: 15px;
   font-weight: 600;
