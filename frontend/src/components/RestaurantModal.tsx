@@ -60,8 +60,13 @@ export default function RestaurantModal({ restaurantId, onClose }: Props) {
             ) : (
               <div className="subtitle">Загружаем…</div>
             )}
+            <button className="modal-close" onClick={onClose} aria-label="Закрыть">
+              ✕
+            </button>
+          </div>
+          {detail && (
             <button
-              className={`btn bell-btn ${isSubscribedToRestaurant(restaurantId) ? 'on' : ''}`}
+              className={`sub-row ${isSubscribedToRestaurant(restaurantId) ? 'on' : ''}`}
               onClick={() => {
                 if (!user) {
                   navigate('/login');
@@ -69,15 +74,12 @@ export default function RestaurantModal({ restaurantId, onClose }: Props) {
                 }
                 toggleRestaurant(restaurantId);
               }}
-              title="Подписка на новые акции этой точки"
-              aria-label="Подписка на точку"
             >
-              {isSubscribedToRestaurant(restaurantId) ? '🔔' : '🔕'}
+              {isSubscribedToRestaurant(restaurantId)
+                ? '🔔 Вы подписаны на новые акции точки — отключить'
+                : '🔕 Сообщать о новых акциях этой точки'}
             </button>
-            <button className="modal-close" onClick={onClose} aria-label="Закрыть">
-              ✕
-            </button>
-          </div>
+          )}
           <div className="modal-body" style={{ paddingBottom: 16 }}>
             {detail && detail.promotions.length === 0 && (
               <div className="empty-state">Сейчас в этой точке нет действующих акций</div>

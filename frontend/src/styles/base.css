@@ -85,34 +85,49 @@ input, textarea, select {
   left: 50%;
   transform: translateX(-50%);
   bottom: calc(14px + env(safe-area-inset-bottom));
-  width: min(92vw, 420px);
-  display: flex;
+  width: min(94vw, 440px);
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
   align-items: center;
-  justify-content: space-around;
-  gap: 4px;
-  padding: 8px 12px;
+  padding: 8px 10px;
   background: rgba(255, 255, 255, 0.82);
   backdrop-filter: blur(16px) saturate(1.4);
   -webkit-backdrop-filter: blur(16px) saturate(1.4);
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: 20px;
   box-shadow: 0 10px 30px rgba(46, 42, 38, 0.16);
   z-index: 500;
 }
 
+/* Подсветка активного пункта: плавно переезжает между колонками */
+.dock-indicator {
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 10px;
+  width: calc((100% - 20px) / 5);
+  border-radius: 14px;
+  background: var(--primary-soft);
+  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s;
+  pointer-events: none;
+}
+
 .dock-item {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 1px;
-  min-width: 68px;
+  min-width: 0;
   min-height: 48px;
   justify-content: center;
-  border-radius: 999px;
+  border-radius: 14px;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: clamp(10px, 2.9vw, 11px);
   font-weight: 600;
-  transition: transform 0.15s, opacity 0.15s;
+  white-space: nowrap;
+  transition: color 0.2s, transform 0.15s;
 }
 
 .dock-item:active {
@@ -121,7 +136,6 @@ input, textarea, select {
 
 .dock-item.active {
   color: var(--primary);
-  background: var(--primary-soft);
 }
 
 .dock-icon {
@@ -130,10 +144,12 @@ input, textarea, select {
 }
 
 .dock-action {
+  position: relative;
+  z-index: 1;
+  justify-self: center;
   width: 54px;
   height: 54px;
-  flex-shrink: 0;
-  border-radius: 50%;
+  border-radius: 18px;
   background: var(--accent);
   color: #fff;
   font-size: 28px;
@@ -625,6 +641,30 @@ input, textarea, select {
 .bell-btn.on {
   background: var(--primary-soft);
   border-color: var(--primary);
+}
+
+/* Подписка на точку: аккуратная строка под шапкой шторки/модалки */
+.sub-row {
+  display: block;
+  width: calc(100% - 28px);
+  margin: 0 14px 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--surface-alt);
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  transition: transform 0.15s, opacity 0.15s;
+}
+
+.sub-row:active {
+  transform: scale(0.985);
+}
+
+.sub-row.on {
+  background: var(--primary-soft);
+  color: var(--primary);
 }
 
 /* ---------- хаб «добавить» ---------- */

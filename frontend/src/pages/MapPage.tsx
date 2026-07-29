@@ -140,26 +140,8 @@ export default function MapPage() {
                 </div>
               )}
               <button
-                className={`btn bell-btn ${
-                  selectedId !== null && isSubscribedToRestaurant(selectedId) ? 'on' : ''
-                }`}
-                style={{ marginLeft: 'auto' }}
-                onClick={() => {
-                  if (!user) {
-                    navigate('/login');
-                    return;
-                  }
-                  if (selectedId !== null) toggleRestaurant(selectedId);
-                }}
-                title="Подписка на новые акции этой точки"
-                aria-label="Подписка на точку"
-              >
-                {selectedId !== null && isSubscribedToRestaurant(selectedId)
-                  ? '🔔'
-                  : '🔕'}
-              </button>
-              <button
                 className="modal-close"
+                style={{ marginLeft: 'auto' }}
                 onClick={() => {
                   setSelectedId(null);
                   setSelected(null);
@@ -169,6 +151,22 @@ export default function MapPage() {
                 ✕
               </button>
             </div>
+            {selected && selectedId !== null && (
+              <button
+                className={`sub-row ${isSubscribedToRestaurant(selectedId) ? 'on' : ''}`}
+                onClick={() => {
+                  if (!user) {
+                    navigate('/login');
+                    return;
+                  }
+                  toggleRestaurant(selectedId);
+                }}
+              >
+                {isSubscribedToRestaurant(selectedId)
+                  ? '🔔 Вы подписаны на новые акции точки — отключить'
+                  : '🔕 Сообщать о новых акциях этой точки'}
+              </button>
+            )}
             {selected && selected.promotions.length === 0 && (
               <div className="empty-state" style={{ padding: '16px 24px 24px' }}>
                 Сейчас в этой точке нет действующих акций
