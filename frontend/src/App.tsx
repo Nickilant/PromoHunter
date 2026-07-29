@@ -9,6 +9,7 @@ import AdminRestaurantSuggestions from './admin/AdminRestaurantSuggestions';
 import AdminSuggestions from './admin/AdminSuggestions';
 import AdminUsers from './admin/AdminUsers';
 import BottomNav from './components/BottomNav';
+import TelegramGate from './components/TelegramGate';
 import { useAuth } from './hooks/useAuth';
 import BrandPage from './pages/BrandPage';
 import FeedPage from './pages/FeedPage';
@@ -46,7 +47,9 @@ function RequireAdmin({ children }: { children: ReactNode }) {
 
 export default function App() {
   return (
-    <Routes>
+    <>
+      <TelegramGate />
+      <Routes>
       <Route element={<UserShell />}>
         <Route path="/" element={<FeedPage />} />
         <Route path="/brand/:brandId" element={<BrandPage />} />
@@ -107,6 +110,7 @@ export default function App() {
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+      </Routes>
+    </>
   );
 }

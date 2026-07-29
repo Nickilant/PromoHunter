@@ -32,6 +32,7 @@ services:
       STATUS_WINDOW_HOURS: ${STATUS_WINDOW_HOURS}
       REPORT_COOLDOWN_MINUTES: ${REPORT_COOLDOWN_MINUTES}
       SEED_ON_START: ${SEED_ON_START}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
     volumes:
       # Живая правка кода. Зависимости стоят в /opt/venv (вне /app),
       # поэтому bind-mount их не затирает.

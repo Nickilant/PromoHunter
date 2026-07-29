@@ -18,6 +18,7 @@ from app.models import (
 )
 from app.routers.public import active_promotion_clause
 from app.schemas import ReportIn, ReportItemOut, ReportOut, RestaurantShort
+from app.services.notify import notify_status_flips
 from app.services.status import refresh_stable_statuses
 
 router = APIRouter(prefix="/reports", tags=["reports"])
@@ -170,8 +171,22 @@ def create_report(
         )
 
     # Мгновенное табло: пересчёт устойчивых статусов затронутых товаров
-    refresh_stable_statuses(db, restaurant.id, [promotion.id], now)
+    flips = refresh_stable_statuses(db, restaurant.id, [promotion.id], now)
     db.commit()
+
+    # Подписчикам акции — о переключениях статусов (после коммита, в фоне)
+    if flips:
+        item_names = {item.id: item.name for item in promotion.items}
+        notify_status_flips(
+            db,
+            restaurant,
+            promotion,
+            [
+                (item_names[item_id], new)
+                for item_id, _, new in flips
+                if item_id in item_names and new in ("available", "unavailable")
+            ],
+        )
 
     report = db.scalar(
         select(Report)

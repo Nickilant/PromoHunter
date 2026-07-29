@@ -19,6 +19,8 @@ interface AuthContextValue {
     displayName: string,
     city: string | null,
   ) => Promise<void>;
+  /** Применить готовый ответ авторизации (вход через Telegram WebApp) */
+  applyAuth: (resp: AuthResponse) => void;
   logout: () => void;
 }
 
@@ -62,13 +64,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(resp.user);
   };
 
+  const applyAuth = (resp: AuthResponse) => {
+    setToken(resp.access_token);
+    setUser(resp.user);
+  };
+
   const logout = () => {
     setToken(null);
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, register, applyAuth, logout }}>
       {children}
     </AuthContext.Provider>
   );

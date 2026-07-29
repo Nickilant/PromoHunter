@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 
 import { api } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
+import { useSubscriptions } from '../hooks/useSubscriptions';
 import type {
   PromotionWithStatuses,
   RestaurantDetail,
@@ -24,6 +25,7 @@ export default function RestaurantModal({ restaurantId, onClose }: Props) {
     promotion: PromotionWithStatuses;
   } | null>(null);
   const { user } = useAuth();
+  const { isSubscribedToRestaurant, toggleRestaurant } = useSubscriptions();
   const navigate = useNavigate();
 
   const load = useCallback(() => {
@@ -58,6 +60,20 @@ export default function RestaurantModal({ restaurantId, onClose }: Props) {
             ) : (
               <div className="subtitle">Загружаем…</div>
             )}
+            <button
+              className={`btn bell-btn ${isSubscribedToRestaurant(restaurantId) ? 'on' : ''}`}
+              onClick={() => {
+                if (!user) {
+                  navigate('/login');
+                  return;
+                }
+                toggleRestaurant(restaurantId);
+              }}
+              title="Подписка на новые акции этой точки"
+              aria-label="Подписка на точку"
+            >
+              {isSubscribedToRestaurant(restaurantId) ? '🔔' : '🔕'}
+            </button>
             <button className="modal-close" onClick={onClose} aria-label="Закрыть">
               ✕
             </button>

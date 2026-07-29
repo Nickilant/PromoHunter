@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Временная иконка-заглушка: замените этот файл на фирменную иконку -->
+  <rect width="64" height="64" rx="14" fill="#6B9080"/>
+  <path d="M18 14h18l14 14v18a4 4 0 0 1-4 4H18a4 4 0 0 1-4-4V18a4 4 0 0 1 4-4z"
+        fill="#F7F5F2" transform="rotate(45 32 32)"/>
+  <circle cx="32" cy="22" r="4.5" fill="#C98B6B"/>
+</svg>

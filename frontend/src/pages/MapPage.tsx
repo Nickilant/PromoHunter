@@ -7,6 +7,7 @@ import PromotionAccordion from '../components/PromotionAccordion';
 import ReportModal from '../components/ReportModal';
 import { useAuth } from '../hooks/useAuth';
 import { useCity } from '../hooks/useCity';
+import { useSubscriptions } from '../hooks/useSubscriptions';
 import { geocodeAddress } from '../utils/geocode';
 import type {
   PromotionWithStatuses,
@@ -30,6 +31,7 @@ export default function MapPage() {
   } | null>(null);
   const { user } = useAuth();
   const { city } = useCity();
+  const { isSubscribedToRestaurant, toggleRestaurant } = useSubscriptions();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -123,8 +125,26 @@ export default function MapPage() {
                 </div>
               )}
               <button
-                className="modal-close"
+                className={`btn bell-btn ${
+                  selectedId !== null && isSubscribedToRestaurant(selectedId) ? 'on' : ''
+                }`}
                 style={{ marginLeft: 'auto' }}
+                onClick={() => {
+                  if (!user) {
+                    navigate('/login');
+                    return;
+                  }
+                  if (selectedId !== null) toggleRestaurant(selectedId);
+                }}
+                title="Подписка на новые акции этой точки"
+                aria-label="Подписка на точку"
+              >
+                {selectedId !== null && isSubscribedToRestaurant(selectedId)
+                  ? '🔔'
+                  : '🔕'}
+              </button>
+              <button
+                className="modal-close"
                 onClick={() => {
                   setSelectedId(null);
                   setSelected(null);

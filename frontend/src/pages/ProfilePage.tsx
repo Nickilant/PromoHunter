@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 
 import { api } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
+import { useSubscriptions } from '../hooks/useSubscriptions';
 import type { Report, RestaurantSuggestion, Suggestion } from '../types';
 import { formatDateTime } from '../utils/time';
 
@@ -17,6 +18,7 @@ export default function ProfilePage() {
   const [reports, setReports] = useState<Report[]>([]);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [restSuggestions, setRestSuggestions] = useState<RestaurantSuggestion[]>([]);
+  const { subscriptions, remove } = useSubscriptions();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -72,6 +74,33 @@ export default function ProfilePage() {
           Выйти
         </button>
       </div>
+
+      <div className="section-title">Мои подписки</div>
+      {!user.has_telegram && (
+        <div className="list-item muted">
+          Подписки работают через Telegram-бота — откройте сервис из Telegram,
+          чтобы получать уведомления о новых акциях и статусах
+        </div>
+      )}
+      {user.has_telegram && subscriptions.length === 0 && (
+        <div className="list-item muted">
+          Подписок пока нет — жмите 🔕 у акции или точки
+        </div>
+      )}
+      {subscriptions.map((s) => (
+        <div className="list-item" key={s.id}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+            <span>
+              {s.restaurant
+                ? `📍 ${s.restaurant.title || s.restaurant.brand.name}, ${s.restaurant.address}`
+                : `🏷️ ${s.promotion?.title} (${s.promotion?.brand.name})`}
+            </span>
+            <button className="btn btn-ghost btn-small" onClick={() => remove(s.id)}>
+              Отписаться
+            </button>
+          </div>
+        </div>
+      ))}
 
       <div className="section-title">Мои отчёты</div>
       {reports.length === 0 && (

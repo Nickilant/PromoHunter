@@ -8,6 +8,11 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 from app.auth import require_admin
 from app.database import get_db
 from app.config import settings
+from app.services.notify import (
+    notify_new_promotion,
+    notify_promotion_deleted,
+    notify_promotion_update,
+)
 from app.models import (
     Brand,
     Promotion,
@@ -17,6 +22,7 @@ from app.models import (
     Report,
     Restaurant,
     RestaurantSuggestion,
+    Subscription,
     SuggestionStatus,
     User,
 )
@@ -252,7 +258,19 @@ def create_promotion(
     )
     db.add(promotion)
     db.commit()
-    return _load_promotion(db, promotion.id)
+    promotion = _load_promotion(db, promotion.id)
+    if _is_currently_active(promotion):
+        notify_new_promotion(db, promotion)
+    return promotion
+
+
+def _is_currently_active(promotion: Promotion) -> bool:
+    now = datetime.now(timezone.utc)
+    return (
+        promotion.is_active
+        and (promotion.starts_at is None or promotion.starts_at <= now)
+        and (promotion.ends_at is None or promotion.ends_at >= now)
+    )
 
 
 @router.patch("/promotions/{promotion_id}", response_model=AdminPromotionOut)
@@ -260,9 +278,14 @@ def update_promotion(
     promotion_id: int, payload: PromotionPatch, db: Session = Depends(get_db)
 ):
     promotion = _load_promotion(db, promotion_id)
+    was_active = _is_currently_active(promotion)
     data = payload.model_dump(exclude_unset=True)
     if "brand_id" in data and db.get(Brand, data["brand_id"]) is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Бренд не найден")
+    changed = any(
+        key in data and getattr(promotion, key) != data[key]
+        for key in ("title", "description", "starts_at", "ends_at", "is_active")
+    ) or payload.items is not None
     for key in ("brand_id", "title", "description", "starts_at", "ends_at", "is_active"):
         if key in data:
             setattr(promotion, key, data[key])
@@ -288,17 +311,45 @@ def update_promotion(
         promotion.items = new_items
 
     db.commit()
-    return _load_promotion(db, promotion_id)
+    promotion = _load_promotion(db, promotion_id)
+
+    # Уведомления подписчикам: акция появилась / изменилась / завершилась
+    is_active_now = _is_currently_active(promotion)
+    if not was_active and is_active_now:
+        notify_new_promotion(db, promotion)
+    elif was_active and not is_active_now:
+        notify_promotion_update(db, promotion, "акция завершена")
+    elif changed and is_active_now:
+        notify_promotion_update(db, promotion, "условия акции обновились")
+    return promotion
 
 
 @router.delete("/promotions/{promotion_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_promotion(promotion_id: int, db: Session = Depends(get_db)):
-    promotion = db.get(Promotion, promotion_id)
+    promotion = db.scalar(
+        select(Promotion)
+        .options(joinedload(Promotion.brand))
+        .where(Promotion.id == promotion_id)
+    )
     if promotion is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Акция не найдена")
-    # Каскадом уходят items и отчёты (FK ondelete=CASCADE)
+    # Чаты подписчиков собираем до каскадного удаления подписок
+    subscriber_chats = list(
+        db.scalars(
+            select(User.telegram_id)
+            .join(Subscription, Subscription.user_id == User.id)
+            .where(
+                Subscription.promotion_id == promotion_id,
+                User.telegram_id.is_not(None),
+                User.is_blocked.is_(False),
+            )
+        )
+    )
+    title, brand_name = promotion.title, promotion.brand.name
+    # Каскадом уходят items, отчёты и подписки (FK ondelete=CASCADE)
     db.delete(promotion)
     db.commit()
+    notify_promotion_deleted(subscriber_chats, title, brand_name)
 
 
 # --- users ---
@@ -565,7 +616,10 @@ def approve_suggestion(
         )
     )
     db.commit()
-    return _load_promotion(db, promotion.id)
+    promotion = _load_promotion(db, promotion.id)
+    if _is_currently_active(promotion):
+        notify_new_promotion(db, promotion)
+    return promotion
 
 
 @router.post("/suggestions/{suggestion_id}/reject", response_model=AdminSuggestionOut)

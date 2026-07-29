@@ -47,5 +47,8 @@ class Settings(BaseSettings):
     # --- фоновый пересчёт ---
     trust_job_interval_seconds: int = 300  # 0 — выключить фоновую джобу
 
+    # --- Telegram (WebApp-авторизация и бот-уведомления) ---
+    telegram_bot_token: str = ""  # пусто — телеграм-функции выключены
+
 
 settings = Settings()

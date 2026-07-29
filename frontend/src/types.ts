@@ -6,6 +6,7 @@ export interface User {
   is_phone_verified: boolean;
   display_name: string;
   city: string | null;
+  has_telegram: boolean;
   role: Role;
   is_blocked: boolean;
   created_at: string;
@@ -200,6 +201,21 @@ export interface AdminPromotion {
 
 export interface AdminUser extends User {
   reports_count: number;
+}
+
+// --- подписки ---
+
+export interface PromotionShort {
+  id: number;
+  title: string;
+  brand: BrandShort;
+}
+
+export interface Subscription {
+  id: number;
+  restaurant: RestaurantShort | null;
+  promotion: PromotionShort | null;
+  created_at: string;
 }
 
 // --- рейтинг ---

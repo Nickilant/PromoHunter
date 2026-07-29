@@ -4,6 +4,7 @@ import { api } from '../api/client';
 import { useToast } from '../components/Toast';
 import type { AdminBrand, AdminPromotion } from '../types';
 import { formatDate } from '../utils/time';
+import CollapsibleGroup from './CollapsibleGroup';
 import PromotionForm, {
   fromLocalInput,
   PromotionFormValue,
@@ -142,12 +143,12 @@ export default function AdminPromotions() {
           return map;
         }, new Map<number, AdminPromotion[]>())
         .entries()].map(([brandId, list]) => (
-        <div className="admin-group" key={brandId}>
-          <div className="admin-group-head">
-            <span className="color-dot" style={{ background: list[0].brand.color }} />
-            {list[0].brand.name}
-            <span className="tag">{list.length}</span>
-          </div>
+        <CollapsibleGroup
+          key={brandId}
+          title={list[0].brand.name}
+          color={list[0].brand.color}
+          count={list.length}
+        >
           <div className="admin-table-wrap">
             <table className="admin-table">
               <thead>
@@ -193,7 +194,7 @@ export default function AdminPromotions() {
               </tbody>
             </table>
           </div>
-        </div>
+        </CollapsibleGroup>
       ))}
 
       {form && (

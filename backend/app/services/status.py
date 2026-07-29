@@ -243,12 +243,17 @@ def refresh_stable_statuses(
     restaurant_id: int,
     promotion_ids: list[int],
     now: datetime | None = None,
-) -> None:
+) -> list[tuple[int, str, str]]:
     """Пересчитать и сохранить устойчивые статусы (вызывается при новом отчёте
-    и из фоновой джобы). Переходные статусы устойчивое состояние не меняют."""
+    и из фоновой джобы). Переходные статусы устойчивое состояние не меняют.
+
+    Возвращает переключения: [(promotion_item_id, старый, новый), ...] —
+    на них подписчики акций получают уведомления.
+    """
     now = now or datetime.now(timezone.utc)
     votes = _collect_votes(db, restaurant_id, promotion_ids, now)
     stables = _load_stables(db, restaurant_id, list(votes.keys()))
+    flips: list[tuple[int, str, str]] = []
 
     for item_id, item_votes in votes.items():
         _cap_contributions(item_votes)
@@ -263,6 +268,8 @@ def refresh_stable_statuses(
         else:
             new_stable = old_stable  # переходная фаза память не трогает
 
+        if new_stable != old_stable:
+            flips.append((item_id, old_stable, new_stable))
         if stable_row is None:
             db.add(
                 ItemStatusState(
@@ -273,3 +280,4 @@ def refresh_stable_statuses(
             )
         elif stable_row.stable != new_stable:
             stable_row.stable = new_stable
+    return flips

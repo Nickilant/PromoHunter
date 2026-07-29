@@ -6,6 +6,7 @@ import { useToast } from '../components/Toast';
 import type { AdminBrand, AdminSuggestion, SuggestionGroup } from '../types';
 import { formatDateTime } from '../utils/time';
 import type { AdminOutletContext } from './AdminLayout';
+import CollapsibleGroup from './CollapsibleGroup';
 import PromotionForm, { fromLocalInput, PromotionFormValue } from './PromotionForm';
 
 const STATUS_LABELS: Record<string, { text: string; cls: string }> = {
@@ -122,15 +123,18 @@ export default function AdminSuggestions() {
       )}
 
       {groups.map((g) => (
-        <div className="suggestion-group" key={`${g.brand_id ?? 'raw'}-${g.brand_name}`}>
-          <div className="suggestion-group-head">
-            {g.brand_color && (
-              <span className="color-dot" style={{ background: g.brand_color }} />
-            )}
-            {g.brand_name}
-            {g.brand_id === null && <span className="tag warn">бренда нет в базе</span>}
-            <span className="tag">{g.suggestions.length}</span>
-          </div>
+        <CollapsibleGroup
+          key={`${g.brand_id ?? 'raw'}-${g.brand_name}`}
+          title={g.brand_name}
+          color={g.brand_color}
+          count={g.suggestions.length}
+          badge={
+            g.brand_id === null ? (
+              <span className="tag warn">бренда нет в базе</span>
+            ) : undefined
+          }
+        >
+          <div className="suggestion-group">
           {g.suggestions.map((s) => {
             const label = STATUS_LABELS[s.status];
             return (
@@ -172,7 +176,8 @@ export default function AdminSuggestions() {
               </div>
             );
           })}
-        </div>
+          </div>
+        </CollapsibleGroup>
       ))}
 
       {approving && (

@@ -35,15 +35,31 @@ class LoginIn(PhoneMixin):
     password: str
 
 
+class TelegramAuthIn(BaseModel):
+    init_data: str
+    city: str | None = Field(default=None, max_length=100)
+
+
+class TelegramContactIn(TelegramAuthIn):
+    # строка response из Telegram.WebApp.requestContact — подписана ботом
+    contact_response: str
+
+
 class UserOut(ORMModel):
     id: int
     phone: str
     is_phone_verified: bool
     display_name: str
     city: str | None = None
+    has_telegram: bool = Field(default=False, validation_alias="telegram_id")
     role: UserRole
     is_blocked: bool
     created_at: datetime
+
+    @field_validator("has_telegram", mode="before")
+    @classmethod
+    def _from_telegram_id(cls, value):
+        return bool(value)
 
 
 class TokenOut(BaseModel):
@@ -392,6 +408,26 @@ class SuggestionRejectIn(BaseModel):
     # Пометка «выдумка/спам» — штраф автору в рейтинге;
     # обычный дубликат штрафовать нельзя
     is_spam: bool = False
+
+
+# --- subscriptions ---
+
+class PromotionShort(ORMModel):
+    id: int
+    title: str
+    brand: BrandShort
+
+
+class SubscriptionIn(BaseModel):
+    restaurant_id: int | None = None
+    promotion_id: int | None = None
+
+
+class SubscriptionOut(ORMModel):
+    id: int
+    restaurant: RestaurantShort | None = None
+    promotion: PromotionShort | None = None
+    created_at: datetime
 
 
 # --- rating ---

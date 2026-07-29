@@ -71,34 +71,26 @@ export default function FeedPage() {
         </div>
       )}
 
-      {brands?.map((brand) => (
-        <button
-          key={brand.id}
-          className="brand-card"
-          onClick={() => navigate(`/brand/${brand.id}`)}
-        >
-          <span className="brand-avatar" style={{ background: brand.color }}>
-            {brand.name[0]}
-          </span>
-          <span className="brand-card-body">
-            <span className="brand-card-title">{brand.name}</span>
-            <span className="brand-card-meta">
-              {brand.restaurants_count}{' '}
-              {brand.restaurants_count === 1 ? 'адрес' : 'адресов'} ·{' '}
-              {brand.promotions.length}{' '}
-              {brand.promotions.length === 1 ? 'акция' : 'акции'}
-            </span>
-            <span className="brand-card-promos">
-              {brand.promotions
-                .slice(0, 2)
-                .map((p) => p.title)
-                .join(' · ')}
-              {brand.promotions.length > 2 && ' · …'}
-            </span>
-          </span>
-          <span className="chevron-right">›</span>
-        </button>
-      ))}
+      {brands !== null && brands.length > 0 && (
+        <div className="brand-grid">
+          {brands.map((brand) => (
+            <button
+              key={brand.id}
+              className="brand-tile"
+              onClick={() => navigate(`/brand/${brand.id}`)}
+            >
+              {brand.logo_url ? (
+                <img className="brand-tile-logo" src={brand.logo_url} alt="" />
+              ) : (
+                <span className="brand-tile-avatar" style={{ background: brand.color }}>
+                  {brand.name[0]}
+                </span>
+              )}
+              <span className="brand-tile-name">{brand.name}</span>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

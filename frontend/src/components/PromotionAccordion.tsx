@@ -1,5 +1,8 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
+import { useAuth } from '../hooks/useAuth';
+import { useSubscriptions } from '../hooks/useSubscriptions';
 import type { PromotionWithStatuses, RestaurantShort } from '../types';
 import { formatDate, timeAgo } from '../utils/time';
 import StatusBadge from './StatusBadge';
@@ -18,6 +21,18 @@ export default function PromotionAccordion({
   defaultOpen = false,
 }: Props) {
   const [open, setOpen] = useState(defaultOpen);
+  const { user } = useAuth();
+  const { isSubscribedToPromotion, togglePromotion } = useSubscriptions();
+  const navigate = useNavigate();
+
+  const subscribed = isSubscribedToPromotion(promotion.id);
+  const onBell = () => {
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+    togglePromotion(promotion.id);
+  };
 
   return (
     <div className="promo-block">
@@ -55,12 +70,27 @@ export default function PromotionAccordion({
               </div>
             );
           })}
-          <button
-            className="btn btn-primary btn-block"
-            onClick={() => onReport(restaurant, promotion)}
-          >
-            Отметить наличие
-          </button>
+          <div className="promo-actions">
+            <button
+              className="btn btn-primary"
+              style={{ flex: 1 }}
+              onClick={() => onReport(restaurant, promotion)}
+            >
+              Отметить наличие
+            </button>
+            <button
+              className={`btn bell-btn ${subscribed ? 'on' : ''}`}
+              onClick={onBell}
+              title={
+                subscribed
+                  ? 'Отписаться от новостей акции'
+                  : 'Подписаться на новости акции'
+              }
+              aria-label="Подписка на акцию"
+            >
+              {subscribed ? '🔔' : '🔕'}
+            </button>
+          </div>
         </div>
       )}
     </div>

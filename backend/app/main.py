@@ -15,6 +15,7 @@ from app.routers import (
     rating,
     reports,
     restaurant_suggestions,
+    subscriptions,
     suggestions,
 )
 
@@ -67,6 +68,7 @@ app.include_router(public.router, prefix="/api")
 app.include_router(reports.router, prefix="/api")
 app.include_router(suggestions.router, prefix="/api")
 app.include_router(restaurant_suggestions.router, prefix="/api")
+app.include_router(subscriptions.router, prefix="/api")
 app.include_router(rating.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
 

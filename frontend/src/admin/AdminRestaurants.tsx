@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import { useToast } from '../components/Toast';
 import type { AdminBrand, AdminRestaurant } from '../types';
+import CollapsibleGroup from './CollapsibleGroup';
 import RestaurantForm, { RestaurantFormValue } from './RestaurantForm';
 
 const emptyForm: RestaurantFormValue = {
@@ -108,12 +109,12 @@ export default function AdminRestaurants() {
       </div>
 
       {[...groups.entries()].map(([brandId, list]) => (
-        <div className="admin-group" key={brandId}>
-          <div className="admin-group-head">
-            <span className="color-dot" style={{ background: list[0].brand.color }} />
-            {list[0].brand.name}
-            <span className="tag">{list.length}</span>
-          </div>
+        <CollapsibleGroup
+          key={brandId}
+          title={list[0].brand.name}
+          color={list[0].brand.color}
+          count={list.length}
+        >
           <div className="admin-table-wrap">
             <table className="admin-table">
               <thead>
@@ -175,7 +176,7 @@ export default function AdminRestaurants() {
               </tbody>
             </table>
           </div>
-        </div>
+        </CollapsibleGroup>
       ))}
 
       {form && (

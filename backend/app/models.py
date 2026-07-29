@@ -2,6 +2,7 @@ import enum
 from datetime import datetime
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     DateTime,
     Enum,
@@ -11,6 +12,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -58,6 +60,8 @@ class User(Base):
         Float, default=1.0, server_default="1.0", nullable=False
     )
     weight_drifted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Привязка Telegram-аккаунта: вход через WebApp и уведомления бота
+    telegram_id: Mapped[int | None] = mapped_column(BigInteger, unique=True)
     role: Mapped[UserRole] = mapped_column(
         Enum(UserRole, name="user_role", values_callable=lambda e: [x.value for x in e]),
         default=UserRole.user,
@@ -298,6 +302,39 @@ class ItemStatusState(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
+
+
+class Subscription(Base):
+    """Подписка на точку (новые акции) или на акцию (изменения и статусы).
+
+    Уведомления доставляет телеграм-бот, поэтому подписка доступна только
+    пользователям с привязанным telegram_id.
+    """
+
+    __tablename__ = "subscriptions"
+    __table_args__ = (
+        Index("ix_subscriptions_user", "user_id"),
+        UniqueConstraint("user_id", "restaurant_id", name="uq_sub_user_restaurant"),
+        UniqueConstraint("user_id", "promotion_id", name="uq_sub_user_promotion"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    restaurant_id: Mapped[int | None] = mapped_column(
+        ForeignKey("restaurants.id", ondelete="CASCADE")
+    )
+    promotion_id: Mapped[int | None] = mapped_column(
+        ForeignKey("promotions.id", ondelete="CASCADE")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    user: Mapped["User"] = relationship()
+    restaurant: Mapped["Restaurant"] = relationship()
+    promotion: Mapped["Promotion"] = relationship()
 
 
 class RestaurantSuggestion(Base):

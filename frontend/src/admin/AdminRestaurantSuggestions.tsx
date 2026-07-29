@@ -10,6 +10,7 @@ import type {
 } from '../types';
 import { formatDateTime } from '../utils/time';
 import type { AdminOutletContext } from './AdminLayout';
+import CollapsibleGroup from './CollapsibleGroup';
 import RestaurantForm, { RestaurantFormValue } from './RestaurantForm';
 
 const STATUS_LABELS: Record<string, { text: string; cls: string }> = {
@@ -125,12 +126,13 @@ export default function AdminRestaurantSuggestions() {
       )}
 
       {groups.map((g) => (
-        <div className="suggestion-group" key={g.brand_id}>
-          <div className="suggestion-group-head">
-            <span className="color-dot" style={{ background: g.brand_color }} />
-            {g.brand_name}
-            <span className="tag">{g.suggestions.length}</span>
-          </div>
+        <CollapsibleGroup
+          key={g.brand_id}
+          title={g.brand_name}
+          color={g.brand_color}
+          count={g.suggestions.length}
+        >
+          <div className="suggestion-group">
           {g.suggestions.map((s) => {
             const label = STATUS_LABELS[s.status];
             return (
@@ -173,7 +175,8 @@ export default function AdminRestaurantSuggestions() {
               </div>
             );
           })}
-        </div>
+          </div>
+        </CollapsibleGroup>
       ))}
 
       {approving && (
