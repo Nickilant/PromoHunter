@@ -190,7 +190,13 @@ input, textarea, select {
   color: var(--primary);
 }
 
+.dock-item svg {
+  stroke-width: 1.7;
+  transition: stroke-width 0.24s ease 0.08s;
+}
+
 .dock-item.lit svg {
+  stroke-width: 2;
   animation: icon-pop 0.24s ease 0.12s both;
 }
 

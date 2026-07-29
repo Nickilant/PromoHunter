@@ -64,7 +64,7 @@ export default function BottomNav() {
         aria-current={isActive ? 'page' : undefined}
         onPointerDown={() => setPressed(item.slot)}
       >
-        <Icon name={item.icon} size={22} strokeWidth={isTarget ? 2 : 1.7} />
+        <Icon name={item.icon} size={22} />
         <span>{item.label}</span>
       </Link>
     );
