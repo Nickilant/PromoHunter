@@ -1,5 +1,10 @@
 // Единый набор иконок сервиса: контурные, 24×24, наследуют цвет через currentColor.
 // Держим в одном файле — правки в одном месте, отдельных зависимостей не тянем.
+//
+// Лестница «размер → толщина обводки», чтобы набор выглядел ровно:
+//   13px → 2.4 | 15–18px → 1.7 | 20–22px → 1.7 (активная вкладка 2.0)
+//   24px → 2.2 | 26px → 1.8 | 44px (пустые состояния) → 1.4
+// Цвет иконка всегда берёт от родителя (currentColor) — своего не имеет.
 import type { CSSProperties, ReactNode } from 'react';
 
 export type IconName =
@@ -9,6 +14,7 @@ export type IconName =
   | 'user'
   | 'plus'
   | 'pin'
+  | 'locate'
   | 'search'
   | 'chevronDown'
   | 'chevronRight'
@@ -65,6 +71,13 @@ const PATHS: Record<IconName, ReactNode> = {
     <>
       <path d="M20 10.5c0 5.5-8 11-8 11s-8-5.5-8-11a8 8 0 0 1 16 0Z" />
       <circle cx="12" cy="10.3" r="2.7" />
+    </>
+  ),
+  locate: (
+    <>
+      <circle cx="12" cy="12" r="7.2" />
+      <circle cx="12" cy="12" r="2.6" />
+      <path d="M12 1.8v3.2M12 19v3.2M1.8 12H5m14 0h3.2" />
     </>
   ),
   search: (

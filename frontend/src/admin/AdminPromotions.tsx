@@ -203,7 +203,7 @@ export default function AdminPromotions() {
           <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
               <h2>{form.id === null ? 'Новая акция' : 'Редактировать акцию'}</h2>
-              <button className="modal-close" onClick={() => setForm(null)}>
+              <button className="modal-close" onClick={() => setForm(null)} aria-label="Закрыть">
                 <Icon name="close" size={20} />
               </button>
             </div>

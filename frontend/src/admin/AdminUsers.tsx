@@ -53,6 +53,10 @@ export default function AdminUsers() {
                     {isSelf && ' (вы)'}{' '}
                     <span
                       className={`tag ${u.is_phone_verified ? 'ok' : 'warn'}`}
+                      role="img"
+                      aria-label={
+                        u.is_phone_verified ? 'Номер подтверждён' : 'Номер не подтверждён'
+                      }
                       title="Подтверждение номера через Telegram"
                     >
                       <Icon name={u.is_phone_verified ? 'check' : 'question'} size={13} />

@@ -57,7 +57,7 @@ function LocateButton() {
       aria-label="Найти меня"
       title="Найти меня"
     >
-      <Icon name="pin" size={21} />
+      <Icon name="locate" size={21} />
     </button>
   );
 }

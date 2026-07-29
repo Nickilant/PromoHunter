@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
-import Icon, { IconName } from './Icon';
+import Icon from './Icon';
+import type { IconName } from './Icon';
 
 // Плавающий док: сетка из равных колонок (не выезжает на узких экранах),
 // подсветка активного пункта плавно переезжает между кнопками.

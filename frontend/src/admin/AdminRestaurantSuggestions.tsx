@@ -190,7 +190,7 @@ export default function AdminRestaurantSuggestions() {
                   Проверьте адрес и координаты — данные подтянуты из заявки
                 </div>
               </div>
-              <button className="modal-close" onClick={() => setApproving(null)}>
+              <button className="modal-close" onClick={() => setApproving(null)} aria-label="Закрыть">
                 <Icon name="close" size={20} />
               </button>
             </div>
@@ -216,7 +216,7 @@ export default function AdminRestaurantSuggestions() {
           >
             <div className="modal-head">
               <h2>Отклонить заявку</h2>
-              <button className="modal-close" onClick={() => setRejecting(null)}>
+              <button className="modal-close" onClick={() => setRejecting(null)} aria-label="Закрыть">
                 <Icon name="close" size={20} />
               </button>
             </div>

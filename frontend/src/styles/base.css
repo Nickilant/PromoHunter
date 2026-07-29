@@ -204,8 +204,6 @@ input, textarea, select {
   border-radius: 18px;
   background: var(--accent);
   color: #fff;
-  font-size: 28px;
-  font-weight: 600;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -719,7 +717,6 @@ input, textarea, select {
   padding: 10px 12px;
   background: var(--surface-alt);
   border: 1px solid var(--border);
-  font-size: 18px;
 }
 
 .bell-btn {

@@ -191,7 +191,7 @@ export default function AdminSuggestions() {
                   Проверьте и поправьте данные — они подтянуты из заявки
                 </div>
               </div>
-              <button className="modal-close" onClick={() => setApproving(null)}>
+              <button className="modal-close" onClick={() => setApproving(null)} aria-label="Закрыть">
                 <Icon name="close" size={20} />
               </button>
             </div>
@@ -213,7 +213,7 @@ export default function AdminSuggestions() {
           <div className="admin-modal" style={{ maxWidth: 480 }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
               <h2>Отклонить заявку</h2>
-              <button className="modal-close" onClick={() => setRejecting(null)}>
+              <button className="modal-close" onClick={() => setRejecting(null)} aria-label="Закрыть">
                 <Icon name="close" size={20} />
               </button>
             </div>

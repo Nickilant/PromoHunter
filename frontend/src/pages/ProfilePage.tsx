@@ -102,6 +102,7 @@ export default function ProfilePage() {
             navigate('/');
           }}
         >
+          <Icon name="logout" size={17} />
           Выйти
         </button>
       </div>

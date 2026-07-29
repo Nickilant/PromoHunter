@@ -149,7 +149,7 @@ export default function RatingPage() {
                   {card.total_points} очков за {period === 'month' ? 'месяц' : 'год'}
                 </div>
               </div>
-              <button className="modal-close" onClick={() => setCard(null)}>
+              <button className="modal-close" onClick={() => setCard(null)} aria-label="Закрыть">
                 <Icon name="close" size={20} />
               </button>
             </div>

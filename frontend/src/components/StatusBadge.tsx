@@ -1,5 +1,6 @@
 import type { ItemStatus } from '../types';
-import Icon, { IconName } from './Icon';
+import Icon from './Icon';
+import type { IconName } from './Icon';
 
 const LABELS: Record<ItemStatus, { text: string; icon: IconName }> = {
   available: { text: 'Есть', icon: 'check' },
