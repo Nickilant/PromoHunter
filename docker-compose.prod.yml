@@ -20,5 +20,6 @@ services:
       target: prod
     volumes: !reset []
     ports: !override
-      - "80:80"
+      # Наружу смотрит хостовый nginx с SSL, он проксирует сюда (см. README)
+      - "127.0.0.1:8080:80"
     command: ["nginx", "-g", "daemon off;"]

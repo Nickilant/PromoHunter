@@ -8,7 +8,9 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      # Только localhost: на проде база не должна торчать в интернет,
+      # локально DBeaver подключается к 127.0.0.1:5432 как и раньше
+      - "127.0.0.1:5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 3s
