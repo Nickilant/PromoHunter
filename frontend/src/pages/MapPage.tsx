@@ -119,7 +119,7 @@ export default function MapPage() {
 
       {selectedId !== null && (
         <div className="bottom-sheet">
-          <div className="bottom-sheet-inner">
+          <div className="bottom-sheet-inner" key={selectedId}>
             <div className="bottom-sheet-grip" />
             <div className="rest-card-head">
               {selected ? (
@@ -136,9 +136,16 @@ export default function MapPage() {
                   </div>
                 </>
               ) : (
-                <div className="rest-card-titles">
-                  <div className="address">Загружаем…</div>
-                </div>
+                <>
+                  <span
+                    className="skeleton on-surface"
+                    style={{ width: 96, height: 24, borderRadius: 999 }}
+                  />
+                  <span
+                    className="skeleton on-surface"
+                    style={{ width: '45%', height: 16, borderRadius: 8 }}
+                  />
+                </>
               )}
               <button
                 className="modal-close"

@@ -12,7 +12,7 @@ import type {
 import PromotionAccordion from './PromotionAccordion';
 import ReportModal from './ReportModal';
 import Icon from './Icon';
-import { useEscape } from '../hooks/useEscape';
+import { useDismiss } from '../hooks/useDismiss';
 
 interface Props {
   restaurantId: number;
@@ -30,7 +30,7 @@ export default function RestaurantModal({ restaurantId, onClose }: Props) {
   const { isSubscribedToRestaurant, toggleRestaurant } = useSubscriptions();
   const navigate = useNavigate();
 
-  useEscape(onClose);
+  const { closing, dismiss, onAnimationEnd } = useDismiss(onClose);
 
   const load = useCallback(() => {
     api.get<RestaurantDetail>(`/restaurants/${restaurantId}`).then(setDetail).catch(() => {});
@@ -48,8 +48,15 @@ export default function RestaurantModal({ restaurantId, onClose }: Props) {
 
   return (
     <>
-      <div className="modal-overlay" onClick={onClose}>
-        <div className="modal" onClick={(e) => e.stopPropagation()}>
+      <div
+        className={`modal-overlay${closing ? ' closing' : ''}`}
+        onClick={dismiss}
+        onAnimationEnd={onAnimationEnd}
+      >
+        <div
+          className={`modal${closing ? ' closing' : ''}`}
+          onClick={(e) => e.stopPropagation()}
+        >
           <div className="modal-head">
             {detail ? (
               <div className="rest-card-head" style={{ padding: 0 }}>
@@ -62,9 +69,18 @@ export default function RestaurantModal({ restaurantId, onClose }: Props) {
                 </div>
               </div>
             ) : (
-              <div className="subtitle">Загружаем…</div>
+              <div className="rest-card-head" style={{ padding: 0, flex: 1 }}>
+                <span
+                  className="skeleton on-surface"
+                  style={{ width: 96, height: 24, borderRadius: 999 }}
+                />
+                <span
+                  className="skeleton on-surface"
+                  style={{ width: '45%', height: 16, borderRadius: 8 }}
+                />
+              </div>
             )}
-            <button className="modal-close" onClick={onClose} aria-label="Закрыть">
+            <button className="modal-close" onClick={dismiss} aria-label="Закрыть">
               <Icon name="close" size={20} />
             </button>
           </div>

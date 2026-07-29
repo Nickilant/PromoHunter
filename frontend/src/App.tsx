@@ -1,5 +1,5 @@
 import { ReactNode } from 'react';
-import { Navigate, Outlet, Route, Routes } from 'react-router-dom';
+import { Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom';
 
 import AdminLayout from './admin/AdminLayout';
 import AdminBrands from './admin/AdminBrands';
@@ -23,8 +23,12 @@ import SuggestPage from './pages/SuggestPage';
 import SuggestRestaurantPage from './pages/SuggestRestaurantPage';
 
 function UserShell() {
+  const { pathname } = useLocation();
+  // Карта занимает весь экран сама — отступ под док создавал бы
+  // «резиновую» прокрутку поверх неё
+  const fullBleed = pathname === '/map';
   return (
-    <div className="app-shell">
+    <div className={`app-shell${fullBleed ? ' full-bleed' : ''}`}>
       <Outlet />
       <BottomNav />
     </div>

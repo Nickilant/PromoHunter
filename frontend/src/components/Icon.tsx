@@ -33,7 +33,6 @@ export type IconName =
   | 'truck'
   | 'inbox'
   | 'send'
-  | 'phone'
   | 'city'
   | 'logout';
 
@@ -170,12 +169,6 @@ const PATHS: Record<IconName, ReactNode> = {
     <>
       <path d="M20.5 3.5 3.8 10.2l6.3 2.6 2.6 6.3 7.8-15.6Z" />
       <path d="M20.5 3.5 10.1 12.8" />
-    </>
-  ),
-  phone: (
-    <>
-      <rect x="6.5" y="2.8" width="11" height="18.4" rx="2.4" />
-      <path d="M10.6 5.4h2.8M12 18.2v.01" />
     </>
   ),
   logout: (

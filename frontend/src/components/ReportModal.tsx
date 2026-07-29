@@ -4,7 +4,7 @@ import { api, ApiError } from '../api/client';
 import type { PromotionWithStatuses, ReportChannel, RestaurantShort } from '../types';
 import { useToast } from './Toast';
 import Icon from './Icon';
-import { useEscape } from '../hooks/useEscape';
+import { useDismiss } from '../hooks/useDismiss';
 
 type Choice = 'yes' | 'no' | 'skip';
 
@@ -24,7 +24,7 @@ export default function ReportModal({ restaurant, promotion, onClose, onReported
   const [sending, setSending] = useState(false);
   const toast = useToast();
 
-  useEscape(onClose);
+  const { closing, dismiss, onAnimationEnd } = useDismiss(onClose);
 
   const marked = promotion.items.filter((i) => choices[i.id] !== 'skip');
 
@@ -59,8 +59,15 @@ export default function ReportModal({ restaurant, promotion, onClose, onReported
     setChoices((prev) => ({ ...prev, [itemId]: choice }));
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+    <div
+      className={`modal-overlay${closing ? ' closing' : ''}`}
+      onClick={dismiss}
+      onAnimationEnd={onAnimationEnd}
+    >
+      <div
+        className={`modal${closing ? ' closing' : ''}`}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="modal-head">
           <div>
             <h2>Отметить наличие</h2>
@@ -68,7 +75,7 @@ export default function ReportModal({ restaurant, promotion, onClose, onReported
               {restaurant.title || restaurant.brand.name} · {promotion.title}
             </div>
           </div>
-          <button className="modal-close" onClick={onClose} aria-label="Закрыть">
+          <button className="modal-close" onClick={dismiss} aria-label="Закрыть">
             <Icon name="close" size={20} />
           </button>
         </div>
@@ -124,10 +131,12 @@ export default function ReportModal({ restaurant, promotion, onClose, onReported
         </div>
         <div className="modal-footer">
           <button
-            className="btn btn-primary btn-block"
+            className={`btn btn-primary btn-block${sending ? ' is-busy' : ''}`}
             disabled={marked.length === 0 || sending}
             onClick={submit}
+            aria-busy={sending}
           >
+            {sending && <span className="spinner" />}
             {sending ? 'Отправляем…' : `Отправить${marked.length ? ` (${marked.length})` : ''}`}
           </button>
         </div>

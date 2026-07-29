@@ -142,7 +142,12 @@ export default function SuggestRestaurantPage() {
           />
         </div>
         {error && <div className="form-error">{error}</div>}
-        <button className="btn btn-primary btn-block" disabled={sending}>
+        <button
+          className={`btn btn-primary btn-block${sending ? ' is-busy' : ''}`}
+          disabled={sending}
+          aria-busy={sending}
+        >
+          {sending && <span className="spinner" />}
           {sending ? 'Отправляем…' : 'Отправить на модерацию'}
         </button>
       </form>

@@ -42,9 +42,9 @@ export default function BrandPage() {
           <h1>Адреса</h1>
         )}
         <span className="city-chip muted-chip">
-            <Icon name="pin" size={15} />
-            {city}
-          </span>
+          <Icon name="pin" size={15} />
+          {city}
+        </span>
       </div>
 
       {restaurants === null && (

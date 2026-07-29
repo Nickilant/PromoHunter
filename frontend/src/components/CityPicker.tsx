@@ -4,7 +4,7 @@ import { api } from '../api/client';
 import type { CityInfo } from '../types';
 import { reverseGeocodeCity } from '../utils/geocode';
 import Icon from './Icon';
-import { useEscape } from '../hooks/useEscape';
+import { useDismiss } from '../hooks/useDismiss';
 
 interface Props {
   current: string | null;
@@ -19,7 +19,7 @@ export default function CityPicker({ current, onSelect, onClose }: Props) {
   const [detecting, setDetecting] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(null);
 
-  useEscape(onClose);
+  const { closing, dismiss, onAnimationEnd } = useDismiss(onClose);
 
   useEffect(() => {
     api.get<CityInfo[]>('/cities').then(setCities).catch(() => {});
@@ -66,7 +66,10 @@ export default function CityPicker({ current, onSelect, onClose }: Props) {
   );
 
   return (
-    <div className="city-picker">
+    <div
+      className={`city-picker${closing ? ' closing' : ''}`}
+      onAnimationEnd={onAnimationEnd}
+    >
       <div className="city-picker-inner">
         <div className="city-picker-head">
           <div>
@@ -74,17 +77,18 @@ export default function CityPicker({ current, onSelect, onClose }: Props) {
             <div className="subtitle">Покажем акции и рестораны рядом</div>
           </div>
           {onClose && (
-            <button className="modal-close" onClick={onClose} aria-label="Закрыть">
+            <button className="modal-close" onClick={dismiss} aria-label="Закрыть">
               <Icon name="close" size={20} />
             </button>
           )}
         </div>
         <button
-          className="btn btn-primary btn-block"
+          className={`btn btn-primary btn-block${detecting ? ' is-busy' : ''}`}
           onClick={detect}
           disabled={detecting}
+          aria-busy={detecting}
         >
-          <Icon name="pin" size={18} />
+          {detecting ? <span className="spinner" /> : <Icon name="locate" size={18} />}
           {detecting ? 'Определяем…' : 'Определить мой город'}
         </button>
         {geoError && <div className="form-error">{geoError}</div>}
@@ -116,7 +120,15 @@ export default function CityPicker({ current, onSelect, onClose }: Props) {
             </button>
           )}
           {!trimmed && filtered.length === 0 && (
-            <div className="empty-state">Загружаем города…</div>
+            <div className="skeleton-list" aria-label="Загружаем города" aria-busy="true">
+              {[0, 1, 2].map((i) => (
+                <div
+                  className="skeleton"
+                  style={{ height: 52, borderRadius: 12 }}
+                  key={i}
+                />
+              ))}
+            </div>
           )}
         </div>
       </div>

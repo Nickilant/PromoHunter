@@ -162,6 +162,10 @@ input, textarea, select {
 .dock-item {
   position: relative;
   z-index: 1;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -210,6 +214,10 @@ input, textarea, select {
 .dock-action {
   position: relative;
   z-index: 1;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
   justify-self: center;
   width: 54px;
   height: 54px;
@@ -226,6 +234,11 @@ input, textarea, select {
 
 .dock-action:active {
   transform: translateY(-14px) scale(0.94);
+}
+
+/* На экране «Добавить» подсвечена центральная кнопка */
+.dock-action.active {
+  box-shadow: 0 0 0 3px var(--primary-soft), 0 8px 20px rgba(201, 139, 107, 0.45);
 }
 
 /* ---------- поиск ---------- */
@@ -304,6 +317,10 @@ input, textarea, select {
   padding: 12px 14px;
   text-align: left;
   min-height: 44px;
+}
+
+.promo-toggle {
+  transition: background-color 0.16s ease;
 }
 
 .promo-toggle:active {
@@ -544,7 +561,7 @@ input, textarea, select {
   border-radius: var(--radius-card) var(--radius-card) 0 0;
   display: flex;
   flex-direction: column;
-  animation: slide-up 0.2s ease;
+  animation: sheet-up 0.26s cubic-bezier(0.2, 0.8, 0.25, 1);
 }
 
 @media (min-width: 640px) {
@@ -552,8 +569,13 @@ input, textarea, select {
     align-items: center;
     padding: 24px;
   }
+  /* На десктопе модалка по центру — выезд снизу здесь неуместен */
   .modal {
     border-radius: var(--radius-card);
+    animation: slide-up 0.2s ease;
+  }
+  .modal.closing {
+    animation: fade-out 0.18s ease forwards;
   }
 }
 
@@ -1006,17 +1028,33 @@ select.city-chip {
 .toast {
   position: fixed;
   left: 50%;
-  bottom: calc(84px + env(safe-area-inset-bottom));
+  bottom: calc(96px + env(safe-area-inset-bottom));
   transform: translateX(-50%);
   background: var(--text);
   color: var(--bg);
   padding: 10px 18px;
-  border-radius: 999px;
+  border-radius: 16px;
   font-size: 14px;
+  line-height: 1.35;
+  text-align: center;
+  max-width: min(92vw, 420px);
   z-index: 1000;
-  box-shadow: var(--shadow-soft);
-  animation: fade-in 0.2s ease;
-  white-space: nowrap;
+  box-shadow: 0 6px 20px rgba(46, 42, 38, 0.22);
+  animation: toast-in 0.22s cubic-bezier(0.2, 0.8, 0.25, 1);
+}
+
+.toast.leaving {
+  animation: toast-out 0.2s ease forwards;
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translate(-50%, 12px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+
+@keyframes toast-out {
+  from { opacity: 1; transform: translate(-50%, 0); }
+  to   { opacity: 0; transform: translate(-50%, 8px); }
 }
 
 /* ---------- пустые состояния ---------- */
@@ -1687,4 +1725,58 @@ select.city-chip {
 .field select:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 1px;
+}
+
+/* ---------- плавное закрытие оверлеев ---------- */
+
+@keyframes fade-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+@keyframes sheet-up {
+  from { transform: translateY(100%); }
+  to   { transform: none; }
+}
+
+@keyframes sheet-down {
+  from { transform: none; }
+  to   { transform: translateY(100%); }
+}
+
+.modal-overlay.closing {
+  animation: fade-out 0.24s ease forwards;
+}
+
+.modal.closing {
+  animation: sheet-down 0.24s cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+.city-picker.closing {
+  animation: fade-out 0.2s ease forwards;
+}
+
+/* Скелетон на светлой модалке должен быть виден */
+.skeleton.on-surface {
+  background: var(--surface-alt);
+  box-shadow: none;
+}
+
+/* Шапка модалки не должна прыгать по высоте, пока грузятся данные */
+.modal-head {
+  min-height: 62px;
+}
+
+/* Шторка карты не схлопывается в одну строку на время загрузки */
+.bottom-sheet-inner {
+  min-height: 140px;
+}
+
+/* Кнопка в процессе отправки остаётся «живой», а не выглядит выключенной */
+.btn.is-busy {
+  opacity: 1;
+}
+
+.btn:disabled:not(.is-busy) {
+  opacity: 0.55;
 }

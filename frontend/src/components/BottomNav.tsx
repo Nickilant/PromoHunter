@@ -83,8 +83,9 @@ export default function BottomNav() {
       {NAV.slice(0, 2).map(renderItem)}
       <Link
         to="/suggest"
-        className="dock-action"
+        className={`dock-action${pathname.startsWith('/suggest') ? ' active' : ''}`}
         aria-label="Добавить акцию или ресторан"
+        aria-current={pathname.startsWith('/suggest') ? 'page' : undefined}
         onPointerDown={() => setPressed(null)}
       >
         <Icon name="plus" size={24} strokeWidth={2.2} />
