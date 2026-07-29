@@ -1,5 +1,8 @@
 # Прод-override: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 services:
+  db:
+    restart: unless-stopped
+
   backend:
     build:
       context: ./backend
@@ -7,6 +10,7 @@ services:
       args:
         UID: ${UID:-1000}
         GID: ${GID:-1000}
+    restart: unless-stopped
     environment:
       SEED_ON_START: "false"
     # !reset: иначе compose домёрживает bind-mount'ы и порты из базового файла
@@ -18,6 +22,11 @@ services:
     build:
       context: ./frontend
       target: prod
+    restart: unless-stopped
+    # nginx на старте резолвит имя backend — контейнер должен уже существовать
+    depends_on:
+      backend:
+        condition: service_started
     volumes: !reset []
     ports: !override
       # Наружу смотрит хостовый nginx с SSL, он проксирует сюда (см. README)
