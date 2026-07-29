@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
-import { geocodeAddress } from '../utils/geocode';
+import { geocodeAddress, geocodeCity } from '../utils/geocode';
 import { LocationPickerMap, MapFocus } from './MapView';
 
 interface Props {
@@ -17,6 +17,21 @@ export default function MapPickerWithSearch({ lat, lng, city, onPick }: Props) {
   const [focus, setFocus] = useState<MapFocus | null>(null);
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Точка ещё не выбрана — начинаем с города формы, а не с дефолта карты
+  useEffect(() => {
+    if (lat !== null || lng !== null || !city) return;
+    let cancelled = false;
+    geocodeCity(city).then((point) => {
+      if (point && !cancelled) {
+        setFocus({ lat: point.lat, lng: point.lng, zoom: 11 });
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [city]);
 
   const search = async () => {
     const q = query.trim();

@@ -8,7 +8,7 @@ import ReportModal from '../components/ReportModal';
 import { useAuth } from '../hooks/useAuth';
 import { useCity } from '../hooks/useCity';
 import { useSubscriptions } from '../hooks/useSubscriptions';
-import { geocodeAddress } from '../utils/geocode';
+import { geocodeAddress, geocodeCity } from '../utils/geocode';
 import type {
   PromotionWithStatuses,
   RestaurantDetail,
@@ -36,10 +36,25 @@ export default function MapPage() {
 
   useEffect(() => {
     if (!city) return;
+    let cancelled = false;
     api
       .get<RestaurantListItem[]>(`/restaurants?city=${encodeURIComponent(city)}`)
-      .then(setRestaurants)
+      .then((list) => {
+        if (cancelled) return;
+        setRestaurants(list);
+        // Точек нет — карта не впишет маркеры, центрируем на самом городе
+        if (list.length === 0) {
+          geocodeCity(city).then((point) => {
+            if (point && !cancelled) {
+              setFocus({ lat: point.lat, lng: point.lng, zoom: 11 });
+            }
+          });
+        }
+      })
       .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
   }, [city]);
 
   const select = (id: number) => {

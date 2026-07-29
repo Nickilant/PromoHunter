@@ -8,6 +8,22 @@ export interface GeoPoint {
   label: string;
 }
 
+/** Координаты города (кэшируются в localStorage) — для центрирования карты */
+export async function geocodeCity(city: string): Promise<GeoPoint | null> {
+  const key = `promohunter_city_geo:${city.toLowerCase()}`;
+  const cached = localStorage.getItem(key);
+  if (cached) {
+    try {
+      return JSON.parse(cached) as GeoPoint;
+    } catch {
+      localStorage.removeItem(key);
+    }
+  }
+  const point = await geocodeAddress(city, null);
+  if (point) localStorage.setItem(key, JSON.stringify(point));
+  return point;
+}
+
 export async function geocodeAddress(
   query: string,
   city: string | null,
