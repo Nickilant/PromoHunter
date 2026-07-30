@@ -8,11 +8,13 @@ from sqlalchemy.orm import Session, joinedload
 from app.auth import get_current_user_optional
 from app.database import get_db
 from app.models import (
+    Faction,
     PromotionSuggestion,
     RatingEvent,
     Report,
     RestaurantSuggestion,
     User,
+    UserRole,
 )
 from app.schemas import (
     RatingCardOut,
@@ -34,56 +36,119 @@ def _period_start(period: Period, now: datetime) -> datetime:
     return now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
 
 
-@router.get("", response_model=RatingOut)
-def leaderboard(
-    city: str,
-    period: Period = "month",
-    db: Session = Depends(get_db),
-    viewer: User | None = Depends(get_current_user_optional),
-):
-    since = _period_start(period, datetime.now(timezone.utc))
+Scope = Literal["all", "faction"]
 
-    rows = db.execute(
+
+def _ranked_subquery(
+    city: str, since: datetime, faction: Faction | None
+):
+    """Пронумерованный зачёт города: место считает СУБД, а не Python.
+
+    Админы в общий зачёт не попадают: у них доступ к модерации, соревноваться
+    с ними нечестно. Публичный пол — ноль, минусовые суммы в таблицу не идут.
+    """
+    conditions = [
+        RatingEvent.city == city,
+        RatingEvent.created_at >= since,
+        User.is_blocked.is_(False),
+        User.role != UserRole.admin,
+    ]
+    if faction is not None:
+        conditions.append(User.faction == faction)
+
+    totals = (
         select(
-            RatingEvent.user_id,
-            User.display_name,
+            RatingEvent.user_id.label("user_id"),
+            User.display_name.label("display_name"),
             func.sum(RatingEvent.points).label("points"),
             func.count().filter(RatingEvent.type == "report_base").label("reports"),
             func.count().filter(RatingEvent.type == "pioneer").label("pioneers"),
         )
         .join(User, User.id == RatingEvent.user_id)
-        .where(
-            RatingEvent.city == city,
-            RatingEvent.created_at >= since,
-            User.is_blocked.is_(False),
-        )
+        .where(*conditions)
         .group_by(RatingEvent.user_id, User.display_name)
-        .order_by(func.sum(RatingEvent.points).desc(), RatingEvent.user_id)
-    ).all()
+        .having(func.sum(RatingEvent.points) > 0)
+        .subquery()
+    )
+    position = (
+        func.row_number()
+        .over(order_by=(totals.c.points.desc(), totals.c.user_id))
+        .label("position")
+    )
+    return select(
+        totals.c.user_id,
+        totals.c.display_name,
+        totals.c.points,
+        totals.c.reports,
+        totals.c.pioneers,
+        position,
+    ).subquery()
 
-    # Публичный пол — ноль: в таблицу попадают только положительные суммы
-    ranked = [r for r in rows if r.points > 0]
-    entries = [
-        RatingEntryOut(
-            user_id=r.user_id,
-            display_name=r.display_name,
-            points=r.points,
-            reports_count=r.reports,
-            pioneers_count=r.pioneers,
-            position=i + 1,
-        )
-        for i, r in enumerate(ranked[:20])
-    ]
+
+def _entry(row) -> RatingEntryOut:
+    return RatingEntryOut(
+        user_id=row.user_id,
+        display_name=row.display_name,
+        points=row.points,
+        reports_count=row.reports,
+        pioneers_count=row.pioneers,
+        position=row.position,
+    )
+
+
+@router.get("", response_model=RatingOut)
+def leaderboard(
+    city: str,
+    period: Period = "month",
+    scope: Scope = "all",
+    limit: int = Query(default=10, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+    viewer: User | None = Depends(get_current_user_optional),
+):
+    """Таблица зачёта постранично плюс своя строка — она приходит всегда,
+    даже если человек на 564-м месте и в выданную страницу не попал."""
+    since = _period_start(period, datetime.now(timezone.utc))
+
+    faction = None
+    if scope == "faction":
+        if viewer is None or viewer.faction is None:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail="Зачёт по фракции доступен, когда выбрана сторона",
+            )
+        faction = viewer.faction
+
+    ranked = _ranked_subquery(city, since, faction)
+
+    total = db.scalar(select(func.count()).select_from(ranked)) or 0
+    rows = db.execute(
+        select(ranked)
+        .order_by(ranked.c.position)
+        .limit(limit)
+        .offset(offset)
+    ).all()
+    entries = [_entry(row) for row in rows]
 
     me = None
     if viewer is not None:
-        position = next(
-            (i + 1 for i, r in enumerate(ranked) if r.user_id == viewer.id), None
-        )
-        my_points = next((r.points for r in rows if r.user_id == viewer.id), 0)
-        me = RatingMeOut(position=position, points=max(0, my_points))
+        my_row = db.execute(
+            select(ranked).where(ranked.c.user_id == viewer.id)
+        ).first()
+        if my_row is not None:
+            me = RatingMeOut(**_entry(my_row).model_dump())
+        else:
+            # Очков нет (или они в минусе) — показываем строку без места
+            me = RatingMeOut(
+                user_id=viewer.id,
+                display_name=viewer.display_name,
+                points=0,
+                reports_count=0,
+                pioneers_count=0,
+                position=None,
+            )
 
-    return RatingOut(entries=entries, me=me)
+    return RatingOut(entries=entries, total=total, me=me)
 
 
 TYPE_ORDER = [

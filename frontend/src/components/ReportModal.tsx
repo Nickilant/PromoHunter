@@ -9,6 +9,7 @@ import type {
 } from '../types';
 import { useToast } from './Toast';
 import Icon from './Icon';
+import Overlay from './Overlay';
 import ReceiptScanner from './ReceiptScanner';
 import { useDismiss } from '../hooks/useDismiss';
 import { useGame } from '../hooks/useGame';
@@ -122,6 +123,7 @@ export default function ReportModal({ restaurant, promotion, onClose, onReported
     setChoices((prev) => ({ ...prev, [itemId]: choice }));
 
   return (
+    <Overlay>
     <div
       className={`modal-overlay${closing ? ' closing' : ''}`}
       onClick={dismiss}
@@ -203,12 +205,12 @@ export default function ReportModal({ restaurant, promotion, onClose, onReported
                 <>
                   <div className="capture-attach-hint">
                     {hasYes
-                      ? `Приложите чек с этой покупки — от ${
-                          config?.min_sum_rubles ?? 50
-                        } ₽ и не старше ${
+                      ? 'Для начала захвата отсканируйте QR-код на чеке с акционным ' +
+                        `товаром не позднее чем через ${
                           config?.receipt_max_age_minutes ?? 15
-                        } мин. Только чек добавляет силу вашей стороне.`
-                      : 'Сначала отметьте «Есть» у того, что купили, — захват идёт только по наличию.'}
+                        } минут после покупки`
+                      : 'Для начала захвата точки отметьте наличие и отсканируйте ' +
+                        'QR на чеке с акционным товаром'}
                   </div>
                   {hasYes && (
                     <>
@@ -254,8 +256,12 @@ export default function ReportModal({ restaurant, promotion, onClose, onReported
                 ? 'Отправить и захватывать'
                 : `Отправить${marked.length ? ` (${marked.length})` : ''}`}
           </button>
+          <button className="btn btn-ghost btn-block" onClick={dismiss}>
+            Назад
+          </button>
         </div>
       </div>
     </div>
+    </Overlay>
   );
 }

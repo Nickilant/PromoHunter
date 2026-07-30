@@ -10,6 +10,7 @@ import type {
   RestaurantShort,
 } from '../types';
 import CapturePanel from './CapturePanel';
+import Overlay from './Overlay';
 import PromotionAccordion from './PromotionAccordion';
 import ReportModal from './ReportModal';
 import Icon from './Icon';
@@ -48,7 +49,7 @@ export default function RestaurantModal({ restaurantId, onClose }: Props) {
   };
 
   return (
-    <>
+    <Overlay>
       <div
         className={`modal-overlay${closing ? ' closing' : ''}`}
         onClick={dismiss}
@@ -81,31 +82,42 @@ export default function RestaurantModal({ restaurantId, onClose }: Props) {
                 />
               </div>
             )}
+            {/* Колокольчик — в строке с названием, а не отдельной полосой */}
+            {detail && (
+              <button
+                className={`head-bell${
+                  isSubscribedToRestaurant(restaurantId) ? ' on' : ''
+                }`}
+                onClick={() => {
+                  if (!user) {
+                    navigate('/login');
+                    return;
+                  }
+                  toggleRestaurant(restaurantId);
+                }}
+                aria-pressed={isSubscribedToRestaurant(restaurantId)}
+                aria-label={
+                  isSubscribedToRestaurant(restaurantId)
+                    ? 'Отписаться от новостей точки'
+                    : 'Подписаться на новости точки'
+                }
+                title={
+                  isSubscribedToRestaurant(restaurantId)
+                    ? 'Отписаться от новостей точки'
+                    : 'Подписаться на новости точки'
+                }
+              >
+                <Icon
+                  name={isSubscribedToRestaurant(restaurantId) ? 'bell' : 'bellOff'}
+                  size={19}
+                />
+              </button>
+            )}
             <button className="modal-close" onClick={dismiss} aria-label="Закрыть">
               <Icon name="close" size={20} />
             </button>
           </div>
           <CapturePanel restaurantId={restaurantId} />
-          {detail && (
-            <button
-              className={`sub-row ${isSubscribedToRestaurant(restaurantId) ? 'on' : ''}`}
-              onClick={() => {
-                if (!user) {
-                  navigate('/login');
-                  return;
-                }
-                toggleRestaurant(restaurantId);
-              }}
-            >
-              <Icon
-                name={isSubscribedToRestaurant(restaurantId) ? 'bell' : 'bellOff'}
-                size={17}
-              />
-              {isSubscribedToRestaurant(restaurantId)
-                ? 'Вы подписаны на новые акции точки — отключить'
-                : 'Сообщать о новых акциях этой точки'}
-            </button>
-          )}
           <div className="modal-body" style={{ paddingBottom: 16 }}>
             {detail && detail.promotions.length === 0 && (
               <div className="empty-state">Сейчас в этой точке нет действующих акций</div>
@@ -132,6 +144,6 @@ export default function RestaurantModal({ restaurantId, onClose }: Props) {
           onReported={load}
         />
       )}
-    </>
+    </Overlay>
   );
 }

@@ -153,9 +153,42 @@ export default function MapPage() {
                   />
                 </>
               )}
+              {/* Колокольчик — в одной строке с названием: отдельной строкой
+                  он налезал на состояние точки */}
+              {selected && selectedId !== null && (
+                <button
+                  className={`head-bell${
+                    isSubscribedToRestaurant(selectedId) ? ' on' : ''
+                  }`}
+                  style={{ marginLeft: 'auto' }}
+                  onClick={() => {
+                    if (!user) {
+                      navigate('/login');
+                      return;
+                    }
+                    toggleRestaurant(selectedId);
+                  }}
+                  aria-pressed={isSubscribedToRestaurant(selectedId)}
+                  aria-label={
+                    isSubscribedToRestaurant(selectedId)
+                      ? 'Отписаться от новостей точки'
+                      : 'Подписаться на новости точки'
+                  }
+                  title={
+                    isSubscribedToRestaurant(selectedId)
+                      ? 'Отписаться от новостей точки'
+                      : 'Подписаться на новости точки'
+                  }
+                >
+                  <Icon
+                    name={isSubscribedToRestaurant(selectedId) ? 'bell' : 'bellOff'}
+                    size={19}
+                  />
+                </button>
+              )}
               <button
                 className="modal-close"
-                style={{ marginLeft: 'auto' }}
+                style={selected ? undefined : { marginLeft: 'auto' }}
                 onClick={() => {
                   setSelectedId(null);
                   setSelected(null);
@@ -166,26 +199,6 @@ export default function MapPage() {
               </button>
             </div>
             {selectedId !== null && <CapturePanel restaurantId={selectedId} />}
-            {selected && selectedId !== null && (
-              <button
-                className={`sub-row ${isSubscribedToRestaurant(selectedId) ? 'on' : ''}`}
-                onClick={() => {
-                  if (!user) {
-                    navigate('/login');
-                    return;
-                  }
-                  toggleRestaurant(selectedId);
-                }}
-              >
-                <Icon
-                  name={isSubscribedToRestaurant(selectedId) ? 'bell' : 'bellOff'}
-                  size={17}
-                />
-                {isSubscribedToRestaurant(selectedId)
-                  ? 'Вы подписаны на новые акции точки — отключить'
-                  : 'Сообщать о новых акциях этой точки'}
-              </button>
-            )}
             {/* скроллится только список акций — шапка и подписка закреплены */}
             <div className="bottom-sheet-scroll">
               {selected && selected.promotions.length === 0 && (

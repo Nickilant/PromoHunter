@@ -17,3 +17,6 @@ export function pluralize(
 export const POINTS = ['точка', 'точки', 'точек'] as const;
 export const PLAYERS = ['игрок', 'игрока', 'игроков'] as const;
 export const RECEIPTS = ['чек', 'чека', 'чеков'] as const;
+export const REPORTS = ['отчёт', 'отчёта', 'отчётов'] as const;
+export const HOURS = ['час', 'часа', 'часов'] as const;
+export const DAYS = ['день', 'дня', 'дней'] as const;

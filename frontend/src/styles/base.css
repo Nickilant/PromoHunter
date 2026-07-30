@@ -951,14 +951,54 @@ input, textarea, select {
 .rating-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   width: 100%;
+  min-height: 40px;
   background: var(--surface);
-  border-radius: var(--radius-card);
+  border-radius: 12px;
   box-shadow: var(--shadow-soft);
-  padding: 12px 16px;
+  padding: 6px 12px;
   text-align: left;
   transition: transform 0.15s;
+}
+
+/* Имя занимает всё свободное место и обрезается, а не переносится:
+   строка держит одну высоту, сколько бы длинным ни было имя */
+.rating-name {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 15px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rating-you {
+  flex: none;
+  background: var(--primary-soft);
+  color: var(--primary-ink);
+  border-radius: 6px;
+  padding: 0 5px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.rating-meta {
+  flex: none;
+  color: var(--text-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* На совсем узких экранах счётчик отчётов уступает место имени и очкам */
+@media (max-width: 359px) {
+  .rating-meta { display: none; }
 }
 
 .rating-row:active {
@@ -970,14 +1010,15 @@ input, textarea, select {
 }
 
 .rating-pos {
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   flex-shrink: 0;
-  border-radius: 50%;
+  border-radius: 9px;
   background: var(--surface-alt);
   color: var(--text-muted);
-  font-weight: 600;
-  font-size: 14px;
+  font-weight: 700;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1105,16 +1146,24 @@ select.city-chip {
   inset: 0;
 }
 
+/* Карта — единый слой в самом низу: своим z-index (0) она замыкает внутри
+   себя всю нумерацию Leaflet (панели 200–700, контролы 800) и собственные
+   плавающие кнопки. Иначе они спорили бы со шторкой и модалками, а маркеры
+   перекрывали бы кнопки. */
 .map-page .leaflet-container {
   width: 100%;
   height: 100%;
+  position: relative;
+  z-index: 0;
 }
 
+/* Кнопки карты внутри её слоя: выше маркеров и подсказок, но вся карта
+   целиком остаётся под шторкой точки и под модалками */
 .locate-btn {
   position: absolute;
   right: 12px;
   top: calc(70px + env(safe-area-inset-top));
-  z-index: 400;
+  z-index: 900;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 16px;
@@ -2404,7 +2453,7 @@ select.city-chip {
   position: absolute;
   right: 12px;
   top: calc(124px + env(safe-area-inset-top));
-  z-index: 400;
+  z-index: 900;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 16px;
@@ -2629,4 +2678,117 @@ select.city-chip {
 .game-onboarding.closing,
 .faction-picker.closing {
   animation: fade-out 0.2s ease forwards;
+}
+
+/* ---------- рейтинг: своё место, «…», зачёт по фракции ---------- */
+
+/* Первая десятка влезает без прокрутки; она появляется, только когда
+   человек сам подгрузил следующие места кнопкой «…» */
+/* Список ограничен экраном, а не количеством строк: десятка, «…» и своё
+   место укладываются без прокрутки, а прокрутка появляется сама, когда
+   человек подгрузил ещё места (или экран совсем небольшой).
+   292px — шапка страницы с переключателями плюс место под доком; замерено. */
+.rating-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: calc(min(100vh, 100dvh) - 338px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* тени строк обрезались бы краем области прокрутки */
+  padding: 2px;
+  margin: -2px;
+}
+
+/* Многоточие-разрыв между таблицей и своей строкой */
+.rating-gap {
+  align-self: center;
+  min-width: 72px;
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: 999px;
+  background: var(--surface-alt);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  padding-bottom: 4px;
+  transition: transform 0.15s, background 0.15s, color 0.15s;
+}
+
+.rating-gap:hover {
+  background: var(--primary-soft);
+  color: var(--primary-ink);
+}
+
+.rating-gap:active {
+  transform: scale(0.94);
+}
+
+.rating-gap.is-busy {
+  padding-bottom: 0;
+}
+
+/* Своя строка ниже разрыва — заметная, но не крикливая */
+.rating-list .rating-row.me {
+  outline: 2px solid var(--primary);
+  outline-offset: 0;
+}
+
+.scope-toggle {
+  margin-top: 8px;
+}
+
+.scope-toggle button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+/* Кнопка своей фракции окрашивается в её цвет, а не в общий зелёный сервиса */
+.scope-toggle button.on.green {
+  background: var(--green-faction);
+  border-color: var(--green-faction);
+}
+
+.scope-toggle button.on.purple {
+  background: var(--purple-faction);
+  border-color: var(--purple-faction);
+}
+
+/* ---------- колокольчик в шапке точки ---------- */
+
+.head-bell {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  background: var(--surface-alt);
+  transition: background 0.18s, color 0.18s, transform 0.15s;
+}
+
+.head-bell.on {
+  background: var(--primary-soft);
+  color: var(--primary-ink);
+}
+
+.head-bell:active {
+  transform: scale(0.92);
+}
+
+/* Две кнопки в подвале модалки — «отправить» и «назад» */
+.modal-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }

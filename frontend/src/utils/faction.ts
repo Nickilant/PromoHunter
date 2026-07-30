@@ -1,4 +1,5 @@
 import type { Faction, PointControl } from '../types';
+import { DAYS, HOURS, pluralize } from './plural';
 
 export const FACTION_TITLE: Record<Faction, string> = {
   green: 'Зелёные',
@@ -82,14 +83,32 @@ export function formatEtaShort(seconds: number | null): string {
   return `${minutes || Math.ceil(total / 60)}м`;
 }
 
-/** Человеческое описание, что сейчас с точкой */
+/**
+ * Что сейчас с точкой. Сторону-владельца не повторяем: она уже написана
+ * на плашке рядом — вместо этого говорим, сколько её держат.
+ */
 export function pointSummary(point: PointControl): string {
   if (point.truce_seconds !== null) return 'Перемирие после отбитой атаки';
   if (point.leader === null) {
-    return point.owner ? `Точка ${FACTION_OF[point.owner]}` : 'Точка свободна';
+    if (!point.owner) return 'За точку пока не воевали';
+    const held = heldFor(point.captured_at);
+    return held ? `Держат точку ${held}` : 'Держат точку';
   }
   if (!point.is_active_now) return 'Точка закрыта — шкалы стоят';
   if (point.owner === null) return `${FACTION_TITLE[point.leader]} занимают точку`;
   if (point.leader === point.owner) return 'Атака отбивается';
   return `${FACTION_TITLE[point.leader]} захватывают точку`;
+}
+
+/** «2 дня», «5 часов» — сколько владеют точкой с момента захвата */
+function heldFor(capturedAt: string | null): string | null {
+  if (!capturedAt) return null;
+  const hours = (Date.now() - new Date(capturedAt).getTime()) / 3_600_000;
+  if (hours < 1) return 'меньше часа';
+  if (hours < 24) {
+    const value = Math.round(hours);
+    return `${value} ${pluralize(value, HOURS)}`;
+  }
+  const days = Math.round(hours / 24);
+  return `${days} ${pluralize(days, DAYS)}`;
 }

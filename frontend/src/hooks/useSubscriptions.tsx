@@ -43,14 +43,18 @@ export function SubscriptionsProvider({ children }: { children: ReactNode }) {
   const findByPromotion = (id: number) =>
     subscriptions.find((s) => s.promotion?.id === id);
 
-  const toggle = async (body: object, existing: Subscription | undefined) => {
+  const toggle = async (
+    body: object,
+    existing: Subscription | undefined,
+    what: string,
+  ) => {
     try {
       if (existing) {
         await api.delete(`/subscriptions/${existing.id}`);
-        toast('Подписка отключена');
+        toast(`Вы отписались от новостей ${what}`);
       } else {
         await api.post('/subscriptions', body);
-        toast('Подписка оформлена — бот пришлёт новости');
+        toast(`Вы подписались на новости ${what}`);
       }
       load();
     } catch (err) {
@@ -73,8 +77,10 @@ export function SubscriptionsProvider({ children }: { children: ReactNode }) {
         subscriptions,
         isSubscribedToRestaurant: (id) => Boolean(findByRestaurant(id)),
         isSubscribedToPromotion: (id) => Boolean(findByPromotion(id)),
-        toggleRestaurant: (id) => toggle({ restaurant_id: id }, findByRestaurant(id)),
-        togglePromotion: (id) => toggle({ promotion_id: id }, findByPromotion(id)),
+        toggleRestaurant: (id) =>
+          toggle({ restaurant_id: id }, findByRestaurant(id), 'этой точки'),
+        togglePromotion: (id) =>
+          toggle({ promotion_id: id }, findByPromotion(id), 'этой акции'),
         remove,
       }}
     >

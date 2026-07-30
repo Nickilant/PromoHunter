@@ -490,13 +490,19 @@ class RatingEntryOut(BaseModel):
     position: int
 
 
-class RatingMeOut(BaseModel):
+class RatingMeOut(RatingEntryOut):
+    """Своя строка — такая же, как в таблице, но приходит всегда.
+
+    position = None означает «очков в этом зачёте пока нет».
+    """
+
     position: int | None = None
-    points: int
 
 
 class RatingOut(BaseModel):
     entries: list[RatingEntryOut]
+    # Сколько всего людей в зачёте — по нему видно, есть ли что подгружать
+    total: int = 0
     me: RatingMeOut | None = None
 
 

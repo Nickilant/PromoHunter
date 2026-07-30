@@ -244,6 +244,9 @@ export interface Subscription {
 
 export type RatingPeriod = 'month' | 'year';
 
+/** all — весь город, faction — только своя сторона */
+export type RatingScope = 'all' | 'faction';
+
 export interface RatingEntry {
   user_id: number;
   display_name: string;
@@ -253,9 +256,15 @@ export interface RatingEntry {
   position: number;
 }
 
+/** Своя строка приходит всегда; position = null — очков ещё нет */
+export interface RatingMe extends Omit<RatingEntry, 'position'> {
+  position: number | null;
+}
+
 export interface RatingResponse {
   entries: RatingEntry[];
-  me: { position: number | null; points: number } | null;
+  total: number;
+  me: RatingMe | null;
 }
 
 export interface RatingCategory {

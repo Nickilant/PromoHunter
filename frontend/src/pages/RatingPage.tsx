@@ -3,12 +3,17 @@ import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
 import { useCity } from '../hooks/useCity';
+import { useGame } from '../hooks/useGame';
 import type {
   CityInfo,
   RatingCard,
+  RatingEntry,
   RatingPeriod,
   RatingResponse,
+  RatingScope,
 } from '../types';
+import { FACTION_TITLE } from '../utils/faction';
+import { REPORTS, pluralize } from '../utils/plural';
 import { formatDateTime } from '../utils/time';
 import Icon from '../components/Icon';
 
@@ -24,29 +29,102 @@ const TYPE_LABELS: Record<string, string> = {
   restaurant_spam: 'Заявки на рестораны — спам',
 };
 
+// Первая страница — ровно 10 мест, чтобы список влезал без прокрутки;
+// «…» подгружает следующую десятку
+const PAGE = 10;
+
+/** Строка таблицы: одинаковая и в топе, и для своего места ниже «…» */
+function Row({
+  entry,
+  me,
+  onOpen,
+}: {
+  entry: RatingEntry;
+  me: number | undefined;
+  onOpen: (userId: number) => void;
+}) {
+  const isMe = me === entry.user_id;
+  return (
+    <button
+      className={`rating-row${isMe ? ' me' : ''}`}
+      onClick={() => onOpen(entry.user_id)}
+    >
+      <span className={`rating-pos ${entry.position <= 3 ? 'top' : ''}`}>
+        {entry.position}
+      </span>
+      {/* Одна строка на место: только так десятка, «…» и своё место
+          укладываются на экран без прокрутки */}
+      <span className="rating-name">
+        {entry.display_name}
+        {isMe && <span className="rating-you">вы</span>}
+      </span>
+      <span className="rating-meta">
+        {entry.reports_count} {pluralize(entry.reports_count, REPORTS)}
+        {entry.pioneers_count > 0 && ` · ${entry.pioneers_count}★`}
+      </span>
+      <span className="rating-points">{entry.points}</span>
+    </button>
+  );
+}
+
 export default function RatingPage() {
   const { city: sessionCity } = useCity();
   const { user } = useAuth();
+  const { faction } = useGame();
   const [city, setCity] = useState<string | null>(sessionCity);
   const [cities, setCities] = useState<CityInfo[]>([]);
   const [period, setPeriod] = useState<RatingPeriod>('month');
+  const [scope, setScope] = useState<RatingScope>('all');
   const [data, setData] = useState<RatingResponse | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [card, setCard] = useState<RatingCard | null>(null);
 
   useEffect(() => {
     api.get<CityInfo[]>('/cities').then(setCities).catch(() => {});
   }, []);
 
+  // Сторону могли снять в профиле — зачёт по фракции тогда недоступен
+  useEffect(() => {
+    if (!faction) setScope('all');
+  }, [faction]);
+
+  const query = (limit: number, offset: number) =>
+    `/rating?city=${encodeURIComponent(city!)}&period=${period}` +
+    `&scope=${scope}&limit=${limit}&offset=${offset}`;
+
   useEffect(() => {
     if (!city) return;
     setData(null);
     api
-      .get<RatingResponse>(
-        `/rating?city=${encodeURIComponent(city)}&period=${period}`,
-      )
+      .get<RatingResponse>(query(PAGE, 0))
       .then(setData)
-      .catch(() => setData({ entries: [], me: null }));
-  }, [city, period]);
+      .catch(() => setData({ entries: [], total: 0, me: null }));
+    // query собирается из этих же значений
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [city, period, scope]);
+
+  const loadMore = async () => {
+    if (!city || !data || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const next = await api.get<RatingResponse>(query(PAGE, data.entries.length));
+      setData({
+        ...next,
+        entries: [...data.entries, ...next.entries],
+      });
+    } catch {
+      /* не подгрузилось — список остаётся как был */
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  const loaded = data?.entries.length ?? 0;
+  const total = data?.total ?? 0;
+  const myPosition = data?.me?.position ?? null;
+  // Своя строка ниже выданной страницы — показываем её отдельно, после «…»
+  const myRowBelow = myPosition !== null && myPosition > loaded;
+  const hasGap = loaded < total;
 
   const openCard = (userId: number) => {
     if (!city) return;
@@ -88,6 +166,23 @@ export default function RatingPage() {
         </button>
       </div>
 
+      {/* Зачёт внутри своей фракции — только когда сторона выбрана */}
+      {faction && (
+        <div className="period-toggle scope-toggle">
+          <button className={scope === 'all' ? 'on' : ''} onClick={() => setScope('all')}>
+            <Icon name="trophy" size={16} />
+            Общий
+          </button>
+          <button
+            className={`${scope === 'faction' ? 'on' : ''} ${faction}`}
+            onClick={() => setScope('faction')}
+          >
+            <Icon name="shield" size={16} strokeWidth={2} />
+            {FACTION_TITLE[faction]}
+          </button>
+        </div>
+      )}
+
       {data === null && (
         <div className="skeleton-list" aria-label="Загружаем рейтинг" aria-busy="true">
           {[0, 1, 2, 3, 4].map((i) => (
@@ -106,36 +201,40 @@ export default function RatingPage() {
         </div>
       )}
 
-      {data?.entries.map((entry) => (
-        <button
-          key={entry.user_id}
-          className={`rating-row ${user?.id === entry.user_id ? 'me' : ''}`}
-          onClick={() => openCard(entry.user_id)}
-        >
-          <span className={`rating-pos ${entry.position <= 3 ? 'top' : ''}`}>
-            {entry.position}
-          </span>
-          <span className="rating-body">
-            <span className="brand-card-title">
-              {entry.display_name}
-              {user?.id === entry.user_id && ' (вы)'}
-            </span>
-            <span className="brand-card-meta">
-              {entry.reports_count}{' '}
-              {entry.reports_count === 1 ? 'отчёт' : 'отчётов'}
-              {entry.pioneers_count > 0 &&
-                ` · ${entry.pioneers_count} первопроходств`}
-            </span>
-          </span>
-          <span className="rating-points">{entry.points}</span>
-        </button>
-      ))}
+      {data !== null && data.entries.length > 0 && (
+        <>
+          <div className="rating-list">
+            {data.entries.map((entry) => (
+              <Row key={entry.user_id} entry={entry} me={user?.id} onOpen={openCard} />
+            ))}
 
-      {data?.me && user && (
+            {/* Между таблицей и своей строкой — многоточие, оно же кнопка
+                «показать ещё десять» */}
+            {hasGap && (
+              <button
+                className={`rating-gap${loadingMore ? ' is-busy' : ''}`}
+                onClick={loadMore}
+                disabled={loadingMore}
+                aria-label="Показать ещё десять мест"
+                title="Показать ещё десять мест"
+              >
+                {loadingMore ? <span className="spinner" /> : '…'}
+              </button>
+            )}
+          </div>
+
+          {/* Своя строка закреплена вне области прокрутки: место видно
+              всегда, на каком угодно экране */}
+          {myRowBelow && data.me && (
+            <Row entry={data.me as RatingEntry} me={user?.id} onOpen={openCard} />
+          )}
+        </>
+      )}
+
+      {data?.me && user && data.me.position === null && (
         <div className="rating-me">
-          {data.me.position !== null
-            ? `Ваше место: ${data.me.position} · ${data.me.points} очков`
-            : 'Вы пока не набрали очков в этом городе — начните с отчёта!'}
+          Вы пока не набрали очков в этом
+          {scope === 'faction' ? ' зачёте' : ' городе'} — начните с отчёта!
         </div>
       )}
 

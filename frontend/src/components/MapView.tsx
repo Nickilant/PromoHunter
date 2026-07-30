@@ -52,7 +52,6 @@ function LocateButton() {
   return (
     <button
       className="locate-btn"
-      style={{ zIndex: 1000 }}
       onClick={(e) => {
         e.stopPropagation();
         locate();
@@ -152,7 +151,6 @@ function LayerToggle({
   return (
     <button
       className={`layer-btn${visible ? ' on' : ''}`}
-      style={{ zIndex: 1000 }}
       onClick={(e) => {
         e.stopPropagation();
         onToggle();

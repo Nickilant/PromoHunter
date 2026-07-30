@@ -51,12 +51,12 @@ export default function CapturePanel({ restaurantId }: { restaurantId: number })
   // отправки чека. Деталь нужна ради собственного вклада и как запасной
   // источник, если точки этого города в табло ещё нет.
   const point = summary ?? detail;
-  if (!point) {
-    return (
-      <div className="capture-panel">
-        <span className="skeleton on-surface" style={{ height: 44, borderRadius: 12 }} />
-      </div>
-    );
+  // Пока не знаем состояние — ничего не рисуем: за свободную точку никто не
+  // воюет, и скелетон исчез бы сразу после загрузки, дёрнув всю карточку.
+  if (!point) return null;
+  // За свободную точку рассказывать нечего — панель не занимает место
+  if (point.owner === null && point.leader === null && point.truce_seconds === null) {
+    return null;
   }
 
   const mine = faction;
