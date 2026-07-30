@@ -243,7 +243,15 @@ export default function RatingPage() {
         </>
       )}
 
-      {data?.me && user && data.me.position === null && (
+      {/* Админ в зачёте не участвует — иначе строка «нет очков» вводит в
+          заблуждение: очки у него есть, просто он вне соревнования */}
+      {user?.role === 'admin' && (
+        <div className="rating-me">
+          Администраторы в зачёте не участвуют — так честнее к остальным
+        </div>
+      )}
+
+      {data?.me && user && user.role !== 'admin' && data.me.position === null && (
         <div className="rating-me">
           Вы пока не набрали очков в этом
           {scope === 'faction' ? ' зачёте' : ' городе'} — начните с отчёта!

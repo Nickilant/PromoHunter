@@ -90,7 +90,7 @@ export function formatEtaShort(seconds: number | null): string {
 export function pointSummary(point: PointControl): string {
   if (point.truce_seconds !== null) return 'Перемирие после отбитой атаки';
   if (point.leader === null) {
-    if (!point.owner) return 'За точку пока не воевали';
+    if (!point.owner) return 'Можно взять первым';
     const held = heldFor(point.captured_at);
     return held ? `Держат точку ${held}` : 'Держат точку';
   }

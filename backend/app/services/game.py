@@ -802,17 +802,25 @@ def project(control: PointControl, restaurant: Restaurant, now: datetime) -> Poi
 
 
 def city_points(db: Session, city: str, now: datetime | None = None) -> list[PointView]:
+    """Табло по всем точкам города, включая те, за которые ещё не воевали.
+
+    Свободные точки тоже нужны на табло: без них в списках и карточках у
+    половины адресов не было бы вообще ничего игрового, хотя режим включён.
+    """
     now = now or datetime.now(timezone.utc)
     rows = (
         db.execute(
-            select(PointControl, Restaurant)
-            .join(Restaurant, Restaurant.id == PointControl.restaurant_id)
+            select(Restaurant, PointControl)
+            .outerjoin(PointControl, PointControl.restaurant_id == Restaurant.id)
             .where(Restaurant.city == city, Restaurant.is_active.is_(True))
         )
         .unique()
         .all()
     )
-    return [project(control, restaurant, now) for control, restaurant in rows]
+    return [
+        project(control or blank_control(restaurant.id, now), restaurant, now)
+        for restaurant, control in rows
+    ]
 
 
 def contribution(

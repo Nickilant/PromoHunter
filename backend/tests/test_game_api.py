@@ -391,3 +391,36 @@ def test_point_detail_for_untouched_point(client, db):
     assert data["owner"] is None
     assert data["green_score"] == 0.0
     assert data["eta_seconds"] is None
+
+
+def test_points_include_untouched_ones(client, db):
+    """Свободные точки тоже на табло: иначе в списках у половины адресов
+    вообще ничего игрового, хотя режим включён."""
+    restaurant, promotion, _ = make_fixtures(db)
+    restaurant.city = "Табло"
+    quiet = restaurant.__class__(
+        brand_id=restaurant.brand_id, city="Табло", address="Тихая, 1", lat=0, lng=0
+    )
+    hidden = restaurant.__class__(
+        brand_id=restaurant.brand_id,
+        city="Табло",
+        address="Закрытая, 2",
+        lat=0,
+        lng=0,
+        is_active=False,
+    )
+    db.add_all([quiet, hidden])
+    db.commit()
+
+    points = client.get("/api/game/points?city=Табло").json()
+    ids = {p["restaurant_id"] for p in points}
+    assert restaurant.id in ids
+    assert quiet.id in ids          # за неё не воевали — но она на табло
+    assert hidden.id not in ids     # выключенных точек в игре нет
+
+    fresh = next(p for p in points if p["restaurant_id"] == quiet.id)
+    assert fresh["owner"] is None
+    assert fresh["leader"] is None
+    assert fresh["green_score"] == 0.0
+    assert fresh["green_receipts"] == 0
+    assert fresh["eta_seconds"] is None
