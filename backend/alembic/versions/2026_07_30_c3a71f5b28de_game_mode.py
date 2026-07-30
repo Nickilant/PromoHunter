@@ -48,9 +48,6 @@ def upgrade() -> None:
         'restaurants',
         sa.Column('active_hours_mask', sa.Integer(), server_default='0', nullable=False),
     )
-    op.create_index(
-        'ix_restaurants_city_active', 'restaurants', ['city', 'is_active'], unique=False
-    )
 
     op.add_column(
         'reports',
@@ -207,7 +204,6 @@ def downgrade() -> None:
     op.drop_table('receipts')
     op.drop_table('fiscal_drives')
     op.drop_column('reports', 'is_receipt_verified')
-    op.drop_index('ix_restaurants_city_active', table_name='restaurants')
     op.drop_column('restaurants', 'active_hours_mask')
     op.drop_column('restaurants', 'utc_offset_minutes')
     op.drop_index('ix_users_city_faction', table_name='users')

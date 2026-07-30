@@ -333,19 +333,18 @@ def advance(
             control.captured_at = now
         control.attack_notified_at = None
         control.warning_notified_at = None
+        finisher = _last_contributor(db, restaurant.id, resolution.faction)
         db.add(
             CaptureEvent(
                 restaurant_id=restaurant.id,
                 city=restaurant.city,
                 faction=resolution.faction,
                 kind=resolution.kind,
-                finisher_user_id=_last_contributor(
-                    db, restaurant.id, resolution.faction
-                ),
+                finisher_user_id=finisher,
                 created_at=now,
             )
         )
-        _award_battle_points(db, restaurant, resolution, now)
+        _award_battle_points(db, restaurant, resolution, finisher, now)
         _bump_standing(db, restaurant.city, resolution.faction, resolution.kind, now)
     return resolutions
 
@@ -375,7 +374,11 @@ def _battle_contributors(
 
 
 def _award_battle_points(
-    db: Session, restaurant: Restaurant, resolution: Resolution, now: datetime
+    db: Session,
+    restaurant: Restaurant,
+    resolution: Resolution,
+    finisher: int | None,
+    now: datetime,
 ) -> None:
     """Очки за взятие/оборону: всем вкладчикам победившей стороны, добившему — больше.
 
@@ -389,7 +392,6 @@ def _award_battle_points(
     contributors = _battle_contributors(db, restaurant.id, faction, since)
     if not contributors:
         return
-    finisher = _last_contributor(db, restaurant.id, faction)
     event_type = "capture_win" if resolution.kind == "capture" else "capture_defend"
     for user_id in contributors:
         points = settings.rating_capture_win_points
@@ -444,24 +446,20 @@ def daily_factor(index: int) -> float:
     return table[index] if index < len(table) else table[-1]
 
 
-def underdog_coef(db: Session, city: str, faction: Faction) -> float:
-    """Коэффициент слабейшей стороны города — чтобы перекос не убивал игру."""
-    rows = db.execute(
-        select(User.faction, func.count(User.id))
-        .where(
-            User.city == city,
-            User.faction.is_not(None),
-            User.is_blocked.is_(False),
-        )
-        .group_by(User.faction)
-    ).all()
-    counts = {row[0]: row[1] for row in rows}
+def underdog_bonus(counts: dict[Faction, int], faction: Faction) -> float:
+    """Прибавка к силе чека за игру в меньшинстве: 0 при равенстве, максимум
+    при полном перекосе. Единственное место, где живёт эта формула."""
     total = sum(counts.values())
     if total == 0:
-        return 1.0
+        return 0.0
     share = counts.get(faction, 0) / total
     behind = max(0.0, min(1.0, (0.5 - share) / 0.5))
-    return 1.0 + settings.capture_underdog_max_bonus * behind
+    return settings.capture_underdog_max_bonus * behind
+
+
+def underdog_coef(db: Session, city: str, faction: Faction) -> float:
+    """Коэффициент слабейшей стороны города — чтобы перекос не убивал игру."""
+    return 1.0 + underdog_bonus(faction_balance(db, city), faction)
 
 
 def faction_balance(db: Session, city: str) -> dict[Faction, int]:
@@ -712,7 +710,7 @@ def refresh_active_hours(db: Session, now: datetime | None = None) -> int:
     for restaurant_id, hour, count in rows:
         by_restaurant.setdefault(restaurant_id, {})[int(hour)] = count
 
-    updated = 0
+    masks: dict[int, int] = {}
     for restaurant_id, hours in by_restaurant.items():
         if sum(hours.values()) < settings.capture_active_hours_min_receipts:
             continue
@@ -721,10 +719,18 @@ def refresh_active_hours(db: Session, now: datetime | None = None) -> int:
             # Расширяем на соседние часы: край выборки не должен обрезать смену
             for shift in (-1, 0, 1):
                 mask |= 1 << ((hour + shift) % 24)
-        restaurant = db.get(Restaurant, restaurant_id)
-        if restaurant is not None and restaurant.active_hours_mask != mask:
-            restaurant.active_hours_mask = mask
-            updated += 1
+        masks[restaurant_id] = mask
+
+    updated = 0
+    if masks:
+        # Одним запросом, а не по точке за раз: джоба ходит раз в минуту
+        restaurants = db.scalars(
+            select(Restaurant).where(Restaurant.id.in_(masks))
+        ).all()
+        for restaurant in restaurants:
+            if restaurant.active_hours_mask != masks[restaurant.id]:
+                restaurant.active_hours_mask = masks[restaurant.id]
+                updated += 1
     db.commit()
     return updated
 

@@ -121,7 +121,6 @@ class Restaurant(Base):
     __table_args__ = (
         Index("ix_restaurants_brand_id", "brand_id"),
         Index("ix_restaurants_city", "city"),
-        Index("ix_restaurants_city_active", "city", "is_active"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)

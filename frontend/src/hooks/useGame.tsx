@@ -106,12 +106,12 @@ export function GameProvider({ children }: { children: ReactNode }) {
       .catch(() => {});
   }, [city, available, enabled]);
 
+  // loadPoints уже зависит от city/available/enabled — их достаточно в нём
   useEffect(() => {
     loadPoints();
-    if (!city || !available || !enabled) return;
     const timer = window.setInterval(loadPoints, POINTS_REFRESH_MS);
     return () => window.clearInterval(timer);
-  }, [loadPoints, city, available, enabled, pointsTick]);
+  }, [loadPoints, pointsTick]);
 
   const setMode = useCallback(
     async (value: boolean) => {

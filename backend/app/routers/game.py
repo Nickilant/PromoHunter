@@ -49,22 +49,17 @@ def _point_out(view: game.PointView) -> PointControlOut:
 def _factions_info(db: Session, city: str | None) -> list[FactionInfoOut]:
     counts = game.faction_balance(db, city) if city else {f: 0 for f in Faction}
     total = sum(counts.values())
-    result = []
-    for faction in Faction:
-        members = counts.get(faction, 0)
-        share = members / total if total else 0.0
-        behind = max(0.0, min(1.0, (0.5 - share) / 0.5))
-        result.append(
-            FactionInfoOut(
-                key=faction,
-                title=game.FACTION_TITLES[faction],
-                members=members,
-                share=round(share, 4),
-                join_blocked=bool(city) and game.join_blocked(counts, faction),
-                underdog_bonus=round(settings.capture_underdog_max_bonus * behind, 4),
-            )
+    return [
+        FactionInfoOut(
+            key=faction,
+            title=game.FACTION_TITLES[faction],
+            members=counts.get(faction, 0),
+            share=round(counts.get(faction, 0) / total, 4) if total else 0.0,
+            join_blocked=bool(city) and game.join_blocked(counts, faction),
+            underdog_bonus=round(game.underdog_bonus(counts, faction), 4),
         )
-    return result
+        for faction in Faction
+    ]
 
 
 @router.get("/config", response_model=GameConfigOut)
@@ -180,8 +175,8 @@ def city_points(city: str, db: Session = Depends(get_db)):
     return [_point_out(view) for view in game.city_points(db, city)]
 
 
-@router.get("/points/{restaurant_id}", response_model=PointControlDetailOut)
-def point_detail(restaurant_id: int, db: Session = Depends(get_db)):
+def _detail_of(db: Session, restaurant_id: int) -> PointControlDetailOut:
+    """Состояние точки на текущий момент, без записи."""
     restaurant = db.get(Restaurant, restaurant_id)
     if restaurant is None or not restaurant.is_active:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Точка не найдена")
@@ -190,8 +185,12 @@ def point_detail(restaurant_id: int, db: Session = Depends(get_db)):
         restaurant_id, now
     )
     view = game.project(control, restaurant, now)
-    base = _point_out(view)
-    return PointControlDetailOut(**base.model_dump())
+    return PointControlDetailOut(**_point_out(view).model_dump())
+
+
+@router.get("/points/{restaurant_id}", response_model=PointControlDetailOut)
+def point_detail(restaurant_id: int, db: Session = Depends(get_db)):
+    return _detail_of(db, restaurant_id)
 
 
 @router.get("/points/{restaurant_id}/me", response_model=PointControlDetailOut)
@@ -201,7 +200,7 @@ def my_point_detail(
     db: Session = Depends(get_db),
 ):
     """То же плюс собственный вклад за сутки."""
-    detail = point_detail(restaurant_id, db)
+    detail = _detail_of(db, restaurant_id)
     receipts, strength = game.contribution(db, restaurant_id, user.id)
     detail.my_receipts_today = receipts
     detail.my_strength_today = round(strength, 2)

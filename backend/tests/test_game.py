@@ -329,3 +329,100 @@ def test_advance_writes_capture_event(db):
     assert event.kind == "capture"
     assert event.city == restaurant.city
     assert db.get(PointControl, restaurant.id).captured_at is not None
+
+
+# --- уведомления об атаке ---
+
+
+def test_attack_notifications_respect_cooldown_and_final_warning(db, monkeypatch):
+    """Защитникам приходит предупреждение, но не на каждом проходе джобы."""
+    from app.models import Faction as F
+    from app.models import Receipt, User
+    from app.services.notify import sweep_attack_notifications
+
+    sent: list[tuple[int, str]] = []
+    monkeypatch.setattr(
+        "app.services.notify.send_batch_async", lambda msgs: sent.extend(msgs)
+    )
+
+    restaurant, _, users = make_fixtures(db)
+    defender = users[0]
+    defender.telegram_id = 555001
+    defender.game_mode = True
+    defender.faction = F.green
+    db.add(
+        Receipt(
+            user_id=defender.id,
+            restaurant_id=restaurant.id,
+            fn="1234567890",
+            doc_number=1,
+            fp="1",
+            sum_kopeks=10000,
+            purchased_at=NOW,
+            faction=F.green,
+            strength=1.0,
+            raw="x",
+            created_at=NOW,
+        )
+    )
+    control = get_control(db, restaurant.id, NOW)
+    control.owner_faction = F.green
+    control.green_score, control.purple_score = 4.0, 9.0
+    control.score_at = control.progress_at = NOW
+    control.battle_started_at = NOW
+    control.green_progress = 0.0
+    control.purple_progress = BAR * 0.3
+    db.commit()
+
+    assert sweep_attack_notifications(db) == 1
+    assert len(sent) == 1
+    assert "захватывают" in sent[0][1]
+    assert sent[0][0] == 555001
+
+    # второй проход подряд — кулдаун держит
+    sent.clear()
+    assert sweep_attack_notifications(db) == 0
+    assert sent == []
+
+    # шкала почти заполнена — уходит финальное предупреждение
+    control.purple_progress = BAR * 0.99
+    control.progress_at = datetime.now(timezone.utc)
+    control.score_at = control.progress_at
+    db.commit()
+    assert sweep_attack_notifications(db) == 1
+    assert "Последний рубеж" in sent[-1][1]
+
+    # и только один раз за битву
+    sent.clear()
+    assert sweep_attack_notifications(db) == 0
+
+
+def test_no_attack_notification_when_owner_is_winning(db, monkeypatch):
+    from app.models import Faction as F
+    from app.models import Receipt
+    from app.services.notify import sweep_attack_notifications
+
+    sent: list[tuple[int, str]] = []
+    monkeypatch.setattr(
+        "app.services.notify.send_batch_async", lambda msgs: sent.extend(msgs)
+    )
+    restaurant, _, users = make_fixtures(db)
+    users[0].telegram_id = 555002
+    users[0].game_mode = True
+    users[0].faction = F.green
+    db.add(
+        Receipt(
+            user_id=users[0].id, restaurant_id=restaurant.id, fn="222", doc_number=1,
+            fp="1", sum_kopeks=10000, purchased_at=NOW, faction=F.green,
+            strength=1.0, raw="x", created_at=NOW,
+        )
+    )
+    control = get_control(db, restaurant.id, NOW)
+    control.owner_faction = F.green
+    control.green_score, control.purple_score = 9.0, 4.0  # владелец ведёт
+    control.score_at = control.progress_at = datetime.now(timezone.utc)
+    control.battle_started_at = control.progress_at
+    db.commit()
+
+    assert sweep_attack_notifications(db) == 0
+    assert sent == []
