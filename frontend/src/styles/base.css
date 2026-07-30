@@ -2692,7 +2692,7 @@ select.city-chip {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  max-height: calc(min(100vh, 100dvh) - 338px);
+  max-height: calc(min(100vh, 100dvh) - 322px);
   overflow-y: auto;
   overscroll-behavior: contain;
   /* тени строк обрезались бы краем области прокрутки */
@@ -2740,26 +2740,63 @@ select.city-chip {
   outline-offset: 0;
 }
 
-.scope-toggle {
-  margin-top: 8px;
-}
-
-.scope-toggle button {
+/* Зачёт «все / своя фракция» — компактный слайдер: рядом с выбором периода
+   он второстепенен, большие кнопки на него тратить незачем */
+.scope-switch-row {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
+  justify-content: flex-end;
 }
 
-/* Кнопка своей фракции окрашивается в её цвет, а не в общий зелёный сервиса */
-.scope-toggle button.on.green {
-  background: var(--green-faction);
-  border-color: var(--green-faction);
+.scope-switch {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
 }
 
-.scope-toggle button.on.purple {
-  background: var(--purple-faction);
-  border-color: var(--purple-faction);
+.scope-switch button {
+  position: relative;
+  z-index: 1;
+  min-width: 76px;
+  min-height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+  transition: color 0.22s ease 0.04s;
+}
+
+.scope-switch button.on {
+  color: var(--text);
+}
+
+/* Бегунок переезжает так же, как подсветка в доке */
+.scope-switch-thumb {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc((100% - 6px) / 2);
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: 0 1px 4px rgba(46, 42, 38, 0.16);
+  pointer-events: none;
+  transition: transform 0.26s cubic-bezier(0.32, 1.1, 0.4, 1);
+}
+
+/* Когда выбран зачёт своей фракции, бегунок берёт её цвет */
+.scope-switch.green button.on:last-child {
+  color: var(--green-faction-ink);
+}
+
+.scope-switch.purple button.on:last-child {
+  color: var(--purple-faction-ink);
 }
 
 /* ---------- колокольчик в шапке точки ---------- */

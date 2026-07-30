@@ -9,7 +9,7 @@ import Icon from './Icon';
  * Отказ ничего не включает: сервис остаётся точно таким, как был.
  */
 export default function GameOnboarding({ onDone }: { onDone: () => void }) {
-  const { setMode, config } = useGame();
+  const { setMode } = useGame();
   const [busy, setBusy] = useState<'yes' | 'no' | null>(null);
   const { closing, dismiss, onAnimationEnd } = useDismiss(onDone);
 
@@ -23,8 +23,6 @@ export default function GameOnboarding({ onDone }: { onDone: () => void }) {
       dismiss();
     }
   };
-
-  const minSum = config?.min_sum_rubles ?? 50;
 
   return (
     <div
@@ -46,28 +44,34 @@ export default function GameOnboarding({ onDone }: { onDone: () => void }) {
 
         <h1>Играть за территорию?</h1>
         <p className="game-onboarding-lead">
-          Кроме поиска акций у нас есть игра: две фракции делят точки на карте.
-          Точку забирает та сторона, которая приносит больше чеков.
+          Кроме поиска акций у нас есть игра: две стороны соревнуются за точки
+          на карте. Помогайте своей стороне, захватывайте новые точки и следите
+          за ходом игры.
         </p>
 
         <ul className="game-facts">
           <li>
             <Icon name="receipt" size={17} />
             <span>
-              Захват идёт только по чеку с кассы — от {minSum} ₽ и рядом с точкой.
-              Написать «есть», не покупая, не получится
+              Захват точки подтверждается чеком с акционным товаром, купленным
+              рядом с этой точкой. Если вы уже совершили такую покупку — просто
+              отсканируйте QR-код на чеке.
             </span>
           </li>
           <li>
             <Icon name="timer" size={17} />
             <span>
-              У каждой стороны своя шкала. Идёт шкала того, у кого чеков больше;
-              чья заполнилась первой — та и решила исход
+              У каждой стороны есть шкала прогресса. Каждый подтверждённый чек
+              приближает команду к захвату точки. Побеждает та сторона, которая
+              первой заполнит свою шкалу.
             </span>
           </li>
           <li>
             <Icon name="layers" size={17} />
-            <span>Владение точек — отдельный слой на карте, его можно скрыть</span>
+            <span>
+              Игровой режим отображается отдельным слоем на карте. Его можно
+              в любой момент включить или скрыть.
+            </span>
           </li>
         </ul>
 
@@ -90,7 +94,7 @@ export default function GameOnboarding({ onDone }: { onDone: () => void }) {
           </button>
         </div>
         <div className="game-onboarding-note">
-          Передумать можно в любой момент — переключатель в профиле
+          Передумать можно в любой момент — переключатель находится в профиле.
         </div>
       </div>
     </div>

@@ -166,20 +166,32 @@ export default function RatingPage() {
         </button>
       </div>
 
-      {/* Зачёт внутри своей фракции — только когда сторона выбрана */}
+      {/* Зачёт внутри своей фракции — только когда сторона выбрана.
+          Компактный слайдер: он второстепенен рядом с выбором периода */}
       {faction && (
-        <div className="period-toggle scope-toggle">
-          <button className={scope === 'all' ? 'on' : ''} onClick={() => setScope('all')}>
-            <Icon name="trophy" size={16} />
-            Общий
-          </button>
-          <button
-            className={`${scope === 'faction' ? 'on' : ''} ${faction}`}
-            onClick={() => setScope('faction')}
-          >
-            <Icon name="shield" size={16} strokeWidth={2} />
-            {FACTION_TITLE[faction]}
-          </button>
+        <div className="scope-switch-row">
+          <div className={`scope-switch ${faction}`} role="tablist" aria-label="Зачёт">
+            <span
+              className="scope-switch-thumb"
+              style={{ transform: scope === 'faction' ? 'translateX(100%)' : 'none' }}
+            />
+            <button
+              role="tab"
+              aria-selected={scope === 'all'}
+              className={scope === 'all' ? 'on' : ''}
+              onClick={() => setScope('all')}
+            >
+              Все
+            </button>
+            <button
+              role="tab"
+              aria-selected={scope === 'faction'}
+              className={scope === 'faction' ? 'on' : ''}
+              onClick={() => setScope('faction')}
+            >
+              {FACTION_TITLE[faction]}
+            </button>
+          </div>
         </div>
       )}
 
