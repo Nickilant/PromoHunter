@@ -17,14 +17,22 @@ from app.models import (
     User,
 )
 from app.routers.public import active_promotion_clause
-from app.schemas import ReportIn, ReportItemOut, ReportOut, RestaurantShort
-from app.services.notify import notify_status_flips
+from app.schemas import (
+    CaptureOut,
+    ReportIn,
+    ReportItemOut,
+    ReportOut,
+    RestaurantShort,
+)
+from app.services import game
+from app.services.notify import notify_capture, notify_status_flips
+from app.services.receipt import ReceiptError, parse_receipt
 from app.services.status import refresh_stable_statuses
 
 router = APIRouter(prefix="/reports", tags=["reports"])
 
 
-def _report_out(report: Report) -> ReportOut:
+def _report_out(report: Report, capture: CaptureOut | None = None) -> ReportOut:
     return ReportOut(
         id=report.id,
         restaurant=RestaurantShort.model_validate(report.restaurant),
@@ -37,6 +45,8 @@ def _report_out(report: Report) -> ReportOut:
             )
             for ri in report.items
         ],
+        is_receipt_verified=report.is_receipt_verified,
+        capture=capture,
         created_at=report.created_at,
     )
 
@@ -77,9 +87,23 @@ def create_report(
             )
         seen.add(item.promotion_item_id)
 
-    # Кулдаун по паре (ресторан, акция)
+    # Чек предъявляют до создания отчёта: незачёт не должен оставлять следов
+    parsed = None
+    if payload.receipt_qr:
+        try:
+            parsed = parse_receipt(payload.receipt_qr)
+        except ReceiptError as error:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(error)) from None
+        if not any(item.is_available for item in payload.items):
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail="Чеком подтверждают, что товар есть — отметьте хотя бы один",
+            )
+
+    # Кулдаун по паре (ресторан, акция); отчёт с чеком его не ждёт —
+    # купил ещё раз, значит снова был на точке
     cooldown = timedelta(minutes=settings.report_cooldown_minutes)
-    last_report_at = db.scalar(
+    last_report_at = None if parsed else db.scalar(
         select(Report.created_at)
         .where(
             Report.user_id == user.id,
@@ -120,6 +144,7 @@ def create_report(
         channel=payload.channel,
         lat=payload.lat,
         lng=payload.lng,
+        is_receipt_verified=parsed is not None,
         items=[
             ReportItem(
                 promotion_item_id=item.promotion_item_id,
@@ -130,6 +155,32 @@ def create_report(
     )
     db.add(report)
     db.flush()
+
+    # --- игровой режим: чек даёт силу фракции и переоценивает свежие «нет» ---
+    capture: CaptureOut | None = None
+    if parsed is not None:
+        try:
+            result = game.apply_receipt(
+                db, user, restaurant, parsed, payload.lat, payload.lng, report, now
+            )
+        except ReceiptError as error:
+            db.rollback()
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(error)) from None
+        refuted = game.grade_denials_by_receipt(
+            db,
+            report,
+            [item.promotion_item_id for item in payload.items if item.is_available],
+            now,
+        )
+        capture = CaptureOut(
+            strength=round(result.strength, 2),
+            points=result.added_points,
+            faction=result.receipt.faction,
+            owner=result.owner,
+            captured=any(r.kind == "capture" for r in result.resolutions),
+            defended=any(r.kind == "defend" for r in result.resolutions),
+            refuted_denials=refuted,
+        )
 
     # --- очки рейтинга, начисляемые сразу (бонусы приходят после дозревания) ---
     day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -188,6 +239,10 @@ def create_report(
             ],
         )
 
+    # Игровые уведомления: точку атакуют / точка перешла
+    if capture is not None:
+        notify_capture(db, restaurant, capture.captured, capture.defended)
+
     report = db.scalar(
         select(Report)
         .options(
@@ -197,7 +252,7 @@ def create_report(
         )
         .where(Report.id == report.id)
     )
-    return _report_out(report)
+    return _report_out(report, capture)
 
 
 @router.get("/mine", response_model=list[ReportOut])

@@ -68,7 +68,12 @@ def _freshness(age_hours: float) -> float:
     return 0.5 ** (age_hours / settings.vote_half_life_hours)
 
 
-def _channel_coef(channel: ReportChannel, is_available: bool) -> float:
+def _channel_coef(
+    channel: ReportChannel, is_available: bool, receipt_verified: bool = False
+) -> float:
+    # Отчёт с чеком — самое надёжное, что у нас есть: человек это купил
+    if receipt_verified and is_available:
+        return settings.channel_receipt_coef
     if channel == ReportChannel.delivery:
         # «мне привезли» — сильный сигнал, «в меню доставки нет» — слабый
         return (
@@ -99,6 +104,7 @@ def _collect_votes(
             Report.id,
             Report.created_at,
             Report.channel,
+            Report.is_receipt_verified,
             User.weight,
             rn,
         )
@@ -117,6 +123,7 @@ def _collect_votes(
             ReportItem.is_available,
             latest.c.created_at,
             latest.c.channel,
+            latest.c.is_receipt_verified,
             latest.c.weight,
         )
         .join(latest, ReportItem.report_id == latest.c.id)
@@ -124,9 +131,13 @@ def _collect_votes(
     ).all()
 
     votes: dict[int, list[_Vote]] = {}
-    for item_id, is_available, created_at, channel, weight in rows:
+    for item_id, is_available, created_at, channel, receipt_verified, weight in rows:
         age = max((now - created_at).total_seconds() / 3600.0, 0.0)
-        strength = weight * _freshness(age) * _channel_coef(channel, is_available)
+        strength = (
+            weight
+            * _freshness(age)
+            * _channel_coef(channel, is_available, receipt_verified)
+        )
         votes.setdefault(item_id, []).append(
             _Vote(
                 is_available=is_available,

@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     channel_on_site_coef: float = 1.0
     channel_delivery_yes_coef: float = 0.75  # «мне привезли» — сильный сигнал
     channel_delivery_no_coef: float = 0.35   # «в меню доставки нет» — слабый
+    channel_receipt_coef: float = 1.6        # «есть» с чеком — сильнее всего
 
     # --- переключение статусов ---
     flip_ratio: float = 1.5               # перевес массы для полного переключения
@@ -56,6 +57,53 @@ class Settings(BaseSettings):
     # Требовать подтверждённый номер для отчётов/заявок/подписок.
     # По умолчанию выключено — локальная разработка работает без Telegram.
     require_phone_verification: bool = False
+
+    # --- игровой режим: захват точек фракциями (docs/game-mode-spec.md) ---
+    game_enabled: bool = True  # выключатель фичи на весь сервис
+    game_job_interval_seconds: int = 60  # 0 — выключить фоновый пересчёт шкал
+
+    # чек ФНС
+    receipt_min_sum_kopeks: int = 5000        # 50 ₽ — ниже не считаем покупкой
+    receipt_max_age_minutes: int = 15         # чек должен быть свежим
+    receipt_future_tolerance_minutes: int = 5  # часы кассы могут спешить
+    receipt_max_i_rate_per_minute: float = 20.0   # предел скорости счётчика ФД
+    receipt_bind_confirmations: int = 3       # подтверждений привязки fn к точке
+    receipt_bind_ttl_days: int = 365          # срок жизни привязки fn
+    capture_geo_radius_m: float = 300.0       # радиус приёма чека от точки
+    capture_require_geo: bool = True
+
+    # сила фракции на точке
+    capture_half_life_hours: float = 72.0     # полураспад силы (у обеих сторон)
+    # Убывающая отдача: 1-й чек пользователя за сутки на точке, 2-й, 3-й, далее
+    capture_daily_returns: list[float] = [1.0, 0.5, 0.25, 0.1]
+    capture_underdog_max_bonus: float = 0.25  # до +25% слабейшей фракции города
+    capture_min_score: float = 0.5            # ниже — сторона в игре не считается
+
+    # шкалы захвата
+    capture_bar_seconds: int = 14400          # 4 часа при равной силе
+    capture_bar_max_speed: float = 2.4        # при перевесе — до 1 ч 40 мин
+    capture_bar_speed_lead_span: float = 3.0  # перевес, где скорость максимальна
+    capture_paused_decay_per_hour: float = 0.10  # шкала на паузе подтаивает
+    capture_truce_hours: float = 2.0          # перемирие после отбитой атаки
+    capture_battle_max_hours: float = 48.0    # висящая битва сбрасывается
+    capture_active_hours_min_receipts: int = 20  # с этого объёма верим часам точки
+
+    # уведомления об атаке
+    capture_attack_notify_cooldown_hours: float = 3.0
+    capture_attack_warning_minutes: float = 30.0  # финальное предупреждение
+
+    # баланс фракций
+    faction_join_block_share: float = 0.60    # набор закрыт при такой доле в городе
+    faction_switch_days: int = 30             # как часто можно менять сторону
+
+    # очки за игру
+    rating_capture_receipt_points: int = 25   # за чек (с той же убывающей отдачей)
+    rating_capture_win_points: int = 10       # участнику победившей стороны
+    rating_capture_finisher_points: int = 15  # тому, чей чек закрыл шкалу
+
+    # ретроградная переоценка «нет» чеком
+    weight_receipt_refute_factor: float = 0.7  # мягче обычного 0.5
+    receipt_refute_window_minutes: int = 45
 
 
 settings = Settings()

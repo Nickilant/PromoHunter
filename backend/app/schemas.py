@@ -2,7 +2,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app.models import ReportChannel, SuggestionStatus, UserRole
+from app.models import Faction, ReportChannel, SuggestionStatus, UserRole
 from app.phone import normalize_phone
 
 
@@ -73,7 +73,16 @@ class UserOut(ORMModel):
     has_telegram: bool = Field(default=False, validation_alias="telegram_id")
     role: UserRole
     is_blocked: bool
+    # игровой режим
+    game_mode: bool = False
+    game_asked: bool = Field(default=False, validation_alias="game_asked_at")
+    faction: Faction | None = None
     created_at: datetime
+
+    @field_validator("game_asked", mode="before")
+    @classmethod
+    def _from_game_asked_at(cls, value):
+        return bool(value)
 
     @field_validator("has_telegram", mode="before")
     @classmethod
@@ -197,6 +206,9 @@ class ReportIn(BaseModel):
     channel: ReportChannel = ReportChannel.on_site
     lat: float | None = None
     lng: float | None = None
+    # Строка из QR-кода чека: превращает отчёт в подтверждённый и даёт
+    # силу фракции на точке (игровой режим)
+    receipt_qr: str | None = Field(default=None, max_length=300)
 
 
 class ReportItemOut(BaseModel):
@@ -205,11 +217,25 @@ class ReportItemOut(BaseModel):
     is_available: bool
 
 
+class CaptureOut(BaseModel):
+    """Что дал чек: вклад, очки и изменившееся состояние точки."""
+
+    strength: float
+    points: int
+    faction: Faction
+    owner: Faction | None = None
+    captured: bool = False
+    defended: bool = False
+    refuted_denials: int = 0
+
+
 class ReportOut(BaseModel):
     id: int
     restaurant: RestaurantShort
     promotion_title: str
     items: list[ReportItemOut]
+    is_receipt_verified: bool = False
+    capture: CaptureOut | None = None
     created_at: datetime
 
 
@@ -318,6 +344,8 @@ class RestaurantIn(BaseModel):
     lat: float
     lng: float
     is_active: bool = True
+    # Смещение часов кассы от UTC: время в QR чека местное и без зоны
+    utc_offset_minutes: int = Field(default=180, ge=-720, le=840)
 
 
 class RestaurantPatch(BaseModel):
@@ -328,6 +356,7 @@ class RestaurantPatch(BaseModel):
     lat: float | None = None
     lng: float | None = None
     is_active: bool | None = None
+    utc_offset_minutes: int | None = Field(default=None, ge=-720, le=840)
 
 
 class AdminRestaurantOut(ORMModel):
@@ -339,6 +368,7 @@ class AdminRestaurantOut(ORMModel):
     lat: float
     lng: float
     is_active: bool
+    utc_offset_minutes: int = 180
     created_at: datetime
 
 
@@ -491,3 +521,81 @@ class RatingCardOut(BaseModel):
     categories: list[RatingCategoryOut]
     # Полная лента — только владельцу карточки
     events: list[RatingEventOut] | None = None
+
+
+# --- игровой режим ---
+
+class FactionInfoOut(BaseModel):
+    key: Faction
+    title: str
+    members: int
+    share: float          # доля в городе, 0..1
+    join_blocked: bool    # набор закрыт: сторона перекошена
+    underdog_bonus: float  # прибавка к силе чека, 0..0.25
+
+
+class GameMeOut(BaseModel):
+    game_mode: bool
+    asked: bool
+    faction: Faction | None = None
+    can_switch_at: datetime | None = None
+
+
+class GameConfigOut(BaseModel):
+    enabled: bool                # фича включена на сервисе
+    city: str | None = None
+    season: str
+    factions: list[FactionInfoOut]
+    me: GameMeOut | None = None
+    bar_seconds: int
+    min_sum_rubles: int
+    receipt_max_age_minutes: int
+    geo_radius_m: float
+
+
+class GameModeIn(BaseModel):
+    enabled: bool
+
+
+class FactionJoinIn(BaseModel):
+    faction: Faction
+
+
+class PointControlOut(BaseModel):
+    restaurant_id: int
+    owner: Faction | None = None
+    green_score: float
+    purple_score: float
+    green_receipts: int
+    purple_receipts: int
+    green_progress: float   # 0..1
+    purple_progress: float
+    leader: Faction | None = None
+    under_attack: bool
+    eta_seconds: float | None = None
+    is_active_now: bool
+    truce_seconds: float | None = None
+    captured_at: datetime | None = None
+
+
+class PointControlDetailOut(PointControlOut):
+    my_receipts_today: int = 0
+    my_strength_today: float = 0.0
+    my_faction: Faction | None = None
+
+
+class FactionStandingOut(BaseModel):
+    faction: Faction
+    title: str
+    points_held: int
+    held_share: float   # средняя доля владения за сезон, 0..1
+    captures: int
+    defends: int
+
+
+class GameStandingsOut(BaseModel):
+    city: str
+    season: str
+    points_total: int
+    neutral: int
+    standings: list[FactionStandingOut]
