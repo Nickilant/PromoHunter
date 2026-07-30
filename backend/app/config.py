@@ -11,16 +11,34 @@ class Settings(BaseSettings):
     report_cooldown_minutes: int = 30
     seed_on_start: bool = False
 
-    # --- сила голоса (см. docs/trust-and-rating-spec.md) ---
-    vote_half_life_hours: float = 4.0     # полураспад свежести голоса
+    # --- сила голоса при дозревании вердиктов (см. docs/trust-and-rating-spec.md) ---
     channel_on_site_coef: float = 1.0
     channel_delivery_yes_coef: float = 0.75  # «мне привезли» — сильный сигнал
     channel_delivery_no_coef: float = 0.35   # «в меню доставки нет» — слабый
-    channel_receipt_coef: float = 1.6        # «есть» с чеком — сильнее всего
+    flip_ratio: float = 1.5               # перевес массы для консенсуса вердикта
 
-    # --- переключение статусов ---
-    flip_ratio: float = 1.5               # перевес массы для полного переключения
-    stale_flip_hours: float = 2.0         # старше — данные «протухли», флип одним голосом
+    # --- определение истины (app/services/truth.py) ---
+    truth_half_life_hours: float = 3.0    # полураспад накопленных лог-шансов
+    truth_k_on_site: float = 1.8          # свидетельство с точки
+    truth_k_receipt: float = 3.0          # «есть» с чеком — человек это купил
+    truth_k_delivery_yes: float = 1.4     # «мне привезли» — сигнал о прошлом
+    truth_k_delivery_no: float = 0.7      # «в меню доставки нет» — не о зале
+    truth_trust_min: float = 0.5          # границы множителя доверия
+    truth_trust_max: float = 1.5
+    truth_ceiling_base: float = 2.6       # потолок уверенности на тихой точке
+    truth_ceiling_slope: float = 0.9      # прирост потолка от ln(плотности)
+    truth_ceiling_max: float = 7.0
+    truth_density_window_minutes: int = 60  # окно, по которому меряется плотность
+    truth_p_available: float = 0.85       # порог уверенного «есть»
+    truth_p_unavailable: float = 0.15     # порог уверенного «кончилось»
+
+    # --- уведомления о переключении статуса ---
+    notify_dwell_minutes: float = 10.0        # выдержка перед уведомлением
+    notify_dwell_window_minutes: float = 20.0  # окно, в котором она копится
+    # Пол против дребезга. Длинная пауза здесь вредна: «кончилось» через
+    # полчаса после «появилось» — это правда, а не спам, и подписчик должен
+    # её получить. Основную защиту даёт выдержка, а не кулдаун.
+    notify_cooldown_minutes: float = 20.0
 
     # --- веса пользователей (скрытые) ---
     weight_min: float = 0.1

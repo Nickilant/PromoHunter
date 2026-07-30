@@ -231,7 +231,8 @@ def create_report(
     flips = refresh_stable_statuses(db, restaurant.id, [promotion.id], now)
     db.commit()
 
-    # Подписчикам акции — о переключениях статусов (после коммита, в фоне)
+    # Подписчикам акции — о переключениях, дозревших до уведомления
+    # (выдержку и кулдаун проверяет refresh_stable_statuses)
     if flips:
         item_names = {item.id: item.name for item in promotion.items}
         notify_status_flips(

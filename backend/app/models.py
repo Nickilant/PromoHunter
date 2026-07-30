@@ -398,6 +398,10 @@ class ItemStatusState(Base):
     stable: Mapped[str] = mapped_column(
         String(16), default="unknown", nullable=False
     )  # available | unavailable | unknown
+    # Что последний раз сказали подписчикам и когда — выдержка и кулдаун
+    # уведомлений считаются отдельно от отображаемого статуса
+    notified: Mapped[str | None] = mapped_column(String(16))
+    notified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
