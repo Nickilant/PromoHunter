@@ -9,6 +9,7 @@ import type {
   RestaurantDetail,
   RestaurantShort,
 } from '../types';
+import CapturePanel from './CapturePanel';
 import PromotionAccordion from './PromotionAccordion';
 import ReportModal from './ReportModal';
 import Icon from './Icon';
@@ -84,6 +85,7 @@ export default function RestaurantModal({ restaurantId, onClose }: Props) {
               <Icon name="close" size={20} />
             </button>
           </div>
+          <CapturePanel restaurantId={restaurantId} />
           {detail && (
             <button
               className={`sub-row ${isSubscribedToRestaurant(restaurantId) ? 'on' : ''}`}

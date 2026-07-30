@@ -2,11 +2,13 @@ import { FormEvent, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { api } from '../api/client';
+import CapturePanel from '../components/CapturePanel';
 import { MapFocus, RestaurantsMap } from '../components/MapView';
 import PromotionAccordion from '../components/PromotionAccordion';
 import ReportModal from '../components/ReportModal';
 import { useAuth } from '../hooks/useAuth';
 import { useCity } from '../hooks/useCity';
+import { useGame } from '../hooks/useGame';
 import { useSubscriptions } from '../hooks/useSubscriptions';
 import { geocodeAddress, geocodeCity } from '../utils/geocode';
 import type {
@@ -33,6 +35,7 @@ export default function MapPage() {
   const { user } = useAuth();
   const { city } = useCity();
   const { isSubscribedToRestaurant, toggleRestaurant } = useSubscriptions();
+  const { enabled: gameEnabled, points, layerVisible, toggleLayer } = useGame();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -98,6 +101,9 @@ export default function MapPage() {
         onSelect={select}
         focus={focus}
         searchPoint={searchPoint}
+        points={gameEnabled ? points : undefined}
+        layerVisible={layerVisible}
+        onToggleLayer={toggleLayer}
       />
 
       <form className="map-search" onSubmit={submitSearch}>
@@ -159,6 +165,7 @@ export default function MapPage() {
                 <Icon name="close" size={20} />
               </button>
             </div>
+            {selectedId !== null && <CapturePanel restaurantId={selectedId} />}
             {selected && selectedId !== null && (
               <button
                 className={`sub-row ${isSubscribedToRestaurant(selectedId) ? 'on' : ''}`}

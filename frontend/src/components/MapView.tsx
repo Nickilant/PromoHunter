@@ -5,13 +5,16 @@ import 'leaflet/dist/leaflet.css';
 import { useEffect } from 'react';
 import {
   CircleMarker,
+  LayerGroup,
   MapContainer,
   TileLayer,
+  Tooltip,
   useMap,
   useMapEvents,
 } from 'react-leaflet';
 
-import type { RestaurantListItem } from '../types';
+import type { PointControl, RestaurantListItem } from '../types';
+import { FACTION_HEX, formatEtaShort, NEUTRAL_HEX } from '../utils/faction';
 import Icon from './Icon';
 
 const DEFAULT_CENTER: [number, number] = [59.935, 30.325]; // Санкт-Петербург
@@ -84,12 +87,95 @@ function FitToMarkers({ points }: { points: [number, number][] }) {
   return null;
 }
 
+/**
+ * Слой принадлежности точек — отдельная группа поверх тайлов и под маркерами
+ * сетей: цветной ореол вокруг точки и подпись с таймером, если идёт битва.
+ * Скрывается кнопкой, ничего не зная про остальную карту.
+ */
+function OwnershipLayer({
+  restaurants,
+  points,
+}: {
+  restaurants: RestaurantListItem[];
+  points: Map<number, PointControl>;
+}) {
+  return (
+    <LayerGroup>
+      {restaurants.map((r) => {
+        const point = points.get(r.id);
+        if (!point) return null;
+        const battle = point.leader !== null;
+        if (point.owner === null && !battle) return null;
+        const color = point.owner ? FACTION_HEX[point.owner] : NEUTRAL_HEX;
+        const leaderColor = point.leader ? FACTION_HEX[point.leader] : color;
+        return (
+          <CircleMarker
+            key={`own-${r.id}`}
+            center={[r.lat, r.lng]}
+            radius={battle ? 22 : 18}
+            interactive={false}
+            className={battle ? 'own-halo pulsing' : 'own-halo'}
+            pathOptions={{
+              color: leaderColor,
+              weight: battle ? 3 : 2,
+              opacity: battle ? 0.95 : 0.55,
+              fillColor: color,
+              fillOpacity: point.owner ? 0.22 : 0.1,
+              dashArray: battle && point.owner ? '5 4' : undefined,
+            }}
+          >
+            {battle && point.is_active_now && (
+              <Tooltip
+                permanent
+                direction="top"
+                offset={[0, -20]}
+                className={`map-timer-tip ${point.leader}`}
+              >
+                {formatEtaShort(point.eta_seconds)}
+              </Tooltip>
+            )}
+          </CircleMarker>
+        );
+      })}
+    </LayerGroup>
+  );
+}
+
+/** Кнопка скрытия слоя владения — рядом с «найти меня» */
+function LayerToggle({
+  visible,
+  onToggle,
+}: {
+  visible: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      className={`layer-btn${visible ? ' on' : ''}`}
+      style={{ zIndex: 1000 }}
+      onClick={(e) => {
+        e.stopPropagation();
+        onToggle();
+      }}
+      aria-pressed={visible}
+      aria-label={visible ? 'Скрыть слой владения' : 'Показать слой владения'}
+      title={visible ? 'Скрыть слой владения' : 'Показать слой владения'}
+    >
+      <Icon name="layers" size={20} />
+    </button>
+  );
+}
+
 interface RestaurantsMapProps {
   restaurants: RestaurantListItem[];
   selectedId: number | null;
   onSelect: (id: number) => void;
   focus: MapFocus | null;
   searchPoint: MapFocus | null;
+  /** Игровой слой: пусто — карта ведёт себя как раньше */
+  points?: Map<number, PointControl>;
+  layerVisible?: boolean;
+  onToggleLayer?: () => void;
 }
 
 export function RestaurantsMap({
@@ -98,6 +184,9 @@ export function RestaurantsMap({
   onSelect,
   focus,
   searchPoint,
+  points,
+  layerVisible = false,
+  onToggleLayer,
 }: RestaurantsMapProps) {
   return (
     <MapContainer center={DEFAULT_CENTER} zoom={DEFAULT_ZOOM} zoomControl={false}>
@@ -105,6 +194,9 @@ export function RestaurantsMap({
       <CleanAttribution />
       <FitToMarkers points={restaurants.map((r) => [r.lat, r.lng])} />
       <FlyTo focus={focus} />
+      {points && layerVisible && (
+        <OwnershipLayer restaurants={restaurants} points={points} />
+      )}
       {searchPoint && (
         <CircleMarker
           center={[searchPoint.lat, searchPoint.lng]}
@@ -131,6 +223,9 @@ export function RestaurantsMap({
           eventHandlers={{ click: () => onSelect(r.id) }}
         />
       ))}
+      {points && onToggleLayer && (
+        <LayerToggle visible={layerVisible} onToggle={onToggleLayer} />
+      )}
       <LocateButton />
     </MapContainer>
   );

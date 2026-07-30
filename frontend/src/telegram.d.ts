@@ -17,6 +17,27 @@ interface TelegramWebApp {
   requestContact?: (
     callback: (shared: boolean, event?: TelegramContactEvent) => void,
   ) => void;
+  /** Штатный сканер QR внутри Telegram (Bot API 6.4+) */
+  showScanQrPopup?: (
+    params: { text?: string },
+    callback?: (text: string) => boolean | void,
+  ) => void;
+  closeScanQrPopup?: () => void;
+  HapticFeedback?: {
+    impactOccurred?: (style: 'light' | 'medium' | 'heavy') => void;
+    notificationOccurred?: (type: 'error' | 'success' | 'warning') => void;
+  };
+}
+
+/** BarcodeDetector есть в Chrome/Android; на iOS-Safari его нет */
+interface BarcodeDetectorResult {
+  rawValue: string;
+}
+
+declare class BarcodeDetector {
+  constructor(options?: { formats?: string[] });
+  detect(source: CanvasImageSource | Blob): Promise<BarcodeDetectorResult[]>;
+  static getSupportedFormats(): Promise<string[]>;
 }
 
 interface Window {

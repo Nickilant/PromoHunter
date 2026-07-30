@@ -1,5 +1,7 @@
 export type Role = 'user' | 'admin';
 
+export type Faction = 'green' | 'purple';
+
 export interface User {
   id: number;
   phone: string;
@@ -9,6 +11,9 @@ export interface User {
   has_telegram: boolean;
   role: Role;
   is_blocked: boolean;
+  game_mode: boolean;
+  game_asked: boolean;
+  faction: Faction | null;
   created_at: string;
 }
 
@@ -117,11 +122,23 @@ export interface ReportItemOut {
   is_available: boolean;
 }
 
+export interface CaptureResult {
+  strength: number;
+  points: number;
+  faction: Faction;
+  owner: Faction | null;
+  captured: boolean;
+  defended: boolean;
+  refuted_denials: number;
+}
+
 export interface Report {
   id: number;
   restaurant: RestaurantShort;
   promotion_title: string;
   items: ReportItemOut[];
+  is_receipt_verified: boolean;
+  capture: CaptureResult | null;
   created_at: string;
 }
 
@@ -261,4 +278,74 @@ export interface RatingCard {
   total_points: number;
   categories: RatingCategory[];
   events: RatingEventItem[] | null;
+}
+
+// --- игровой режим ---
+
+export interface FactionInfo {
+  key: Faction;
+  title: string;
+  members: number;
+  share: number;
+  join_blocked: boolean;
+  underdog_bonus: number;
+}
+
+export interface GameMe {
+  game_mode: boolean;
+  asked: boolean;
+  faction: Faction | null;
+  can_switch_at: string | null;
+}
+
+export interface GameConfig {
+  enabled: boolean;
+  city: string | null;
+  season: string;
+  factions: FactionInfo[];
+  me: GameMe | null;
+  bar_seconds: number;
+  min_sum_rubles: number;
+  receipt_max_age_minutes: number;
+  geo_radius_m: number;
+}
+
+export interface PointControl {
+  restaurant_id: number;
+  owner: Faction | null;
+  green_score: number;
+  purple_score: number;
+  green_receipts: number;
+  purple_receipts: number;
+  green_progress: number;
+  purple_progress: number;
+  leader: Faction | null;
+  under_attack: boolean;
+  eta_seconds: number | null;
+  is_active_now: boolean;
+  truce_seconds: number | null;
+  captured_at: string | null;
+}
+
+export interface PointControlDetail extends PointControl {
+  my_receipts_today: number;
+  my_strength_today: number;
+  my_faction: Faction | null;
+}
+
+export interface FactionStanding {
+  faction: Faction;
+  title: string;
+  points_held: number;
+  held_share: number;
+  captures: number;
+  defends: number;
+}
+
+export interface GameStandings {
+  city: string;
+  season: string;
+  points_total: number;
+  neutral: number;
+  standings: FactionStanding[];
 }

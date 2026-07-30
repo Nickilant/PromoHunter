@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import { api } from '../api/client';
+import { CaptureTimer, OwnerChip } from '../components/GameBits';
 import RestaurantModal from '../components/RestaurantModal';
 import { useCity } from '../hooks/useCity';
+import { useGame } from '../hooks/useGame';
 import type { RestaurantListItem } from '../types';
 import { timeAgo } from '../utils/time';
 import Icon from '../components/Icon';
@@ -15,6 +17,7 @@ export default function BrandPage() {
   const [restaurants, setRestaurants] = useState<RestaurantListItem[] | null>(null);
   const [openId, setOpenId] = useState<number | null>(null);
   const { city } = useCity();
+  const { enabled: gameEnabled, pointOf } = useGame();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -64,6 +67,7 @@ export default function BrandPage() {
 
       {restaurants?.map((r) => {
         const updated = timeAgo(r.last_report_at);
+        const point = gameEnabled ? pointOf(r.id) : undefined;
         return (
           <button key={r.id} className="address-card" onClick={() => setOpenId(r.id)}>
             <span className="address-card-body">
@@ -74,6 +78,12 @@ export default function BrandPage() {
               <span className="brand-card-meta">
                 {updated ? `отчёты ${updated}` : 'отчётов ещё не было'}
               </span>
+              {point && (
+                <span className="address-card-game">
+                  <OwnerChip owner={point.owner} size="small" />
+                  <CaptureTimer point={point} />
+                </span>
+              )}
             </span>
             <span className="chevron-right"><Icon name="chevronRight" size={20} /></span>
           </button>

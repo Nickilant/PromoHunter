@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
 import { api } from '../api/client';
+import GameSettings from '../components/GameSettings';
 import { useAuth } from '../hooks/useAuth';
 import { useSubscriptions } from '../hooks/useSubscriptions';
 import type { Report, RestaurantSuggestion, Suggestion, TelegramInfo } from '../types';
@@ -106,6 +107,8 @@ export default function ProfilePage() {
           Выйти
         </button>
       </div>
+
+      <GameSettings />
 
       <div className="section-title">Мои подписки</div>
       {!user.has_telegram && (

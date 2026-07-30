@@ -9,6 +9,7 @@ import AdminRestaurantSuggestions from './admin/AdminRestaurantSuggestions';
 import AdminSuggestions from './admin/AdminSuggestions';
 import AdminUsers from './admin/AdminUsers';
 import BottomNav from './components/BottomNav';
+import GameGate from './components/GameGate';
 import TelegramGate from './components/TelegramGate';
 import { useAuth } from './hooks/useAuth';
 import BrandPage from './pages/BrandPage';
@@ -53,6 +54,7 @@ export default function App() {
   return (
     <>
       <TelegramGate />
+      <GameGate />
       <Routes>
       <Route element={<UserShell />}>
         <Route path="/" element={<FeedPage />} />

@@ -10,6 +10,7 @@ import App from './App';
 import { ToastProvider } from './components/Toast';
 import { AuthProvider } from './hooks/useAuth';
 import { CityProvider } from './hooks/useCity';
+import { GameProvider } from './hooks/useGame';
 import { SubscriptionsProvider } from './hooks/useSubscriptions';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -19,7 +20,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <CityProvider>
           <ToastProvider>
             <SubscriptionsProvider>
-              <App />
+              <GameProvider>
+                <App />
+              </GameProvider>
             </SubscriptionsProvider>
           </ToastProvider>
         </CityProvider>

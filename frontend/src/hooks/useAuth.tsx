@@ -1,6 +1,7 @@
 import {
   createContext,
   ReactNode,
+  useCallback,
   useContext,
   useEffect,
   useState,
@@ -21,6 +22,8 @@ interface AuthContextValue {
   ) => Promise<void>;
   /** Применить готовый ответ авторизации (вход через Telegram WebApp) */
   applyAuth: (resp: AuthResponse) => void;
+  /** Перечитать профиль: настройки могли измениться на сервере */
+  refresh: () => Promise<void>;
   logout: () => void;
 }
 
@@ -69,13 +72,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(resp.user);
   };
 
+  const refresh = useCallback(async () => {
+    if (!getToken()) return;
+    try {
+      setUser(await api.get<User>('/auth/me'));
+    } catch {
+      /* профиль не перечитался — оставляем прежний */
+    }
+  }, []);
+
   const logout = () => {
     setToken(null);
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, applyAuth, logout }}>
+    <AuthContext.Provider
+      value={{ user, loading, login, register, applyAuth, refresh, logout }}
+    >
       {children}
     </AuthContext.Provider>
   );

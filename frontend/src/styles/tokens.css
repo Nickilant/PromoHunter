@@ -21,6 +21,16 @@
   --status-maybe-appeared: #8FBFA9;   /* не было и возможно появилось */
   --status-unknown:        #BFB8AE;
 
+  /* фракции игрового режима: те же приглушённые тона, что и вся палитра,
+     но заметно различимые и на карте, и в списках */
+  --green-faction:      #4F9D69;
+  --green-faction-ink:  #35704A;
+  --green-faction-soft: #E4F0E7;
+  --purple-faction:     #8A6BBF;
+  --purple-faction-ink: #64499A;
+  --purple-faction-soft:#EDE7F6;
+  --neutral-faction:    #B4ADA3;
+
   /* форма */
   --radius-card: 16px;
   --radius-control: 12px;
