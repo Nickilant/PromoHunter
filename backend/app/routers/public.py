@@ -18,6 +18,7 @@ from app.schemas import (
     RestaurantListItem,
     RestaurantShort,
 )
+from app.services.promo_scope import promotion_visible_in, visible_in_city_clause
 from app.services.status import compute_statuses
 
 router = APIRouter(tags=["public"])
@@ -120,7 +121,11 @@ def catalog(
         db.scalars(
             select(Promotion)
             .options(selectinload(Promotion.items))
-            .where(Promotion.brand_id.in_(counts.keys()), active_promotion_clause(now))
+            .where(
+                Promotion.brand_id.in_(counts.keys()),
+                active_promotion_clause(now),
+                visible_in_city_clause(city),
+            )
             .order_by(Promotion.created_at.desc())
         )
         .unique()
@@ -256,7 +261,12 @@ def restaurant_detail(restaurant_id: int, db: Session = Depends(get_db)):
         db.scalars(
             select(Promotion)
             .options(selectinload(Promotion.items))
-            .where(Promotion.brand_id == restaurant.brand_id, active_promotion_clause(now))
+            .where(
+                Promotion.brand_id == restaurant.brand_id,
+                active_promotion_clause(now),
+                # Акция сети может не проводиться в этом городе
+                visible_in_city_clause(restaurant.city),
+            )
             .order_by(Promotion.created_at.desc())
         )
         .unique()
@@ -290,7 +300,8 @@ def feed(q: str | None = None, city: str | None = None, db: Session = Depends(ge
     promotions = (
         db.scalars(
             select(Promotion)
-            .options(selectinload(Promotion.items))
+            # cities — чтобы отфильтровать охват по городу каждой точки
+            .options(selectinload(Promotion.items), selectinload(Promotion.cities))
             .where(active_promotion_clause(now))
             .order_by(Promotion.created_at.desc())
         )
@@ -321,7 +332,13 @@ def feed(q: str | None = None, city: str | None = None, db: Session = Depends(ge
 
     entries: list[tuple[datetime | None, FeedEntry]] = []
     for restaurant in restaurants:
-        brand_promos = promos_by_brand.get(restaurant.brand_id, [])
+        # Лента может быть по всем городам сразу, поэтому охват проверяем
+        # для города каждой точки отдельно
+        brand_promos = [
+            p
+            for p in promos_by_brand.get(restaurant.brand_id, [])
+            if promotion_visible_in(p, restaurant.city)
+        ]
         if not brand_promos:
             continue
 

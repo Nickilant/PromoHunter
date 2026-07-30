@@ -22,6 +22,7 @@ from app.models import (
     Subscription,
     User,
 )
+from app.services.promo_scope import promotion_visible_in
 from app.telegram import send_batch_async
 
 logger = logging.getLogger("promohunter.notify")
@@ -74,14 +75,21 @@ def _promotion_subscriber_chats(db: Session, promotion_id: int) -> list[int]:
 
 
 def notify_new_promotion(db: Session, promotion: Promotion) -> None:
-    """Новая акция сети → подписчикам её точек."""
+    """Новая акция сети → подписчикам её точек.
+
+    Точки в городах, где акция не проводится, из рассылки выпадают: обещать
+    людям то, чего у них не будет, хуже, чем промолчать.
+    """
     subscribers = _brand_restaurant_subscribers(db, promotion.brand_id)
     if not subscribers:
         return
     items = ", ".join(item.name for item in promotion.items[:5])
     messages = []
     for chat_id, restaurants in subscribers.items():
-        places = "\n".join(f"📍 {_restaurant_label(r)}" for r in restaurants[:5])
+        covered = [r for r in restaurants if promotion_visible_in(promotion, r.city)]
+        if not covered:
+            continue
+        places = "\n".join(f"📍 {_restaurant_label(r)}" for r in covered[:5])
         messages.append(
             (
                 chat_id,

@@ -26,6 +26,7 @@ from app.schemas import (
 )
 from app.services import game
 from app.services.notify import notify_capture, notify_status_flips
+from app.services.promo_scope import promotion_visible_in
 from app.services.receipt import ReceiptError, parse_receipt
 from app.services.status import refresh_stable_statuses
 
@@ -64,7 +65,7 @@ def create_report(
     now = datetime.now(timezone.utc)
     promotion = db.scalar(
         select(Promotion)
-        .options(selectinload(Promotion.items))
+        .options(selectinload(Promotion.items), selectinload(Promotion.cities))
         .where(Promotion.id == payload.promotion_id, active_promotion_clause(now))
     )
     if promotion is None:
@@ -72,6 +73,11 @@ def create_report(
     if promotion.brand_id != restaurant.brand_id:
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST, detail="Акция не относится к сети этой точки"
+        )
+    if not promotion_visible_in(promotion, restaurant.city):
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            detail="Эта акция не проводится в городе точки",
         )
 
     valid_item_ids = {item.id for item in promotion.items}

@@ -2,7 +2,13 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app.models import Faction, ReportChannel, SuggestionStatus, UserRole
+from app.models import (
+    Faction,
+    PromotionCityMode,
+    ReportChannel,
+    SuggestionStatus,
+    UserRole,
+)
 from app.phone import normalize_phone
 
 
@@ -258,11 +264,20 @@ class SuggestionOut(ORMModel):
     title: str
     description: str | None = None
     items_raw: str
+    city: str | None = None
     status: SuggestionStatus
     moderator_comment: str | None = None
     created_promotion_id: int | None = None
     created_at: datetime
     reviewed_at: datetime | None = None
+    reviewed_by_name: str | None = Field(
+        default=None, validation_alias="reviewed_by"
+    )
+
+    @field_validator("reviewed_by_name", mode="before")
+    @classmethod
+    def _reviewer_name(cls, value):
+        return getattr(value, "display_name", None) if value is not None else None
 
 
 # --- restaurant suggestions ---
@@ -291,6 +306,14 @@ class RestaurantSuggestionOut(ORMModel):
     created_restaurant_id: int | None = None
     created_at: datetime
     reviewed_at: datetime | None = None
+    reviewed_by_name: str | None = Field(
+        default=None, validation_alias="reviewed_by"
+    )
+
+    @field_validator("reviewed_by_name", mode="before")
+    @classmethod
+    def _reviewer_name(cls, value):
+        return getattr(value, "display_name", None) if value is not None else None
 
 
 class AdminRestaurantSuggestionOut(RestaurantSuggestionOut):
@@ -379,6 +402,16 @@ class PromotionItemIn(BaseModel):
     name: str = Field(min_length=1, max_length=200)
 
 
+class PromotionCityScope(BaseModel):
+    """Охват акции: как читать список городов.
+
+    exclude + пустой список = федеральная акция.
+    """
+
+    mode: PromotionCityMode = PromotionCityMode.exclude
+    cities: list[str] = Field(default_factory=list)
+
+
 class PromotionIn(BaseModel):
     brand_id: int
     title: str = Field(min_length=1, max_length=200)
@@ -387,6 +420,7 @@ class PromotionIn(BaseModel):
     ends_at: datetime | None = None
     is_active: bool = True
     items: list[PromotionItemIn] = Field(min_length=1)
+    scope: PromotionCityScope = Field(default_factory=PromotionCityScope)
 
 
 class PromotionPatch(BaseModel):
@@ -397,6 +431,16 @@ class PromotionPatch(BaseModel):
     ends_at: datetime | None = None
     is_active: bool | None = None
     items: list[PromotionItemIn] | None = Field(default=None, min_length=1)
+    scope: PromotionCityScope | None = None
+
+
+class PromotionCityToggleIn(BaseModel):
+    """Точечная правка охвата: модератор трогает только свой город."""
+
+    city: str = Field(min_length=1, max_length=100)
+    # true — город в списке (для exclude это «убрать акцию из города»,
+    # для include — «показывать в городе»)
+    listed: bool
 
 
 class PromotionItemOut(ORMModel):
@@ -415,18 +459,34 @@ class AdminPromotionOut(ORMModel):
     is_active: bool
     created_at: datetime
     items: list[PromotionItemOut]
+    city_mode: PromotionCityMode = PromotionCityMode.exclude
+    scope_cities: list[str] = Field(default_factory=list)
+    scope_label: str = "вся страна"
+    # Может ли текущий сотрудник править саму акцию (а не только свой город)
+    can_edit: bool = True
 
 
 # --- admin: users ---
 
 class AdminUserOut(UserOut):
     reports_count: int = 0
+    moderator_cities: list[str] = Field(default_factory=list)
 
 
 class UserPatch(BaseModel):
     role: UserRole | None = None
     is_blocked: bool | None = None
     display_name: str | None = Field(default=None, min_length=1, max_length=100)
+    # Города модератора: список заменяется целиком
+    moderator_cities: list[str] | None = None
+
+
+class StaffScopeOut(BaseModel):
+    """Кто я в админке: глобальный админ или модератор своих городов."""
+
+    role: UserRole
+    is_global: bool
+    cities: list[str] = Field(default_factory=list)
 
 
 # --- admin: suggestions ---
@@ -445,6 +505,8 @@ class SuggestionGroupOut(BaseModel):
 
 class SuggestionApproveIn(BaseModel):
     brand_id: int
+    # Охват создаваемой акции; модератору он всё равно сузится до его городов
+    scope: PromotionCityScope = Field(default_factory=PromotionCityScope)
     title: str | None = Field(default=None, min_length=1, max_length=200)
     description: str | None = None
     starts_at: datetime | None = None

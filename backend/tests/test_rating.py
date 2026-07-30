@@ -176,3 +176,31 @@ def test_leaderboard_is_scoped_to_city(client, db):
 
     data = client.get(f"/api/rating?city={CITY}").json()
     assert [e["display_name"] for e in data["entries"]] == ["Местный"]
+
+
+def test_moderator_is_out_of_his_own_city_standings(db, client):
+    """Модератор влияет на начисление очков в своём городе — значит вне зачёта.
+    В чужом городе он соревнуется на общих основаниях."""
+    from app.models import ModeratorCity
+
+    add_player(db, "Обычный", 10)
+    mod = add_player(db, "Модератор", 500)
+    mod.role = UserRole.moderator
+    db.add(ModeratorCity(user_id=mod.id, city=CITY))
+    # очки того же человека в другом городе
+    db.add(
+        RatingEvent(
+            user_id=mod.id,
+            city="Другой",
+            type="report_base",
+            points=300,
+            created_at=datetime.now(timezone.utc),
+        )
+    )
+    db.commit()
+
+    here = client.get(f"/api/rating?city={CITY}").json()
+    assert [e["display_name"] for e in here["entries"]] == ["Обычный"]
+
+    elsewhere = client.get("/api/rating?city=Другой").json()
+    assert [e["display_name"] for e in elsewhere["entries"]] == ["Модератор"]

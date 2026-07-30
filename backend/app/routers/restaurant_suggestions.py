@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.auth import get_current_user, require_not_blocked
 from app.database import get_db
 from app.models import Brand, RestaurantSuggestion, User
+from app.services.scope import normalize_city
 from app.schemas import RestaurantSuggestionIn, RestaurantSuggestionOut
 
 router = APIRouter(prefix="/restaurant-suggestions", tags=["restaurant-suggestions"])
@@ -23,7 +24,7 @@ def create_restaurant_suggestion(
         user_id=user.id,
         brand_id=payload.brand_id,
         title=(payload.title or "").strip() or None,
-        city=payload.city.strip(),
+        city=normalize_city(payload.city),
         address=payload.address.strip(),
         lat=payload.lat,
         lng=payload.lng,

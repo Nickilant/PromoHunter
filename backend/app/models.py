@@ -22,7 +22,23 @@ from app.database import Base
 
 class UserRole(str, enum.Enum):
     user = "user"
+    # Городской модератор: разбирает заявки и правит точки только в тех
+    # городах, что перечислены в moderator_cities
+    moderator = "moderator"
     admin = "admin"
+
+
+class PromotionCityMode(str, enum.Enum):
+    """Как читать список городов акции.
+
+    exclude — акция идёт везде, кроме перечисленных (пустой список = вся
+    страна). Так удобно объявить федеральную акцию и убрать её из пары
+    городов, где сеть её не проводит.
+    include — акция идёт только в перечисленных городах.
+    """
+
+    exclude = "exclude"
+    include = "include"
 
 
 class SuggestionStatus(str, enum.Enum):
@@ -165,6 +181,18 @@ class Promotion(Base):
     starts_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    # Охват по городам: список городов в promotion_cities читается согласно
+    # этому режиму. По умолчанию — федеральная акция без исключений.
+    city_mode: Mapped[PromotionCityMode] = mapped_column(
+        Enum(
+            PromotionCityMode,
+            name="promotion_city_mode",
+            values_callable=lambda e: [x.value for x in e],
+        ),
+        default=PromotionCityMode.exclude,
+        server_default="exclude",
+        nullable=False,
+    )
     created_by_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL")
     )
@@ -178,6 +206,38 @@ class Promotion(Base):
         cascade="all, delete-orphan",
         order_by="PromotionItem.sort_order",
     )
+    cities: Mapped[list["PromotionCity"]] = relationship(
+        back_populates="promotion", cascade="all, delete-orphan"
+    )
+
+
+class PromotionCity(Base):
+    """Город в списке охвата акции. Смысл задаёт Promotion.city_mode."""
+
+    __tablename__ = "promotion_cities"
+
+    promotion_id: Mapped[int] = mapped_column(
+        ForeignKey("promotions.id", ondelete="CASCADE"), primary_key=True
+    )
+    city: Mapped[str] = mapped_column(String(100), primary_key=True)
+
+    promotion: Mapped["Promotion"] = relationship(back_populates="cities")
+
+
+class ModeratorCity(Base):
+    """Город, за который отвечает модератор. Строк нет — прав нет."""
+
+    __tablename__ = "moderator_cities"
+
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    city: Mapped[str] = mapped_column(String(100), primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    user: Mapped["User"] = relationship()
 
 
 class PromotionItem(Base):
@@ -433,8 +493,13 @@ class RestaurantSuggestion(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Кто рассмотрел: с появлением второго модератора без этого не разобраться
+    reviewed_by_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )
 
-    user: Mapped["User"] = relationship()
+    user: Mapped["User"] = relationship(foreign_keys=[user_id])
+    reviewed_by: Mapped["User | None"] = relationship(foreign_keys=[reviewed_by_id])
     brand: Mapped["Brand"] = relationship()
 
 
@@ -455,6 +520,9 @@ class PromotionSuggestion(Base):
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
     items_raw: Mapped[str] = mapped_column(Text, nullable=False)
+    # Город для маршрутизации к модератору: у самой акции города нет, она
+    # принадлежит бренду, поэтому берём его у указанной точки или у автора
+    city: Mapped[str | None] = mapped_column(String(100))
     status: Mapped[SuggestionStatus] = mapped_column(
         Enum(
             SuggestionStatus,
@@ -472,8 +540,12 @@ class PromotionSuggestion(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    reviewed_by_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )
 
-    user: Mapped["User"] = relationship()
+    user: Mapped["User"] = relationship(foreign_keys=[user_id])
+    reviewed_by: Mapped["User | None"] = relationship(foreign_keys=[reviewed_by_id])
     brand: Mapped["Brand"] = relationship()
     restaurant: Mapped["Restaurant"] = relationship()
 

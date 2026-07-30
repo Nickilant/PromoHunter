@@ -9,6 +9,7 @@ from app.auth import get_current_user_optional
 from app.database import get_db
 from app.models import (
     Faction,
+    ModeratorCity,
     PromotionSuggestion,
     RatingEvent,
     Report,
@@ -16,6 +17,7 @@ from app.models import (
     User,
     UserRole,
 )
+from app.services.scope import city_key
 from app.schemas import (
     RatingCardOut,
     RatingCategoryOut,
@@ -44,14 +46,25 @@ def _ranked_subquery(
 ):
     """Пронумерованный зачёт города: место считает СУБД, а не Python.
 
-    Админы в общий зачёт не попадают: у них доступ к модерации, соревноваться
-    с ними нечестно. Публичный пол — ноль, минусовые суммы в таблицу не идут.
+    Модерация даёт влияние на начисление очков, поэтому в зачёте города не
+    участвуют ни глобальные админы, ни модераторы этого города. В чужих
+    городах модератор соревнуется на общих основаниях. Публичный пол — ноль,
+    минусовые суммы в таблицу не идут.
     """
+    moderates_here = (
+        select(ModeratorCity.user_id)
+        .where(
+            ModeratorCity.user_id == User.id,
+            func.lower(func.trim(ModeratorCity.city)) == city_key(city),
+        )
+        .exists()
+    )
     conditions = [
         RatingEvent.city == city,
         RatingEvent.created_at >= since,
         User.is_blocked.is_(False),
         User.role != UserRole.admin,
+        ~moderates_here,
     ]
     if faction is not None:
         conditions.append(User.faction == faction)

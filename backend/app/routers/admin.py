@@ -13,9 +13,20 @@ from app.services.notify import (
     notify_promotion_deleted,
     notify_promotion_update,
 )
+from app.services.promo_scope import describe_scope, promotion_visible_in
+from app.services.scope import (
+    Scope,
+    city_filter,
+    city_key,
+    normalize_city,
+    require_staff,
+)
 from app.models import (
     Brand,
+    ModeratorCity,
     Promotion,
+    PromotionCity,
+    PromotionCityMode,
     PromotionItem,
     PromotionSuggestion,
     RatingEvent,
@@ -25,6 +36,7 @@ from app.models import (
     Subscription,
     SuggestionStatus,
     User,
+    UserRole,
 )
 from app.schemas import (
     AdminBrandOut,
@@ -35,19 +47,40 @@ from app.schemas import (
     AdminUserOut,
     BrandIn,
     BrandPatch,
+    PromotionCityToggleIn,
     PromotionIn,
     PromotionPatch,
     RestaurantIn,
     RestaurantPatch,
     RestaurantSuggestionApproveIn,
     RestaurantSuggestionGroupOut,
+    StaffScopeOut,
     SuggestionApproveIn,
     SuggestionGroupOut,
     SuggestionRejectIn,
     UserPatch,
 )
 
-router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_admin)])
+# В админку пускаем и глобального админа, и городского модератора;
+# что именно ему доступно, решает Scope в каждом обработчике
+router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_staff)])
+
+
+@router.get("/scope", response_model=StaffScopeOut)
+def my_scope(scope: Scope = Depends(require_staff), db: Session = Depends(get_db)):
+    """Кто я в админке — по этому интерфейс прячет недоступные разделы."""
+    cities: list[str] = []
+    if not scope.is_global:
+        cities = sorted(
+            db.scalars(
+                select(ModeratorCity.city).where(
+                    ModeratorCity.user_id == scope.user.id
+                )
+            ).all()
+        )
+    return StaffScopeOut(
+        role=scope.user.role, is_global=scope.is_global, cities=cities
+    )
 
 _TRANSLIT = str.maketrans(
     "абвгдеёжзийклмнопрстуфхцчшщъыьэюя",
@@ -91,7 +124,12 @@ def admin_brands(db: Session = Depends(get_db)):
 
 
 @router.post("/brands", response_model=AdminBrandOut, status_code=status.HTTP_201_CREATED)
-def create_brand(payload: BrandIn, db: Session = Depends(get_db)):
+def create_brand(
+    payload: BrandIn,
+    db: Session = Depends(get_db),
+    scope: Scope = Depends(require_staff),
+):
+    scope.require_global("Управление брендами")
     name = payload.name.strip()
     if db.scalar(select(Brand).where(func.lower(Brand.name) == name.lower())):
         raise HTTPException(status.HTTP_409_CONFLICT, detail="Бренд с таким названием уже есть")
@@ -108,7 +146,13 @@ def create_brand(payload: BrandIn, db: Session = Depends(get_db)):
 
 
 @router.patch("/brands/{brand_id}", response_model=AdminBrandOut)
-def update_brand(brand_id: int, payload: BrandPatch, db: Session = Depends(get_db)):
+def update_brand(
+    brand_id: int,
+    payload: BrandPatch,
+    db: Session = Depends(get_db),
+    scope: Scope = Depends(require_staff),
+):
+    scope.require_global("Управление брендами")
     brand = db.get(Brand, brand_id)
     if brand is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Бренд не найден")
@@ -133,7 +177,12 @@ def update_brand(brand_id: int, payload: BrandPatch, db: Session = Depends(get_d
 
 
 @router.delete("/brands/{brand_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_brand(brand_id: int, db: Session = Depends(get_db)):
+def delete_brand(
+    brand_id: int,
+    db: Session = Depends(get_db),
+    scope: Scope = Depends(require_staff),
+):
+    scope.require_global("Управление брендами")
     brand = db.get(Brand, brand_id)
     if brand is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Бренд не найден")
@@ -152,7 +201,11 @@ def delete_brand(brand_id: int, db: Session = Depends(get_db)):
 # --- restaurants ---
 
 @router.get("/restaurants", response_model=list[AdminRestaurantOut])
-def admin_restaurants(brand_id: int | None = None, db: Session = Depends(get_db)):
+def admin_restaurants(
+    brand_id: int | None = None,
+    db: Session = Depends(get_db),
+    scope: Scope = Depends(require_staff),
+):
     stmt = (
         select(Restaurant)
         .options(joinedload(Restaurant.brand))
@@ -160,16 +213,26 @@ def admin_restaurants(brand_id: int | None = None, db: Session = Depends(get_db)
     )
     if brand_id is not None:
         stmt = stmt.where(Restaurant.brand_id == brand_id)
+    mine = city_filter(scope, Restaurant.city)
+    if mine is not None:
+        stmt = stmt.where(mine)
     return db.scalars(stmt).unique().all()
 
 
 @router.post(
     "/restaurants", response_model=AdminRestaurantOut, status_code=status.HTTP_201_CREATED
 )
-def create_restaurant(payload: RestaurantIn, db: Session = Depends(get_db)):
+def create_restaurant(
+    payload: RestaurantIn,
+    db: Session = Depends(get_db),
+    scope: Scope = Depends(require_staff),
+):
     if db.get(Brand, payload.brand_id) is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Бренд не найден")
-    restaurant = Restaurant(**payload.model_dump())
+    data = payload.model_dump()
+    data["city"] = normalize_city(data["city"])
+    scope.require(data["city"], "Город точки")
+    restaurant = Restaurant(**data)
     db.add(restaurant)
     db.commit()
     db.refresh(restaurant)
@@ -178,14 +241,23 @@ def create_restaurant(payload: RestaurantIn, db: Session = Depends(get_db)):
 
 @router.patch("/restaurants/{restaurant_id}", response_model=AdminRestaurantOut)
 def update_restaurant(
-    restaurant_id: int, payload: RestaurantPatch, db: Session = Depends(get_db)
+    restaurant_id: int,
+    payload: RestaurantPatch,
+    db: Session = Depends(get_db),
+    scope: Scope = Depends(require_staff),
 ):
     restaurant = db.get(Restaurant, restaurant_id)
     if restaurant is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Точка не найдена")
+    # Проверяем и текущий город, и новый: иначе точку можно было бы
+    # «увезти» из своей зоны ответственности в чужую
+    scope.require(restaurant.city, "Точка")
     data = payload.model_dump(exclude_unset=True)
     if "brand_id" in data and db.get(Brand, data["brand_id"]) is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Бренд не найден")
+    if data.get("city"):
+        data["city"] = normalize_city(data["city"])
+        scope.require(data["city"], "Новый город точки")
     for key, value in data.items():
         setattr(restaurant, key, value)
     db.commit()
@@ -194,10 +266,15 @@ def update_restaurant(
 
 
 @router.delete("/restaurants/{restaurant_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_restaurant(restaurant_id: int, db: Session = Depends(get_db)):
+def delete_restaurant(
+    restaurant_id: int,
+    db: Session = Depends(get_db),
+    scope: Scope = Depends(require_staff),
+):
     restaurant = db.get(Restaurant, restaurant_id)
     if restaurant is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Точка не найдена")
+    scope.require(restaurant.city, "Точка")
     db.delete(restaurant)
     db.commit()
 
@@ -207,7 +284,14 @@ def delete_restaurant(restaurant_id: int, db: Session = Depends(get_db)):
 def _load_promotion(db: Session, promotion_id: int) -> Promotion:
     promotion = db.scalar(
         select(Promotion)
-        .options(joinedload(Promotion.brand), selectinload(Promotion.items))
+        .options(
+            joinedload(Promotion.brand),
+            selectinload(Promotion.items),
+            selectinload(Promotion.cities),
+        )
+        # populate_existing — иначе после правки охвата вернулась бы уже
+        # загруженная в сессии коллекция городов, то есть прежняя
+        .execution_options(populate_existing=True)
         .where(Promotion.id == promotion_id)
     )
     if promotion is None:
@@ -215,22 +299,87 @@ def _load_promotion(db: Session, promotion_id: int) -> Promotion:
     return promotion
 
 
+def _promo_editable_by(promotion: Promotion, scope: Scope) -> bool:
+    """Модератор правит саму акцию, только если она целиком его.
+
+    Федеральную акцию менять нельзя — она видна и в чужих городах; у неё
+    модератору доступен лишь свой город в охвате (см. ручку /cities).
+    """
+    if scope.is_global:
+        return True
+    if promotion.city_mode != PromotionCityMode.include:
+        return False
+    listed = {city_key(row.city) for row in promotion.cities}
+    return bool(listed) and listed <= (scope.cities or set())
+
+
+def _promo_out(promotion: Promotion, scope: Scope) -> AdminPromotionOut:
+    out = AdminPromotionOut.model_validate(promotion)
+    out.scope_cities = sorted(row.city for row in promotion.cities)
+    out.scope_label = describe_scope(promotion)
+    out.can_edit = _promo_editable_by(promotion, scope)
+    return out
+
+
+def _apply_scope(
+    db: Session, promotion: Promotion, mode: PromotionCityMode, cities: list[str]
+) -> None:
+    """Переписать охват акции целиком (доступно глобальному админу)."""
+    promotion.city_mode = mode
+    wanted: dict[str, str] = {}
+    for raw in cities:
+        name = normalize_city(raw)
+        if name:
+            wanted.setdefault(city_key(name), name)
+    db.query(PromotionCity).filter(
+        PromotionCity.promotion_id == promotion.id
+    ).delete(synchronize_session=False)
+    for name in wanted.values():
+        db.add(PromotionCity(promotion_id=promotion.id, city=name))
+
+
 @router.get("/promotions", response_model=list[AdminPromotionOut])
 def admin_promotions(
     brand_id: int | None = None,
     is_active: bool | None = None,
     db: Session = Depends(get_db),
+    scope: Scope = Depends(require_staff),
 ):
     stmt = (
         select(Promotion)
-        .options(joinedload(Promotion.brand), selectinload(Promotion.items))
+        .options(
+            joinedload(Promotion.brand),
+            selectinload(Promotion.items),
+            selectinload(Promotion.cities),
+        )
         .order_by(Promotion.created_at.desc())
     )
     if brand_id is not None:
         stmt = stmt.where(Promotion.brand_id == brand_id)
     if is_active is not None:
         stmt = stmt.where(Promotion.is_active.is_(is_active))
-    return db.scalars(stmt).unique().all()
+    promotions = db.scalars(stmt).unique().all()
+
+    if not scope.is_global:
+        # Модератору показываем то, что видно в его городах: и федеральные
+        # акции тоже — их он может убрать из своего города
+        promotions = [
+            p
+            for p in promotions
+            if any(promotion_visible_in(p, city) for city in _scope_city_names(db, scope))
+        ]
+    return [_promo_out(p, scope) for p in promotions]
+
+
+def _scope_city_names(db: Session, scope: Scope) -> list[str]:
+    """Отображаемые названия городов модератора (не ключи сравнения)."""
+    if scope.is_global:
+        return []
+    return list(
+        db.scalars(
+            select(ModeratorCity.city).where(ModeratorCity.user_id == scope.user.id)
+        ).all()
+    )
 
 
 @router.post(
@@ -239,10 +388,24 @@ def admin_promotions(
 def create_promotion(
     payload: PromotionIn,
     db: Session = Depends(get_db),
-    admin: User = Depends(require_admin),
+    scope: Scope = Depends(require_staff),
 ):
     if db.get(Brand, payload.brand_id) is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Бренд не найден")
+
+    mode, cities = payload.scope.mode, list(payload.scope.cities)
+    if not scope.is_global:
+        # Модератор заводит акцию только для своих городов и только режимом
+        # «только в списке» — федеральную создавать он не вправе
+        mode = PromotionCityMode.include
+        cities = [c for c in cities if scope.allows(c)] or _scope_city_names(db, scope)
+        if not cities:
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                detail="У вас нет городов, для которых можно завести акцию",
+            )
+    _require_scope_allowed(scope, mode, cities)
+
     promotion = Promotion(
         brand_id=payload.brand_id,
         title=payload.title.strip(),
@@ -250,18 +413,35 @@ def create_promotion(
         starts_at=payload.starts_at,
         ends_at=payload.ends_at,
         is_active=payload.is_active,
-        created_by_id=admin.id,
+        created_by_id=scope.user.id,
         items=[
             PromotionItem(name=item.name.strip(), sort_order=i)
             for i, item in enumerate(payload.items)
         ],
     )
     db.add(promotion)
+    db.flush()
+    _apply_scope(db, promotion, mode, cities)
     db.commit()
     promotion = _load_promotion(db, promotion.id)
     if _is_currently_active(promotion):
         notify_new_promotion(db, promotion)
-    return promotion
+    return _promo_out(promotion, scope)
+
+
+def _require_scope_allowed(
+    scope: Scope, mode: PromotionCityMode, cities: list[str]
+) -> None:
+    """Модератор не может выйти охватом за свои города."""
+    if scope.is_global:
+        return
+    if mode != PromotionCityMode.include:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            detail="Федеральные акции заводит только глобальный администратор",
+        )
+    for city in cities:
+        scope.require(city, "Город акции")
 
 
 def _is_currently_active(promotion: Promotion) -> bool:
@@ -275,9 +455,21 @@ def _is_currently_active(promotion: Promotion) -> bool:
 
 @router.patch("/promotions/{promotion_id}", response_model=AdminPromotionOut)
 def update_promotion(
-    promotion_id: int, payload: PromotionPatch, db: Session = Depends(get_db)
+    promotion_id: int,
+    payload: PromotionPatch,
+    db: Session = Depends(get_db),
+    scope: Scope = Depends(require_staff),
 ):
     promotion = _load_promotion(db, promotion_id)
+    if not _promo_editable_by(promotion, scope):
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            detail=(
+                "Эта акция идёт не только в ваших городах — менять её условия "
+                "может глобальный администратор. Свой город можно убрать "
+                "из охвата отдельной кнопкой."
+            ),
+        )
     was_active = _is_currently_active(promotion)
     data = payload.model_dump(exclude_unset=True)
     if "brand_id" in data and db.get(Brand, data["brand_id"]) is None:
@@ -310,6 +502,11 @@ def update_promotion(
                 new_items.append(PromotionItem(name=item.name.strip(), sort_order=i))
         promotion.items = new_items
 
+    if payload.scope is not None:
+        _require_scope_allowed(scope, payload.scope.mode, payload.scope.cities)
+        _apply_scope(db, promotion, payload.scope.mode, payload.scope.cities)
+        changed = True
+
     db.commit()
     promotion = _load_promotion(db, promotion_id)
 
@@ -321,18 +518,57 @@ def update_promotion(
         notify_promotion_update(db, promotion, "акция завершена")
     elif changed and is_active_now:
         notify_promotion_update(db, promotion, "условия акции обновились")
-    return promotion
+    return _promo_out(promotion, scope)
+
+
+@router.post("/promotions/{promotion_id}/cities", response_model=AdminPromotionOut)
+def toggle_promotion_city(
+    promotion_id: int,
+    payload: PromotionCityToggleIn,
+    db: Session = Depends(get_db),
+    scope: Scope = Depends(require_staff),
+):
+    """Добавить или убрать один город из охвата акции.
+
+    Ради этого всё и затевалось: городской модератор может сказать «у нас
+    этой акции нет», не трогая её в остальной стране и не заводя список из
+    всех городов вручную.
+    """
+    promotion = _load_promotion(db, promotion_id)
+    city = normalize_city(payload.city)
+    if not city:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Не указан город")
+    scope.require(city, "Город")
+
+    existing = next(
+        (row for row in promotion.cities if city_key(row.city) == city_key(city)), None
+    )
+    if payload.listed and existing is None:
+        db.add(PromotionCity(promotion_id=promotion.id, city=city))
+    elif not payload.listed and existing is not None:
+        db.delete(existing)
+    db.commit()
+    return _promo_out(_load_promotion(db, promotion_id), scope)
 
 
 @router.delete("/promotions/{promotion_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_promotion(promotion_id: int, db: Session = Depends(get_db)):
+def delete_promotion(
+    promotion_id: int,
+    db: Session = Depends(get_db),
+    scope: Scope = Depends(require_staff),
+):
     promotion = db.scalar(
         select(Promotion)
-        .options(joinedload(Promotion.brand))
+        .options(joinedload(Promotion.brand), selectinload(Promotion.cities))
         .where(Promotion.id == promotion_id)
     )
     if promotion is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Акция не найдена")
+    if not _promo_editable_by(promotion, scope):
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            detail="Удалить акцию, идущую не только в ваших городах, нельзя",
+        )
     # Чаты подписчиков собираем до каскадного удаления подписок
     subscriber_chats = list(
         db.scalars(
@@ -355,17 +591,26 @@ def delete_promotion(promotion_id: int, db: Session = Depends(get_db)):
 # --- users ---
 
 @router.get("/users", response_model=list[AdminUserOut])
-def admin_users(db: Session = Depends(get_db)):
+def admin_users(db: Session = Depends(get_db), scope: Scope = Depends(require_staff)):
+    # Блокировка и роли действуют на всю страну, поэтому раздел глобальный
+    scope.require_global("Управление пользователями")
     counts = dict(
         db.execute(
             select(Report.user_id, func.count(Report.id)).group_by(Report.user_id)
         ).all()
     )
+    cities: dict[int, list[str]] = {}
+    for user_id, city in db.execute(
+        select(ModeratorCity.user_id, ModeratorCity.city).order_by(ModeratorCity.city)
+    ).all():
+        cities.setdefault(user_id, []).append(city)
+
     users = db.scalars(select(User).order_by(User.created_at)).all()
     result = []
     for user in users:
         out = AdminUserOut.model_validate(user)
         out.reports_count = counts.get(user.id, 0)
+        out.moderator_cities = cities.get(user.id, [])
         result.append(out)
     return result
 
@@ -382,21 +627,51 @@ def update_user(
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Пользователь не найден")
     data = payload.model_dump(exclude_unset=True)
     if user.id == admin.id and (
-        data.get("is_blocked") is True or data.get("role") == "user"
+        data.get("is_blocked") is True or data.get("role") in ("user", "moderator")
     ):
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
             detail="Нельзя заблокировать или разжаловать самого себя",
         )
+
+    cities = data.pop("moderator_cities", None)
     for key, value in data.items():
         setattr(user, key, value)
+
+    if cities is not None:
+        _set_moderator_cities(db, user, cities)
+    # Разжаловали модератора — города за ним висеть не должны
+    if user.role != UserRole.moderator:
+        db.query(ModeratorCity).filter(ModeratorCity.user_id == user.id).delete(
+            synchronize_session=False
+        )
+
     db.commit()
     db.refresh(user)
     out = AdminUserOut.model_validate(user)
     out.reports_count = (
         db.scalar(select(func.count(Report.id)).where(Report.user_id == user.id)) or 0
     )
+    out.moderator_cities = sorted(
+        db.scalars(
+            select(ModeratorCity.city).where(ModeratorCity.user_id == user.id)
+        ).all()
+    )
     return out
+
+
+def _set_moderator_cities(db: Session, user: User, cities: list[str]) -> None:
+    """Заменить список городов модератора целиком."""
+    wanted: dict[str, str] = {}
+    for raw in cities:
+        name = normalize_city(raw)
+        if name:
+            wanted.setdefault(city_key(name), name)
+    db.query(ModeratorCity).filter(ModeratorCity.user_id == user.id).delete(
+        synchronize_session=False
+    )
+    for name in wanted.values():
+        db.add(ModeratorCity(user_id=user.id, city=name))
 
 
 # --- suggestions ---
@@ -405,11 +680,13 @@ def update_user(
 def admin_suggestions(
     status_filter: SuggestionStatus | None = Query(default=None, alias="status"),
     db: Session = Depends(get_db),
+    scope: Scope = Depends(require_staff),
 ):
     stmt = (
         select(PromotionSuggestion)
         .options(
             joinedload(PromotionSuggestion.user),
+            joinedload(PromotionSuggestion.reviewed_by),
             joinedload(PromotionSuggestion.brand),
             joinedload(PromotionSuggestion.restaurant).joinedload(Restaurant.brand),
         )
@@ -417,6 +694,9 @@ def admin_suggestions(
     )
     if status_filter is not None:
         stmt = stmt.where(PromotionSuggestion.status == status_filter)
+    mine = city_filter(scope, PromotionSuggestion.city)
+    if mine is not None:
+        stmt = stmt.where(mine)
     suggestions = db.scalars(stmt).unique().all()
 
     # Группировка: по brand_id, а для заявок без бренда — по brand_name_raw
@@ -448,17 +728,22 @@ def admin_suggestions(
 def admin_restaurant_suggestions(
     status_filter: SuggestionStatus | None = Query(default=None, alias="status"),
     db: Session = Depends(get_db),
+    scope: Scope = Depends(require_staff),
 ):
     stmt = (
         select(RestaurantSuggestion)
         .options(
             joinedload(RestaurantSuggestion.user),
+            joinedload(RestaurantSuggestion.reviewed_by),
             joinedload(RestaurantSuggestion.brand),
         )
         .order_by(RestaurantSuggestion.created_at.desc())
     )
     if status_filter is not None:
         stmt = stmt.where(RestaurantSuggestion.status == status_filter)
+    mine = city_filter(scope, RestaurantSuggestion.city)
+    if mine is not None:
+        stmt = stmt.where(mine)
     suggestions = db.scalars(stmt).unique().all()
 
     groups: dict[int, RestaurantSuggestionGroupOut] = {}
@@ -484,6 +769,7 @@ def approve_restaurant_suggestion(
     suggestion_id: int,
     payload: RestaurantSuggestionApproveIn,
     db: Session = Depends(get_db),
+    scope: Scope = Depends(require_staff),
 ):
     suggestion = db.get(RestaurantSuggestion, suggestion_id)
     if suggestion is None:
@@ -493,10 +779,17 @@ def approve_restaurant_suggestion(
     if db.get(Brand, payload.brand_id) is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Бренд не найден")
 
+    # Город приходит из тела запроса, поэтому проверяем оба: и город самой
+    # заявки, и присланный — иначе чужую точку можно было бы завести,
+    # подставив другой город
+    city = normalize_city(payload.city)
+    scope.require(suggestion.city, "Заявка")
+    scope.require(city, "Город точки")
+
     restaurant = Restaurant(
         brand_id=payload.brand_id,
         title=(payload.title or "").strip() or None,
-        city=payload.city.strip(),
+        city=city,
         address=payload.address.strip(),
         lat=payload.lat,
         lng=payload.lng,
@@ -507,6 +800,7 @@ def approve_restaurant_suggestion(
     suggestion.status = SuggestionStatus.approved
     suggestion.created_restaurant_id = restaurant.id
     suggestion.reviewed_at = datetime.now(timezone.utc)
+    suggestion.reviewed_by_id = scope.user.id
     db.add(
         RatingEvent(
             user_id=suggestion.user_id,
@@ -530,16 +824,21 @@ def approve_restaurant_suggestion(
     response_model=AdminRestaurantSuggestionOut,
 )
 def reject_restaurant_suggestion(
-    suggestion_id: int, payload: SuggestionRejectIn, db: Session = Depends(get_db)
+    suggestion_id: int,
+    payload: SuggestionRejectIn,
+    db: Session = Depends(get_db),
+    scope: Scope = Depends(require_staff),
 ):
     suggestion = db.get(RestaurantSuggestion, suggestion_id)
     if suggestion is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Заявка не найдена")
     if suggestion.status != SuggestionStatus.pending:
         raise HTTPException(status.HTTP_409_CONFLICT, detail="Заявка уже рассмотрена")
+    scope.require(suggestion.city, "Заявка")
     suggestion.status = SuggestionStatus.rejected
     suggestion.moderator_comment = payload.moderator_comment.strip()
     suggestion.reviewed_at = datetime.now(timezone.utc)
+    suggestion.reviewed_by_id = scope.user.id
     if payload.is_spam:
         db.add(
             RatingEvent(
@@ -555,6 +854,7 @@ def reject_restaurant_suggestion(
         select(RestaurantSuggestion)
         .options(
             joinedload(RestaurantSuggestion.user),
+            joinedload(RestaurantSuggestion.reviewed_by),
             joinedload(RestaurantSuggestion.brand),
         )
         .where(RestaurantSuggestion.id == suggestion_id)
@@ -566,7 +866,7 @@ def approve_suggestion(
     suggestion_id: int,
     payload: SuggestionApproveIn,
     db: Session = Depends(get_db),
-    admin: User = Depends(require_admin),
+    scope: Scope = Depends(require_staff),
 ):
     suggestion = db.get(PromotionSuggestion, suggestion_id)
     if suggestion is None:
@@ -575,10 +875,19 @@ def approve_suggestion(
         raise HTTPException(status.HTTP_409_CONFLICT, detail="Заявка уже рассмотрена")
     if db.get(Brand, payload.brand_id) is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Бренд не найден")
+    scope.require(suggestion.city, "Заявка")
 
     names = [name.strip() for name in payload.items if name.strip()]
     if not names:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Укажите хотя бы один товар")
+
+    # Модератор одобряет заявку только для своих городов: акция принадлежит
+    # бренду, и федеральной её вправе сделать лишь глобальный админ
+    mode, cities = payload.scope.mode, list(payload.scope.cities)
+    if not scope.is_global:
+        mode = PromotionCityMode.include
+        cities = [suggestion.city] if suggestion.city else _scope_city_names(db, scope)
+    _require_scope_allowed(scope, mode, cities)
 
     promotion = Promotion(
         brand_id=payload.brand_id,
@@ -589,15 +898,17 @@ def approve_suggestion(
         starts_at=payload.starts_at,
         ends_at=payload.ends_at,
         is_active=True,
-        created_by_id=admin.id,
+        created_by_id=scope.user.id,
         items=[PromotionItem(name=name, sort_order=i) for i, name in enumerate(names)],
     )
     db.add(promotion)
     db.flush()
+    _apply_scope(db, promotion, mode, cities)
 
     suggestion.status = SuggestionStatus.approved
     suggestion.created_promotion_id = promotion.id
     suggestion.reviewed_at = datetime.now(timezone.utc)
+    suggestion.reviewed_by_id = scope.user.id
 
     # Рейтинг автору заявки: человек принёс в сервис целую акцию
     author = db.get(User, suggestion.user_id)
@@ -619,21 +930,26 @@ def approve_suggestion(
     promotion = _load_promotion(db, promotion.id)
     if _is_currently_active(promotion):
         notify_new_promotion(db, promotion)
-    return promotion
+    return _promo_out(promotion, scope)
 
 
 @router.post("/suggestions/{suggestion_id}/reject", response_model=AdminSuggestionOut)
 def reject_suggestion(
-    suggestion_id: int, payload: SuggestionRejectIn, db: Session = Depends(get_db)
+    suggestion_id: int,
+    payload: SuggestionRejectIn,
+    db: Session = Depends(get_db),
+    scope: Scope = Depends(require_staff),
 ):
     suggestion = db.get(PromotionSuggestion, suggestion_id)
     if suggestion is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Заявка не найдена")
     if suggestion.status != SuggestionStatus.pending:
         raise HTTPException(status.HTTP_409_CONFLICT, detail="Заявка уже рассмотрена")
+    scope.require(suggestion.city, "Заявка")
     suggestion.status = SuggestionStatus.rejected
     suggestion.moderator_comment = payload.moderator_comment.strip()
     suggestion.reviewed_at = datetime.now(timezone.utc)
+    suggestion.reviewed_by_id = scope.user.id
 
     # Штраф только за «выдумку/спам» с явной пометкой модератора —
     # обычный дубликат не наказываем
@@ -658,6 +974,7 @@ def reject_suggestion(
         select(PromotionSuggestion)
         .options(
             joinedload(PromotionSuggestion.user),
+            joinedload(PromotionSuggestion.reviewed_by),
             joinedload(PromotionSuggestion.restaurant).joinedload(Restaurant.brand),
         )
         .where(PromotionSuggestion.id == suggestion_id)
