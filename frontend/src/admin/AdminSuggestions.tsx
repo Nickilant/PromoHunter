@@ -61,6 +61,11 @@ export default function AdminSuggestions() {
           .map((line) => line.trim())
           .filter(Boolean)
           .map((name) => ({ name })),
+        // Заявка пришла из конкретного города — предлагаем сузить охват до
+        // него, чтобы одобрение локальной заявки не стало федеральной акцией
+        scope: s.city
+          ? { mode: 'include' as const, cities: [s.city] }
+          : { mode: 'exclude' as const, cities: [] },
       },
     });
   };
@@ -76,6 +81,7 @@ export default function AdminSuggestions() {
         starts_at: fromLocalInput(value.starts_at),
         ends_at: fromLocalInput(value.ends_at),
         items: value.items.map((i) => i.name).filter(Boolean),
+        scope: value.scope,
       });
       setApproving(null);
       load();

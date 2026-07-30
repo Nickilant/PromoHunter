@@ -91,9 +91,9 @@ export default function ProfilePage() {
           <span className="muted">Отчётов отправлено</span>
           <span>{reports.length >= 100 ? '100+' : reports.length}</span>
         </div>
-        {user.role === 'admin' && (
+        {(user.role === 'admin' || user.role === 'moderator') && (
           <Link to="/admin" className="btn btn-ghost">
-            Перейти в админку
+            {user.role === 'moderator' ? 'Модерация моих городов' : 'Перейти в админку'}
           </Link>
         )}
         <button

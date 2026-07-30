@@ -1,4 +1,19 @@
-export type Role = 'user' | 'admin';
+export type Role = 'user' | 'moderator' | 'admin';
+
+/** Кто я в админке: глобальный админ или модератор своих городов */
+export interface StaffScope {
+  role: Role;
+  is_global: boolean;
+  cities: string[];
+}
+
+/** Как читать список городов акции */
+export type PromotionCityMode = 'exclude' | 'include';
+
+export interface PromotionScope {
+  mode: PromotionCityMode;
+  cities: string[];
+}
 
 export type Faction = 'green' | 'purple';
 
@@ -152,11 +167,13 @@ export interface Suggestion {
   title: string;
   description: string | null;
   items_raw: string;
+  city: string | null;
   status: SuggestionStatus;
   moderator_comment: string | null;
   created_promotion_id: number | null;
   created_at: string;
   reviewed_at: string | null;
+  reviewed_by_name: string | null;
 }
 
 export interface AdminSuggestion extends Suggestion {
@@ -185,6 +202,7 @@ export interface RestaurantSuggestion {
   created_restaurant_id: number | null;
   created_at: string;
   reviewed_at: string | null;
+  reviewed_by_name: string | null;
 }
 
 export interface AdminRestaurantSuggestion extends RestaurantSuggestion {
@@ -214,10 +232,16 @@ export interface AdminPromotion {
   is_active: boolean;
   created_at: string;
   items: PromotionItemAdmin[];
+  city_mode: PromotionCityMode;
+  scope_cities: string[];
+  scope_label: string;
+  /** Может ли текущий сотрудник править саму акцию, а не только свой город */
+  can_edit: boolean;
 }
 
 export interface AdminUser extends User {
   reports_count: number;
+  moderator_cities: string[];
 }
 
 export interface TelegramInfo {

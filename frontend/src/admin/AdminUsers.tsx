@@ -3,12 +3,14 @@ import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import { useToast } from '../components/Toast';
 import { useAuth } from '../hooks/useAuth';
-import type { AdminUser, Role } from '../types';
+import type { AdminUser, CityInfo, Role } from '../types';
 import { formatDate } from '../utils/time';
 import Icon from '../components/Icon';
 
 export default function AdminUsers() {
   const [users, setUsers] = useState<AdminUser[]>([]);
+  const [cities, setCities] = useState<CityInfo[]>([]);
+  const [editing, setEditing] = useState<AdminUser | null>(null);
   const { user: me } = useAuth();
   const toast = useToast();
 
@@ -17,14 +19,31 @@ export default function AdminUsers() {
   };
 
   useEffect(load, []);
+  useEffect(() => {
+    api.get<CityInfo[]>('/cities').then(setCities).catch(() => {});
+  }, []);
 
-  const patch = async (id: number, body: { role?: Role; is_blocked?: boolean }) => {
+  const patch = async (
+    id: number,
+    body: { role?: Role; is_blocked?: boolean; moderator_cities?: string[] },
+  ) => {
     try {
       await api.patch(`/admin/users/${id}`, body);
       load();
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Ошибка');
     }
+  };
+
+  const toggleCity = async (u: AdminUser, city: string) => {
+    const has = u.moderator_cities.some((c) => c.toLowerCase() === city.toLowerCase());
+    const next = has
+      ? u.moderator_cities.filter((c) => c.toLowerCase() !== city.toLowerCase())
+      : [...u.moderator_cities, city];
+    await patch(u.id, { moderator_cities: next });
+    setEditing((prev) =>
+      prev && prev.id === u.id ? { ...prev, moderator_cities: next } : prev,
+    );
   };
 
   return (
@@ -37,6 +56,7 @@ export default function AdminUsers() {
               <th>Телефон</th>
               <th>Имя</th>
               <th>Роль</th>
+              <th>Города модерации</th>
               <th>Статус</th>
               <th>Регистрация</th>
               <th>Отчётов</th>
@@ -70,8 +90,23 @@ export default function AdminUsers() {
                       onChange={(e) => patch(u.id, { role: e.target.value as Role })}
                     >
                       <option value="user">user</option>
+                      <option value="moderator">moderator</option>
                       <option value="admin">admin</option>
                     </select>
+                  </td>
+                  <td>
+                    {u.role === 'moderator' ? (
+                      <button
+                        className="btn btn-ghost btn-small"
+                        onClick={() => setEditing(u)}
+                      >
+                        {u.moderator_cities.length
+                          ? u.moderator_cities.join(', ')
+                          : 'назначить города'}
+                      </button>
+                    ) : (
+                      <span className="muted">—</span>
+                    )}
                   </td>
                   <td>
                     <span className={`tag ${u.is_blocked ? 'error' : 'ok'}`}>
@@ -97,6 +132,55 @@ export default function AdminUsers() {
           </tbody>
         </table>
       </div>
+
+      {editing && (
+        <div className="modal-overlay" onClick={() => setEditing(null)}>
+          <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              <div>
+                <h2>Города модератора</h2>
+                <div className="subtitle">{editing.display_name}</div>
+              </div>
+              <button
+                className="modal-close"
+                onClick={() => setEditing(null)}
+                aria-label="Закрыть"
+              >
+                <Icon name="close" size={20} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="form-success">
+                Модератор разбирает заявки и правит точки только этих городов.
+                Бренды, пользователи и федеральные акции ему недоступны.
+              </div>
+              {/* Выбираем из существующих городов, а не вводим руками:
+                  опечатка здесь означала бы заявки, которые никто не видит */}
+              <div className="scope-cities">
+                {cities.map((c) => {
+                  const on = editing.moderator_cities.some(
+                    (x) => x.toLowerCase() === c.name.toLowerCase(),
+                  );
+                  return (
+                    <button
+                      type="button"
+                      key={c.name}
+                      className={`scope-city${on ? ' on' : ''} include`}
+                      onClick={() => toggleCity(editing, c.name)}
+                      aria-pressed={on}
+                    >
+                      {c.name}
+                    </button>
+                  );
+                })}
+              </div>
+              {cities.length === 0 && (
+                <div className="muted">Городов пока нет — сначала добавьте точки</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

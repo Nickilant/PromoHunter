@@ -1,7 +1,8 @@
 import { FormEvent, useState } from 'react';
 
-import type { AdminBrand } from '../types';
+import type { AdminBrand, PromotionScope } from '../types';
 import Icon from '../components/Icon';
+import PromotionScopeEditor from './PromotionScopeEditor';
 
 export interface PromotionFormValue {
   brand_id: string;
@@ -11,6 +12,7 @@ export interface PromotionFormValue {
   ends_at: string;
   is_active: boolean;
   items: { id?: number; name: string }[];
+  scope: PromotionScope;
 }
 
 export function toLocalInput(iso: string | null): string {
@@ -30,6 +32,9 @@ interface Props {
   submitLabel: string;
   onSubmit: (value: PromotionFormValue) => Promise<void>;
   error: string | null;
+  /** Модератор охват не выбирает — акция заводится для его городов */
+  scopeEditable?: boolean;
+  scopeNote?: string;
 }
 
 export default function PromotionForm({
@@ -38,6 +43,8 @@ export default function PromotionForm({
   submitLabel,
   onSubmit,
   error,
+  scopeEditable = true,
+  scopeNote,
 }: Props) {
   const [value, setValue] = useState<PromotionFormValue>(initial);
   const [sending, setSending] = useState(false);
@@ -176,10 +183,22 @@ export default function PromotionForm({
         </div>
       </div>
 
+      <div className="field">
+        <label>Города</label>
+        {scopeEditable ? (
+          <PromotionScopeEditor
+            value={value.scope}
+            onChange={(scope) => set('scope', scope)}
+          />
+        ) : (
+          <div className="form-success">{scopeNote}</div>
+        )}
+      </div>
+
       {selectedBrand && (
         <div className="form-success">
-          Акция появится во всех точках сети «{selectedBrand.name}» — сейчас их{' '}
-          {selectedBrand.restaurants_count}
+          Акция появится в точках сети «{selectedBrand.name}» — всего их{' '}
+          {selectedBrand.restaurants_count}, с учётом выбранных городов
         </div>
       )}
       {error && <div className="form-error">{error}</div>}

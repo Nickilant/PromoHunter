@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
+import { useOutletContext } from 'react-router-dom';
 
 import { api } from '../api/client';
 import { useToast } from '../components/Toast';
 import type { AdminBrand, AdminPromotion } from '../types';
+import type { AdminOutletContext } from './AdminLayout';
 import { formatDate } from '../utils/time';
 import CollapsibleGroup from './CollapsibleGroup';
 import PromotionForm, {
@@ -22,6 +24,9 @@ export default function AdminPromotions() {
   );
   const [error, setError] = useState<string | null>(null);
   const toast = useToast();
+  const { scope } = useOutletContext<AdminOutletContext>();
+  const isGlobal = scope?.is_global ?? true;
+  const myCities = scope?.cities ?? [];
 
   const load = () => {
     const params = new URLSearchParams();
@@ -50,6 +55,8 @@ export default function AdminPromotions() {
       ends_at: fromLocalInput(value.ends_at),
       is_active: value.is_active,
       items: value.items.map((i) => ({ id: i.id, name: i.name })),
+      // Модератору охват выставит сервер по его городам
+      ...(isGlobal ? { scope: value.scope } : {}),
     };
     const brand = brands.find((b) => b.id === body.brand_id);
     try {
@@ -82,6 +89,21 @@ export default function AdminPromotions() {
     }
   };
 
+  const toggleCity = async (p: AdminPromotion, city: string, listed: boolean) => {
+    try {
+      await api.post(`/admin/promotions/${p.id}/cities`, { city, listed });
+      load();
+      const hiddenNow = p.city_mode === 'include' ? !listed : listed;
+      toast(
+        hiddenNow
+          ? `«${p.title}» больше не показывается в городе ${city}`
+          : `«${p.title}» снова показывается в городе ${city}`,
+      );
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Ошибка');
+    }
+  };
+
   const openNew = () => {
     setError(null);
     setForm({
@@ -94,6 +116,7 @@ export default function AdminPromotions() {
         ends_at: '',
         is_active: true,
         items: [{ name: '' }],
+        scope: { mode: 'exclude', cities: [] },
       },
     });
   };
@@ -110,6 +133,7 @@ export default function AdminPromotions() {
         ends_at: toLocalInput(p.ends_at),
         is_active: p.is_active,
         items: p.items.map((i) => ({ id: i.id, name: i.name })),
+        scope: { mode: p.city_mode, cities: p.scope_cities },
       },
     });
   };
@@ -157,6 +181,7 @@ export default function AdminPromotions() {
                   <th>Название</th>
                   <th>Товаров</th>
                   <th>Период</th>
+                  <th>Города</th>
                   <th>Статус</th>
                   <th></th>
                 </tr>
@@ -170,24 +195,62 @@ export default function AdminPromotions() {
                       {formatDate(p.starts_at)} — {formatDate(p.ends_at)}
                     </td>
                     <td>
+                      <span className={`tag ${p.city_mode === 'include' ? 'warn' : 'ok'}`}>
+                        {p.scope_label}
+                      </span>
+                    </td>
+                    <td>
                       <span className={`tag ${p.is_active ? 'ok' : 'error'}`}>
                         {p.is_active ? 'Активна' : 'Выключена'}
                       </span>
                     </td>
                     <td>
                       <div className="actions">
-                        <button
-                          className="btn btn-ghost btn-small"
-                          onClick={() => openEdit(p)}
-                        >
-                          Изменить
-                        </button>
-                        <button
-                          className="btn btn-danger btn-small"
-                          onClick={() => remove(p)}
-                        >
-                          Удалить
-                        </button>
+                        {/* Модератор может выключить акцию в своём городе,
+                            не трогая её в остальной стране */}
+                        {!isGlobal &&
+                          myCities.map((city) => {
+                            const off = p.scope_cities.some(
+                              (c) => c.toLowerCase() === city.toLowerCase(),
+                            );
+                            const hidden = p.city_mode === 'include' ? !off : off;
+                            return (
+                              <button
+                                key={city}
+                                className="btn btn-ghost btn-small"
+                                onClick={() => toggleCity(p, city, !off)}
+                                title={
+                                  hidden
+                                    ? `Вернуть акцию в город ${city}`
+                                    : `Убрать акцию из города ${city}`
+                                }
+                              >
+                                {/* Название города через двоеточие: склонять
+                                    его в подписи всё равно нечем */}
+                                {myCities.length > 1
+                                  ? `${hidden ? 'Вернуть' : 'Убрать'}: ${city}`
+                                  : hidden
+                                    ? 'Вернуть у себя'
+                                    : 'Убрать у себя'}
+                              </button>
+                            );
+                          })}
+                        {p.can_edit && (
+                          <button
+                            className="btn btn-ghost btn-small"
+                            onClick={() => openEdit(p)}
+                          >
+                            Изменить
+                          </button>
+                        )}
+                        {p.can_edit && (
+                          <button
+                            className="btn btn-danger btn-small"
+                            onClick={() => remove(p)}
+                          >
+                            Удалить
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

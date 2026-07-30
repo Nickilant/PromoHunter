@@ -43,10 +43,14 @@ function RequireAuth({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
-function RequireAdmin({ children }: { children: ReactNode }) {
+function RequireStaff({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
   if (loading) return null;
-  if (!user || user.role !== 'admin') return <Navigate to="/" replace />;
+  // Городской модератор тоже работает в админке — что ему доступно,
+  // решает сервер по его городам
+  if (!user || (user.role !== 'admin' && user.role !== 'moderator')) {
+    return <Navigate to="/" replace />;
+  }
   return <>{children}</>;
 }
 
@@ -101,9 +105,9 @@ export default function App() {
       <Route
         path="/admin"
         element={
-          <RequireAdmin>
+          <RequireStaff>
             <AdminLayout />
-          </RequireAdmin>
+          </RequireStaff>
         }
       >
         <Route index element={<Navigate to="brands" replace />} />
