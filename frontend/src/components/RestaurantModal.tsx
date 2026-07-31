@@ -68,7 +68,18 @@ export default function RestaurantModal({ restaurantId, onClose }: Props) {
                 </span>
                 <div className="rest-card-titles">
                   {detail.title && <div className="title">{detail.title}</div>}
-                  <div className="address">{detail.address}</div>
+                  <div className="address">
+                    {detail.address}
+                    {/* Карточку открыли из списка — где это на карте, неочевидно.
+                        С самой карты сюда не попадают: там своя шторка */}
+                    <button
+                      className="show-on-map"
+                      onClick={() => navigate(`/map?point=${restaurantId}`)}
+                    >
+                      <Icon name="map" size={13} strokeWidth={2} />
+                      На карте
+                    </button>
+                  </div>
                 </div>
               </div>
             ) : (

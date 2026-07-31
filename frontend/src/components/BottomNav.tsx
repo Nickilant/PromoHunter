@@ -104,7 +104,7 @@ export default function BottomNav() {
         aria-current={pathname.startsWith('/nearby') ? 'page' : undefined}
         onPointerDown={() => setPressed(null)}
       >
-        <Icon name="locate" size={24} strokeWidth={2.2} />
+        <Icon name="plus" size={24} strokeWidth={2.2} />
       </Link>
       {NAV.slice(2).map(renderItem)}
     </nav>

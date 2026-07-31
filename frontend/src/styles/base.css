@@ -1489,6 +1489,27 @@ select.city-chip {
 
 /* Список «рядом»: расстояние слева фиксированной колонкой, чтобы адреса
    выстраивались по одной линии и список читался сверху вниз */
+/* «На карте» — рядом с адресом в шапке карточки точки. Мелкая и вторичная:
+   основное действие в карточке — акции, а не переход на карту */
+.show-on-map {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--surface-alt);
+  color: var(--primary-ink);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.show-on-map:active {
+  transform: scale(0.96);
+}
+
 .nearby-item {
   display: flex;
   align-items: center;

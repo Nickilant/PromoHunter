@@ -124,15 +124,24 @@ function FlyTo({ focus }: { focus: MapFocus | null }) {
 }
 
 /** Вписывает в экран все маркеры города при их смене */
-function FitToMarkers({ points }: { points: [number, number][] }) {
+function FitToMarkers({
+  points,
+  disabled = false,
+}: {
+  points: [number, number][];
+  disabled?: boolean;
+}) {
   const map = useMap();
   const key = points.map((p) => p.join(',')).join(';');
   useEffect(() => {
+    // Точки грузятся асинхронно, и без этого флага вписывание сработало бы
+    // уже после наводки на конкретную точку и отменило бы её
+    if (disabled) return;
     if (points.length > 0) {
       map.fitBounds(points, { padding: [48, 48], maxZoom: 14 });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, map]);
+  }, [key, map, disabled]);
   return null;
 }
 
@@ -224,6 +233,8 @@ interface RestaurantsMapProps {
   points?: Map<number, PointControl>;
   layerVisible?: boolean;
   onToggleLayer?: () => void;
+  /** Карту открыли ради конкретной точки — общий обзор города не нужен */
+  keepFocus?: boolean;
 }
 
 export function RestaurantsMap({
@@ -235,13 +246,17 @@ export function RestaurantsMap({
   points,
   layerVisible = false,
   onToggleLayer,
+  keepFocus = false,
 }: RestaurantsMapProps) {
   const [me, setMe] = useState<UserPosition | null>(null);
   return (
     <MapContainer center={DEFAULT_CENTER} zoom={DEFAULT_ZOOM} zoomControl={false}>
       <TileLayer url={TILE_URL} attribution={TILE_ATTRIBUTION} />
       <CleanAttribution />
-      <FitToMarkers points={restaurants.map((r) => [r.lat, r.lng])} />
+      <FitToMarkers
+        points={restaurants.map((r) => [r.lat, r.lng])}
+        disabled={keepFocus}
+      />
       <FlyTo focus={focus} />
       {points && layerVisible && (
         <OwnershipLayer restaurants={restaurants} points={points} />

@@ -1,5 +1,5 @@
-import { FormEvent, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { FormEvent, useEffect, useRef, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import { api } from '../api/client';
 import CapturePanel from '../components/CapturePanel';
@@ -37,6 +37,27 @@ export default function MapPage() {
   const { isSubscribedToRestaurant, toggleRestaurant } = useSubscriptions();
   const { enabled: gameEnabled, points, layerVisible, toggleLayer } = useGame();
   const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
+  // ?point=<id> — карту открыли из карточки точки кнопкой «На карте»
+  const requestedPoint = params.get('point');
+  const focusedFromUrl = useRef(false);
+
+  useEffect(() => {
+    if (!requestedPoint || focusedFromUrl.current) return;
+    const id = Number(requestedPoint);
+    if (!Number.isFinite(id)) return;
+    focusedFromUrl.current = true;
+    api
+      .get<RestaurantDetail>(`/restaurants/${id}`)
+      .then((detail) => {
+        setSelectedId(detail.id);
+        setSelected(detail);
+        setFocus({ lat: detail.lat, lng: detail.lng, zoom: 16 });
+      })
+      .catch(() => {})
+      // Параметр одноразовый: иначе возврат на вкладку снова открывал бы точку
+      .finally(() => setParams({}, { replace: true }));
+  }, [requestedPoint, setParams]);
 
   useEffect(() => {
     if (!city) return;
@@ -97,6 +118,7 @@ export default function MapPage() {
     <div className="map-page">
       <RestaurantsMap
         restaurants={restaurants}
+        keepFocus={focusedFromUrl.current}
         selectedId={selectedId}
         onSelect={select}
         focus={focus}
