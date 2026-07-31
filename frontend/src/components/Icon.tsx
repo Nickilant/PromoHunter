@@ -35,6 +35,7 @@ export type IconName =
   | 'send'
   | 'city'
   | 'logout'
+  | 'lock'
   | 'shield'
   | 'flag'
   | 'swords'
@@ -184,6 +185,13 @@ const PATHS: Record<IconName, ReactNode> = {
     <>
       <path d="M14.5 8V5.6a1.8 1.8 0 0 0-1.8-1.8H5.8A1.8 1.8 0 0 0 4 5.6v12.8a1.8 1.8 0 0 0 1.8 1.8h6.9a1.8 1.8 0 0 0 1.8-1.8V16" />
       <path d="M20 12H9.5m10.5 0-3.4-3.4M20 12l-3.4 3.4" />
+    </>
+  ),
+
+  lock: (
+    <>
+      <rect x="4.2" y="10.4" width="15.6" height="10" rx="2.2" />
+      <path d="M8 10.4V7.6a4 4 0 0 1 8 0v2.8" />
     </>
   ),
 

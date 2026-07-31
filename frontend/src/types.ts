@@ -24,6 +24,7 @@ export interface User {
   display_name: string;
   city: string | null;
   has_telegram: boolean;
+  has_password: boolean;
   role: Role;
   is_blocked: boolean;
   game_mode: boolean;

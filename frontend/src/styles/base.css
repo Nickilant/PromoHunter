@@ -1304,6 +1304,35 @@ select.city-chip {
   padding: 0;
 }
 
+.password-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Отмена и сохранение в одну строку: форма короткая, кнопки во всю ширину
+   выглядели бы тяжелее самой формы */
+.password-form-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.password-form-actions .btn {
+  flex: 1;
+}
+
+.about-card {
+  background: var(--surface);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-soft);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 .section-title {
   font-size: 15px;
   font-weight: 600;
@@ -1359,6 +1388,14 @@ select.city-chip {
 .auth-switch {
   text-align: center;
   font-size: 14px;
+  color: var(--text-muted);
+}
+
+/* Подсказка под формой входа: мельче переключателя, чтобы не спорить с ним */
+.auth-help {
+  text-align: center;
+  font-size: 12px;
+  line-height: 1.5;
   color: var(--text-muted);
 }
 

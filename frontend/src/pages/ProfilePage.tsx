@@ -3,9 +3,11 @@ import { Link, useNavigate } from 'react-router-dom';
 
 import { api } from '../api/client';
 import GameSettings from '../components/GameSettings';
+import PasswordSettings from '../components/PasswordSettings';
 import { useAuth } from '../hooks/useAuth';
 import { useSubscriptions } from '../hooks/useSubscriptions';
 import type { Report, RestaurantSuggestion, Suggestion, TelegramInfo } from '../types';
+import { DEVELOPER_TELEGRAM, DEVELOPER_TELEGRAM_URL } from '../utils/contacts';
 import { formatDateTime } from '../utils/time';
 import Icon from '../components/Icon';
 
@@ -108,6 +110,8 @@ export default function ProfilePage() {
         </button>
       </div>
 
+      <PasswordSettings />
+
       <GameSettings />
 
       <div className="section-title">Мои подписки</div>
@@ -207,6 +211,22 @@ export default function ProfilePage() {
           </div>
         );
       })}
+
+      <div className="section-title">О сервисе</div>
+      <div className="about-card">
+        <div className="muted">
+          PromoHunter делают вручную и по одной точке за раз. Нашли ошибку в
+          данных, не открывается акция, есть идея — напишите, разберусь.
+        </div>
+        <a
+          className="btn btn-ghost"
+          href={DEVELOPER_TELEGRAM_URL}
+          target="_blank"
+          rel="noreferrer"
+        >
+          <Icon name="send" size={17} />@{DEVELOPER_TELEGRAM}
+        </a>
+      </div>
     </div>
   );
 }

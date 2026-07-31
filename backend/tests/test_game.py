@@ -374,27 +374,29 @@ def test_attack_notifications_respect_cooldown_and_final_warning(db, monkeypatch
     control.purple_progress = BAR * 0.3
     db.commit()
 
-    assert sweep_attack_notifications(db) == 1
+    # Джобе передаём тот же момент, что и фикстурам: без этого тест живёт
+    # ровно один день — до NOW, а потом битва оказывается вчерашней
+    assert sweep_attack_notifications(db, NOW) == 1
     assert len(sent) == 1
     assert "захватывают" in sent[0][1]
     assert sent[0][0] == 555001
 
     # второй проход подряд — кулдаун держит
     sent.clear()
-    assert sweep_attack_notifications(db) == 0
+    assert sweep_attack_notifications(db, NOW) == 0
     assert sent == []
 
     # шкала почти заполнена — уходит финальное предупреждение
     control.purple_progress = BAR * 0.99
-    control.progress_at = datetime.now(timezone.utc)
-    control.score_at = control.progress_at
+    control.progress_at = NOW
+    control.score_at = NOW
     db.commit()
-    assert sweep_attack_notifications(db) == 1
+    assert sweep_attack_notifications(db, NOW) == 1
     assert "Последний рубеж" in sent[-1][1]
 
     # и только один раз за битву
     sent.clear()
-    assert sweep_attack_notifications(db) == 0
+    assert sweep_attack_notifications(db, NOW) == 0
 
 
 def test_no_attack_notification_when_owner_is_winning(db, monkeypatch):

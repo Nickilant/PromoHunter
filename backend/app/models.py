@@ -82,7 +82,12 @@ class User(Base):
     # Подтверждение номера кодом через Telegram — следующий этап;
     # пока при регистрации ставим True без проверки
     is_phone_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    # NULL — пароля нет: аккаунт создан входом через Telegram-контакт.
+    # Такому пользователю профиль предложит задать пароль без ввода текущего.
+    password_hash: Mapped[str | None] = mapped_column(String(255))
+    # Момент последней смены пароля. Токены, выданные раньше, отвергаются:
+    # смена пароля должна выкидывать того, кто знал старый.
+    password_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     display_name: Mapped[str] = mapped_column(String(100), nullable=False)
     # Город по умолчанию: записывается из сессии при регистрации,
     # редактирование в настройках профиля — следующий этап

@@ -1,3 +1,4 @@
+import hashlib
 from datetime import datetime, timedelta, timezone
 
 from fastapi import Depends, HTTPException, status
@@ -20,14 +21,43 @@ def hash_password(password: str) -> str:
     return pwd_context.hash(password)
 
 
-def verify_password(plain: str, hashed: str) -> bool:
+def verify_password(plain: str, hashed: str | None) -> bool:
+    # Пароля нет (вход был через Telegram) — сверять не с чем
+    if not hashed:
+        return False
     return pwd_context.verify(plain, hashed)
+
+
+def password_fingerprint(user: User) -> str:
+    """Короткий отпечаток текущего пароля.
+
+    Bcrypt солит каждый хеш заново, поэтому отпечаток меняется при любой смене
+    пароля — даже на такой же. Он и служит версией токена: сравнение по времени
+    выдачи тут не годится, у JWT `iat` секундная точность, и токен, выданный в
+    ту же секунду, что и смена, пережил бы её.
+    """
+    return hashlib.sha256((user.password_hash or "").encode()).hexdigest()[:16]
 
 
 def create_access_token(user: User) -> str:
     expire = datetime.now(timezone.utc) + timedelta(minutes=settings.jwt_expire_minutes)
-    payload = {"sub": str(user.id), "exp": expire}
+    payload = {"sub": str(user.id), "pv": password_fingerprint(user), "exp": expire}
     return jwt.encode(payload, settings.jwt_secret, algorithm=ALGORITHM)
+
+
+def token_outdated(user: User, payload: dict) -> bool:
+    """Токен из прошлой жизни аккаунта: пароль с тех пор сменили.
+
+    Списка отозванных токенов у нас нет, а смена пароля обязана выкидывать
+    того, кто знал старый.
+    """
+    fingerprint = payload.get("pv")
+    if fingerprint is None:
+        # Токен выдан до появления отпечатка. Он действителен, пока пароль ни
+        # разу не меняли: выкатка не должна разлогинивать всех разом. Первая же
+        # смена обесценивает и такие токены.
+        return user.password_changed_at is not None
+    return fingerprint != password_fingerprint(user)
 
 
 def get_current_user(
@@ -46,6 +76,10 @@ def get_current_user(
     user = db.get(User, user_id)
     if user is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Пользователь не найден")
+    if token_outdated(user, payload):
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED, detail="Пароль изменён — войдите заново"
+        )
     return user
 
 
@@ -60,9 +94,12 @@ def get_current_user_optional(
         payload = jwt.decode(
             credentials.credentials, settings.jwt_secret, algorithms=[ALGORITHM]
         )
-        return db.get(User, int(payload["sub"]))
+        user = db.get(User, int(payload["sub"]))
     except (JWTError, KeyError, ValueError):
         return None
+    if user is None or token_outdated(user, payload):
+        return None
+    return user
 
 
 def require_not_blocked(user: User = Depends(get_current_user)) -> User:

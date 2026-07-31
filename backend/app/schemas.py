@@ -41,6 +41,12 @@ class LoginIn(PhoneMixin):
     password: str
 
 
+class PasswordChangeIn(BaseModel):
+    # Пусто, если пароля ещё не было (аккаунт создан входом через Telegram)
+    current_password: str | None = None
+    new_password: str = Field(min_length=6, max_length=128)
+
+
 class PhoneVerificationRequestIn(PhoneMixin):
     pass
 
@@ -77,6 +83,9 @@ class UserOut(ORMModel):
     display_name: str
     city: str | None = None
     has_telegram: bool = Field(default=False, validation_alias="telegram_id")
+    # false — пароль ни разу не задавали (вход был через Telegram):
+    # профиль предложит задать его без ввода текущего
+    has_password: bool = Field(default=False, validation_alias="password_hash")
     role: UserRole
     is_blocked: bool
     # игровой режим
@@ -93,6 +102,11 @@ class UserOut(ORMModel):
     @field_validator("has_telegram", mode="before")
     @classmethod
     def _from_telegram_id(cls, value):
+        return bool(value)
+
+    @field_validator("has_password", mode="before")
+    @classmethod
+    def _from_password_hash(cls, value):
         return bool(value)
 
 
