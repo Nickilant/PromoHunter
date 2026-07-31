@@ -8,6 +8,9 @@ interface TelegramContactEvent {
 
 interface TelegramWebApp {
   initData: string;
+  /** Версия Bot API у клиента, например «6.0» */
+  version?: string;
+  isVersionAtLeast?: (version: string) => boolean;
   ready(): void;
   expand(): void;
   /** Отключает закрытие мини-аппа свайпом вниз по контенту (Bot API 7.7+) */

@@ -50,7 +50,7 @@ export default function ProfilePage() {
         <h1>Профиль</h1>
         <Link to="/suggest" className="btn btn-accent btn-small">
           <Icon name="plus" size={16} strokeWidth={2.2} />
-          Заявить акцию
+          Добавить в сервис
         </Link>
       </div>
 

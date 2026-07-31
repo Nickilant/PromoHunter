@@ -4,6 +4,7 @@ import { Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom';
 import AdminLayout from './admin/AdminLayout';
 import AdminBrands from './admin/AdminBrands';
 import AdminCities from './admin/AdminCities';
+import NearbyPage from './pages/NearbyPage';
 import AdminPromotions from './admin/AdminPromotions';
 import AdminRestaurants from './admin/AdminRestaurants';
 import AdminRestaurantSuggestions from './admin/AdminRestaurantSuggestions';
@@ -65,6 +66,7 @@ export default function App() {
         <Route path="/" element={<FeedPage />} />
         <Route path="/brand/:brandId" element={<BrandPage />} />
         <Route path="/map" element={<MapPage />} />
+        <Route path="/nearby" element={<NearbyPage />} />
         <Route path="/rating" element={<RatingPage />} />
         <Route
           path="/suggest"

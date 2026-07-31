@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 import Icon from './Icon';
+import { safe, supports, webApp } from '../utils/telegram';
 
 /**
  * Считывание QR с кассового чека средствами платформы:
@@ -15,8 +16,13 @@ import Icon from './Icon';
 
 const HINT = 'Отсканируйте QR на кассовом чеке';
 
-function telegramScanner() {
-  return window.Telegram?.WebApp?.showScanQrPopup ? window.Telegram.WebApp : null;
+// Штатный сканер появился в Bot API 6.4. На клиентах постарше метод в SDK
+// есть, но при вызове бросает WebAppMethodUnsupported — проверять наличие
+// функции недостаточно, нужна версия.
+const SCANNER_API = '6.4';
+
+function telegramScanner(): TelegramWebApp | null {
+  return supports(SCANNER_API) ? webApp() : null;
 }
 
 function hasBarcodeDetector(): boolean {
@@ -33,20 +39,29 @@ export default function ReceiptScanner({ onScanned, disabled }: Props) {
   const [reading, setReading] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
-  // Если мини-апп закрыли с открытым сканером — не оставляем его висеть
-  useEffect(() => () => window.Telegram?.WebApp?.closeScanQrPopup?.(), []);
+  // Если мини-апп закрыли с открытым сканером — не оставляем его висеть.
+  // Вызов обязательно через safe: на клиентах до 6.4 он бросает исключение,
+  // а исключение из размонтирования уносит всё дерево в белый экран.
+  useEffect(
+    () => () => {
+      if (supports(SCANNER_API)) safe(() => webApp()?.closeScanQrPopup?.());
+    },
+    [],
+  );
 
   const scanInTelegram = () => {
     const app = telegramScanner();
     if (!app?.showScanQrPopup) return;
     setError(null);
-    app.showScanQrPopup({ text: HINT }, (text) => {
-      if (!text) return false;
-      app.closeScanQrPopup?.();
-      app.HapticFeedback?.impactOccurred?.('light');
-      onScanned(text);
-      return true; // закрыть попап
-    });
+    safe(() =>
+      app.showScanQrPopup!({ text: HINT }, (text) => {
+        if (!text) return false;
+        safe(() => app.closeScanQrPopup?.());
+        safe(() => app.HapticFeedback?.impactOccurred?.('light'));
+        onScanned(text);
+        return true; // закрыть попап
+      }),
+    );
   };
 
   const scanFromPhoto = async (file: File) => {

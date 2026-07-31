@@ -1487,6 +1487,70 @@ select.city-chip {
   line-height: 1.45;
 }
 
+/* Список «рядом»: расстояние слева фиксированной колонкой, чтобы адреса
+   выстраивались по одной линии и список читался сверху вниз */
+.nearby-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  background: var(--surface);
+  border-radius: var(--radius-control);
+  box-shadow: var(--shadow-soft);
+  padding: 12px 14px;
+  text-align: left;
+  transition: transform 0.15s;
+}
+
+.nearby-item:active {
+  transform: scale(0.99);
+}
+
+.nearby-distance {
+  flex-shrink: 0;
+  width: 56px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--primary-ink);
+}
+
+.nearby-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.nearby-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.nearby-name {
+  font-size: 14px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nearby-address {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.nearby-meta {
+  font-size: 12px;
+}
+
+.brand-chip.small {
+  font-size: 11px;
+  padding: 2px 8px;
+}
+
 .suggest-pending {
   display: flex;
   align-items: center;
