@@ -9,6 +9,7 @@ import type {
 } from '../types';
 import { useToast } from './Toast';
 import Icon from './Icon';
+import type { IconName } from './Icon';
 import Overlay from './Overlay';
 import ReceiptScanner from './ReceiptScanner';
 import { useDismiss } from '../hooks/useDismiss';
@@ -16,6 +17,15 @@ import { useGame } from '../hooks/useGame';
 import { FACTION_TITLE } from '../utils/faction';
 
 type Choice = 'yes' | 'no' | 'skip';
+
+// «Не смотрел» стоит посередине не для симметрии: это значение по умолчанию,
+// и бегунок в покое остаётся там же. Значка у него нет намеренно — подпись
+// самая длинная, а вопросительный знак на 13px всё равно каша.
+const MARK_OPTIONS: { value: Choice; label: string; icon?: IconName }[] = [
+  { value: 'yes', label: 'Есть', icon: 'check' },
+  { value: 'skip', label: 'Не смотрел' },
+  { value: 'no', label: 'Нет', icon: 'close' },
+];
 
 interface Props {
   restaurant: RestaurantShort;
@@ -167,31 +177,47 @@ export default function ReportModal({ restaurant, promotion, onClose, onReported
               указан в чеке заказа: {restaurant.address}
             </div>
           )}
-          {promotion.items.map((item) => (
-            <div className="report-item" key={item.id}>
-              <div className="name">{item.name}</div>
-              <div className="tri-toggle">
-                <button
-                  className={choices[item.id] === 'yes' ? 'on-yes' : ''}
-                  onClick={() => setChoice(item.id, 'yes')}
-                >
-                  Есть
-                </button>
-                <button
-                  className={choices[item.id] === 'no' ? 'on-no' : ''}
-                  onClick={() => setChoice(item.id, 'no')}
-                >
-                  Нет
-                </button>
-                <button
-                  className={choices[item.id] === 'skip' ? 'on-skip' : ''}
-                  onClick={() => setChoice(item.id, 'skip')}
-                >
-                  Не смотрел
-                </button>
-              </div>
-            </div>
-          ))}
+          <div className="report-list">
+            {promotion.items.map((item) => {
+              // Подстраховка: без неё пустой выбор дал бы класс is-undefined,
+              // бегунок остался бы под «Есть» и список выглядел бы отвеченным
+              const choice = choices[item.id] ?? 'skip';
+              return (
+                <div className="report-item" key={item.id}>
+                  <div className="name" id={`report-item-${item.id}`}>
+                    {item.name}
+                  </div>
+                  <div
+                    className={`mark-switch is-${choice}`}
+                    role="radiogroup"
+                    aria-labelledby={`report-item-${item.id}`}
+                  >
+                    <span className="mark-switch-thumb" aria-hidden="true" />
+                    {MARK_OPTIONS.map((opt) => (
+                      <label
+                        key={opt.value}
+                        className={`mark-switch-option${
+                          choice === opt.value ? ' is-on' : ''
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name={`mark-${item.id}`}
+                          value={opt.value}
+                          checked={choice === opt.value}
+                          onChange={() => setChoice(item.id, opt.value)}
+                        />
+                        {opt.icon && (
+                          <Icon name={opt.icon} size={13} strokeWidth={2.4} />
+                        )}
+                        {opt.label}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
           {canCapture && (
             <div className="capture-attach">
               <div className="capture-attach-head">
