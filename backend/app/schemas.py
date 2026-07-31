@@ -149,6 +149,37 @@ class CityOut(BaseModel):
     restaurants_count: int
 
 
+class AdminCityOut(ORMModel):
+    id: int
+    name: str
+    is_active: bool
+    restaurants_count: int = 0
+
+
+class CityIn(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+
+
+class CityPatch(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=100)
+    is_active: bool | None = None
+
+
+class CityBulkIn(BaseModel):
+    """Пачка городов одним полем: их много, добавлять по одному невыносимо.
+
+    Разделители — перевод строки, запятая и точка с запятой: список обычно
+    приносят копипастой откуда-нибудь, и он бывает в любом из этих видов.
+    """
+
+    names: str = Field(min_length=1, max_length=20000)
+
+
+class CityBulkOut(BaseModel):
+    added: list[str]
+    skipped: list[str]  # уже были в справочнике
+
+
 class CatalogPromo(BaseModel):
     id: int
     title: str

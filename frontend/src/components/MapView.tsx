@@ -2,8 +2,9 @@
 // чтобы карту можно было заменить (например, на Яндекс.Карты), не трогая остальное.
 import 'leaflet/dist/leaflet.css';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import {
+  Circle,
   CircleMarker,
   LayerGroup,
   MapContainer,
@@ -40,27 +41,76 @@ export interface MapFocus {
   zoom?: number;
 }
 
-function LocateButton() {
+export interface UserPosition {
+  lat: number;
+  lng: number;
+  /** Точность в метрах — рисуем кругом вокруг точки */
+  accuracy: number;
+}
+
+function LocateButton({ onLocated }: { onLocated: (p: UserPosition) => void }) {
   const map = useMap();
+  const [busy, setBusy] = useState(false);
   const locate = () => {
     if (!navigator.geolocation) return;
-    navigator.geolocation.getCurrentPosition((pos) => {
-      // Ничего не отправляем на сервер — только центрируем карту
-      map.flyTo([pos.coords.latitude, pos.coords.longitude], 15);
-    });
+    setBusy(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setBusy(false);
+        // Ничего не отправляем на сервер — только показываем и центрируем
+        onLocated({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          accuracy: pos.coords.accuracy,
+        });
+        map.flyTo([pos.coords.latitude, pos.coords.longitude], 15);
+      },
+      () => setBusy(false),
+      { enableHighAccuracy: true, timeout: 12000 },
+    );
   };
   return (
     <button
-      className="locate-btn"
+      className={`locate-btn${busy ? ' is-busy' : ''}`}
       onClick={(e) => {
         e.stopPropagation();
         locate();
       }}
+      disabled={busy}
       aria-label="Найти меня"
       title="Найти меня"
     >
-      <Icon name="locate" size={21} />
+      {busy ? <span className="spinner" /> : <Icon name="locate" size={21} />}
     </button>
+  );
+}
+
+/** Где стоит человек: синяя точка и круг точности, как в любых картах */
+function UserMarker({ position }: { position: UserPosition }) {
+  return (
+    <LayerGroup>
+      {position.accuracy > 25 && (
+        <Circle
+          center={[position.lat, position.lng]}
+          radius={Math.min(position.accuracy, 2000)}
+          pathOptions={{
+            color: '#3B82F6',
+            weight: 1,
+            fillColor: '#3B82F6',
+            fillOpacity: 0.12,
+          }}
+        />
+      )}
+      <CircleMarker
+        center={[position.lat, position.lng]}
+        radius={7}
+        pathOptions={{ color: '#fff', weight: 3, fillColor: '#3B82F6', fillOpacity: 1 }}
+      >
+        <Tooltip direction="top" offset={[0, -8]}>
+          Вы здесь
+        </Tooltip>
+      </CircleMarker>
+    </LayerGroup>
   );
 }
 
@@ -186,6 +236,7 @@ export function RestaurantsMap({
   layerVisible = false,
   onToggleLayer,
 }: RestaurantsMapProps) {
+  const [me, setMe] = useState<UserPosition | null>(null);
   return (
     <MapContainer center={DEFAULT_CENTER} zoom={DEFAULT_ZOOM} zoomControl={false}>
       <TileLayer url={TILE_URL} attribution={TILE_ATTRIBUTION} />
@@ -221,10 +272,11 @@ export function RestaurantsMap({
           eventHandlers={{ click: () => onSelect(r.id) }}
         />
       ))}
+      {me && <UserMarker position={me} />}
       {points && onToggleLayer && (
         <LayerToggle visible={layerVisible} onToggle={onToggleLayer} />
       )}
-      <LocateButton />
+      <LocateButton onLocated={setMe} />
     </MapContainer>
   );
 }

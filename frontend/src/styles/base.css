@@ -1009,6 +1009,18 @@ input, textarea, select {
   outline: 2px solid var(--primary);
 }
 
+/* Своя строка окрашивается цветом своей стороны — но едва заметно: это
+   пометка «вы здесь», а не акцент, спорящий с обводкой и местами в топе */
+.rating-row.me.faction-green {
+  background: color-mix(in srgb, #4F9D69 10%, var(--surface));
+  outline-color: #4F9D69;
+}
+
+.rating-row.me.faction-purple {
+  background: color-mix(in srgb, #8A6BBF 10%, var(--surface));
+  outline-color: #8A6BBF;
+}
+
 .rating-pos {
   width: 28px;
   height: 28px;
@@ -1275,6 +1287,141 @@ select.city-chip {
   color: var(--text-muted);
 }
 
+/* Карточка «кто я»: имя крупно, остальное подписью */
+.profile-id {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--surface);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-soft);
+  padding: 16px;
+}
+
+.profile-avatar {
+  flex-shrink: 0;
+  width: 52px;
+  height: 52px;
+  border-radius: 18px;
+  background: var(--primary-soft);
+  color: var(--primary-ink);
+  display: grid;
+  place-items: center;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.profile-id-body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.profile-name {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.profile-id-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  flex-wrap: wrap;
+}
+
+.profile-id-meta.muted {
+  color: var(--text-muted);
+}
+
+/* Три плитки активности — вместо строки «Отчётов отправлено» в таблице */
+.profile-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.profile-stat {
+  background: var(--surface);
+  border-radius: var(--radius-control);
+  box-shadow: var(--shadow-soft);
+  padding: 12px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.profile-stat-value {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.profile-stat-label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* Сворачиваемые разделы активности */
+.profile-section {
+  background: var(--surface);
+  border-radius: var(--radius-control);
+  box-shadow: var(--shadow-soft);
+  overflow: hidden;
+}
+
+.profile-section-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 13px 14px;
+  text-align: left;
+}
+
+.profile-section-title {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.profile-section-count {
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--surface-alt);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  display: grid;
+  place-items: center;
+}
+
+.profile-section-head .chevron {
+  margin-left: auto;
+  display: flex;
+  color: var(--text-muted);
+  transition: transform 0.2s;
+}
+
+.profile-section-head .chevron.open {
+  transform: rotate(180deg);
+}
+
+.profile-section-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 8px 10px;
+}
+
+/* Выход — не акцент: он в самом низу и не должен спорить с настройками */
+.profile-logout {
+  margin-top: 4px;
+  color: var(--text-muted);
+}
+
 .verify-block {
   background: #F7EBD9;
   color: #A87B33;
@@ -1319,6 +1466,98 @@ select.city-chip {
 
 .password-form-actions .btn {
   flex: 1;
+}
+
+/* Заголовок страницы с подзаголовком — там, где рядом нет чипа города
+   и обычный page-header смотрится куцым */
+.page-intro {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.page-intro h1 {
+  margin: 0;
+}
+
+.page-intro p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.suggest-pending {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--primary-soft);
+  border-radius: var(--radius-control);
+  padding: 12px 14px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.suggest-pending .chevron-right {
+  margin-left: auto;
+}
+
+.suggest-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.suggest-steps li {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  background: var(--surface);
+  border-radius: var(--radius-control);
+  box-shadow: var(--shadow-soft);
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.suggest-step-num {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  background: var(--primary-soft);
+  color: var(--primary-ink);
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* Экран последнего рубежа: показывается вместо всего приложения, поэтому
+   рассчитывает только на себя — без токенов раскладки страниц */
+.crash-screen {
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 32px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.crash-detail {
+  background: var(--surface-alt);
+  border-radius: var(--radius-control);
+  padding: 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 40vh;
+  overflow: auto;
 }
 
 .about-card {
@@ -1471,6 +1710,26 @@ select.city-chip {
 
 .city-item.current {
   outline: 2px solid var(--primary);
+}
+
+/* Строка автоопределённого города и кнопка определения — первыми в списке,
+   поэтому выделены мягкой заливкой, а не обводкой */
+.city-item.detected,
+.city-item.detect {
+  background: var(--primary-soft);
+}
+
+.city-item span:first-child {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.city-more {
+  padding: 4px 4px 8px;
+  font-size: 12px;
+  text-align: center;
 }
 
 .city-item.other {

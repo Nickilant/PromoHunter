@@ -6,6 +6,7 @@ import type { AdminBrand, AdminRestaurant } from '../types';
 import CollapsibleGroup from './CollapsibleGroup';
 import RestaurantForm, { RestaurantFormValue } from './RestaurantForm';
 import Icon from '../components/Icon';
+import AdminSearch, { matches } from './AdminSearch';
 
 const emptyForm: RestaurantFormValue = {
   brand_id: '',
@@ -19,6 +20,7 @@ const emptyForm: RestaurantFormValue = {
 
 export default function AdminRestaurants() {
   const [restaurants, setRestaurants] = useState<AdminRestaurant[]>([]);
+  const [query, setQuery] = useState('');
   const [brands, setBrands] = useState<AdminBrand[]>([]);
   const [brandFilter, setBrandFilter] = useState('');
   const [form, setForm] = useState<{ id: number | null; value: RestaurantFormValue } | null>(
@@ -79,8 +81,11 @@ export default function AdminRestaurants() {
   };
 
   // Группировка по брендам, чтобы не искать по общему списку
+  const shown = restaurants.filter((r) =>
+    matches(query, r.title, r.city, r.address, r.brand.name),
+  );
   const groups = new Map<number, AdminRestaurant[]>();
-  for (const r of restaurants) {
+  for (const r of shown) {
     const list = groups.get(r.brand.id) ?? [];
     list.push(r);
     groups.set(r.brand.id, list);
@@ -108,6 +113,14 @@ export default function AdminRestaurants() {
           ))}
         </select>
       </div>
+
+      <AdminSearch
+        value={query}
+        onChange={setQuery}
+        placeholder="Поиск по адресу, городу, названию или сети"
+        found={shown.length}
+        total={restaurants.length}
+      />
 
       {[...groups.entries()].map(([brandId, list]) => (
         <CollapsibleGroup

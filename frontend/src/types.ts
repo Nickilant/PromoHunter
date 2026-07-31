@@ -69,6 +69,18 @@ export interface RestaurantListItem extends RestaurantShort {
   last_report_at: string | null;
 }
 
+export interface AdminCity {
+  id: number;
+  name: string;
+  is_active: boolean;
+  restaurants_count: number;
+}
+
+export interface CityBulkResult {
+  added: string[];
+  skipped: string[];
+}
+
 export interface CityInfo {
   name: string;
   restaurants_count: number;

@@ -5,7 +5,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useCity } from '../hooks/useCity';
 import { useGame } from '../hooks/useGame';
 import type {
-  CityInfo,
+  Faction,
   RatingCard,
   RatingEntry,
   RatingPeriod,
@@ -37,16 +37,20 @@ const PAGE = 10;
 function Row({
   entry,
   me,
+  myFaction,
   onOpen,
 }: {
   entry: RatingEntry;
   me: number | undefined;
+  myFaction: Faction | null;
   onOpen: (userId: number) => void;
 }) {
   const isMe = me === entry.user_id;
   return (
     <button
-      className={`rating-row${isMe ? ' me' : ''}`}
+      className={`rating-row${isMe ? ' me' : ''}${
+        isMe && myFaction ? ` faction-${myFaction}` : ''
+      }`}
       onClick={() => onOpen(entry.user_id)}
     >
       <span className={`rating-pos ${entry.position <= 3 ? 'top' : ''}`}>
@@ -68,20 +72,16 @@ function Row({
 }
 
 export default function RatingPage() {
-  const { city: sessionCity } = useCity();
+  // Город — общий для всего приложения: тот же чип и тот же пикер, что на
+  // странице акций. Свой список городов здесь разъезжался с остальным сервисом
+  const { city, openPicker } = useCity();
   const { user } = useAuth();
   const { faction } = useGame();
-  const [city, setCity] = useState<string | null>(sessionCity);
-  const [cities, setCities] = useState<CityInfo[]>([]);
   const [period, setPeriod] = useState<RatingPeriod>('month');
   const [scope, setScope] = useState<RatingScope>('all');
   const [data, setData] = useState<RatingResponse | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [card, setCard] = useState<RatingCard | null>(null);
-
-  useEffect(() => {
-    api.get<CityInfo[]>('/cities').then(setCities).catch(() => {});
-  }, []);
 
   // Сторону могли снять в профиле — зачёт по фракции тогда недоступен
   useEffect(() => {
@@ -141,20 +141,10 @@ export default function RatingPage() {
     <div className="page">
       <div className="page-header">
         <h1>Рейтинг</h1>
-        <select
-          className="city-chip"
-          value={city ?? ''}
-          onChange={(e) => setCity(e.target.value)}
-        >
-          {city && !cities.some((c) => c.name === city) && (
-            <option value={city}>{city}</option>
-          )}
-          {cities.map((c) => (
-            <option key={c.name} value={c.name}>
-              {c.name}
-            </option>
-          ))}
-        </select>
+        <button className="city-chip" onClick={openPicker}>
+          <Icon name="pin" size={15} />
+          {city ?? 'Город'}
+        </button>
       </div>
 
       <div className="period-toggle">
@@ -217,7 +207,13 @@ export default function RatingPage() {
         <>
           <div className="rating-list">
             {data.entries.map((entry) => (
-              <Row key={entry.user_id} entry={entry} me={user?.id} onOpen={openCard} />
+              <Row
+                key={entry.user_id}
+                entry={entry}
+                me={user?.id}
+                myFaction={faction}
+                onOpen={openCard}
+              />
             ))}
 
             {/* Между таблицей и своей строкой — многоточие, оно же кнопка
@@ -238,7 +234,12 @@ export default function RatingPage() {
           {/* Своя строка закреплена вне области прокрутки: место видно
               всегда, на каком угодно экране */}
           {myRowBelow && data.me && (
-            <Row entry={data.me as RatingEntry} me={user?.id} onOpen={openCard} />
+            <Row
+              entry={data.me as RatingEntry}
+              me={user?.id}
+              myFaction={faction}
+              onOpen={openCard}
+            />
           )}
         </>
       )}

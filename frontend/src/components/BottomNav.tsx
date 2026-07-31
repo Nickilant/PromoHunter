@@ -53,6 +53,11 @@ export default function BottomNav() {
     return () => cancelAnimationFrame(id);
   }, []);
 
+  // Указатель увели с кнопки — перехода не будет, подсветку возвращаем на
+  // место. Иначе после «нажал и провёл пальцем мимо» плашка оставалась на
+  // кнопке, хотя вкладка не переключилась.
+  const cancelPress = () => setPressed(null);
+
   const renderItem = (item: NavItem) => {
     const isActive = active?.to === item.to;
     const isTarget = shown === item.slot;
@@ -62,7 +67,16 @@ export default function BottomNav() {
         to={item.to}
         className={`dock-item ${isActive ? 'active' : ''} ${isTarget ? 'lit' : ''}`}
         aria-current={isActive ? 'page' : undefined}
-        onPointerDown={() => setPressed(item.slot)}
+        onPointerDown={(e) => {
+          // Тач по умолчанию захватывает указатель целью, и pointerleave до
+          // неё не доходит — снимаем захват, иначе отмену не поймать
+          if (e.currentTarget.hasPointerCapture?.(e.pointerId)) {
+            e.currentTarget.releasePointerCapture(e.pointerId);
+          }
+          setPressed(item.slot);
+        }}
+        onPointerLeave={cancelPress}
+        onPointerCancel={cancelPress}
       >
         <Icon name={item.icon} size={22} />
         <span>{item.label}</span>

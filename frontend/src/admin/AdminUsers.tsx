@@ -6,9 +6,11 @@ import { useAuth } from '../hooks/useAuth';
 import type { AdminUser, CityInfo, Role } from '../types';
 import { formatDate } from '../utils/time';
 import Icon from '../components/Icon';
+import AdminSearch, { matches } from './AdminSearch';
 
 export default function AdminUsers() {
   const [users, setUsers] = useState<AdminUser[]>([]);
+  const [query, setQuery] = useState('');
   const [cities, setCities] = useState<CityInfo[]>([]);
   const [editing, setEditing] = useState<AdminUser | null>(null);
   const { user: me } = useAuth();
@@ -46,9 +48,21 @@ export default function AdminUsers() {
     );
   };
 
+  const shown = users.filter((u) =>
+    matches(query, u.phone, u.display_name, u.moderator_cities.join(' ')),
+  );
+
   return (
     <div>
       <h1>Пользователи</h1>
+      <AdminSearch
+        value={query}
+        onChange={setQuery}
+        placeholder="Поиск по телефону, имени или городу модерации"
+        found={shown.length}
+        total={users.length}
+      />
+
       <div className="admin-table-wrap">
         <table className="admin-table">
           <thead>
@@ -64,7 +78,7 @@ export default function AdminUsers() {
             </tr>
           </thead>
           <tbody>
-            {users.map((u) => {
+            {shown.map((u) => {
               const isSelf = me?.id === u.id;
               return (
                 <tr key={u.id}>

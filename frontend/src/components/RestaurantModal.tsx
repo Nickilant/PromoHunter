@@ -49,7 +49,8 @@ export default function RestaurantModal({ restaurantId, onClose }: Props) {
   };
 
   return (
-    <Overlay>
+    <>
+      <Overlay>
       <div
         className={`modal-overlay${closing ? ' closing' : ''}`}
         onClick={dismiss}
@@ -135,7 +136,10 @@ export default function RestaurantModal({ restaurantId, onClose }: Props) {
           </div>
         </div>
       </div>
+      </Overlay>
 
+      {/* Отметка наличия — свой оверлей со своим порталом, вкладывать её
+          в портал карточки нельзя (см. комментарий в Overlay.tsx) */}
       {reportTarget && (
         <ReportModal
           restaurant={reportTarget.restaurant}
@@ -144,6 +148,6 @@ export default function RestaurantModal({ restaurantId, onClose }: Props) {
           onReported={load}
         />
       )}
-    </Overlay>
+    </>
   );
 }

@@ -15,6 +15,7 @@ const links = [
   // globalOnly — раздел общий для всей страны, городскому модератору там
   // делать нечего
   { to: 'brands', label: 'Бренды', globalOnly: true },
+  { to: 'cities', label: 'Города' },
   { to: 'restaurants', label: 'Рестораны' },
   { to: 'promotions', label: 'Акции' },
   { to: 'users', label: 'Пользователи', globalOnly: true },

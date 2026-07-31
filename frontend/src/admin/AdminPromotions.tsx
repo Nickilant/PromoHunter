@@ -13,9 +13,11 @@ import PromotionForm, {
   toLocalInput,
 } from './PromotionForm';
 import Icon from '../components/Icon';
+import AdminSearch, { matches } from './AdminSearch';
 
 export default function AdminPromotions() {
   const [promotions, setPromotions] = useState<AdminPromotion[]>([]);
+  const [query, setQuery] = useState('');
   const [brands, setBrands] = useState<AdminBrand[]>([]);
   const [brandFilter, setBrandFilter] = useState('');
   const [activeFilter, setActiveFilter] = useState('');
@@ -138,6 +140,17 @@ export default function AdminPromotions() {
     });
   };
 
+  const shown = promotions.filter((p) =>
+    matches(
+      query,
+      p.title,
+      p.description,
+      p.brand.name,
+      p.items.map((i) => i.name).join(' '),
+      p.scope_label,
+    ),
+  );
+
   return (
     <div>
       <h1>Акции</h1>
@@ -160,7 +173,15 @@ export default function AdminPromotions() {
         </select>
       </div>
 
-      {[...promotions
+      <AdminSearch
+        value={query}
+        onChange={setQuery}
+        placeholder="Поиск по названию акции, товару или сети"
+        found={shown.length}
+        total={promotions.length}
+      />
+
+      {[...shown
         .reduce((map, p) => {
           const list = map.get(p.brand.id) ?? [];
           list.push(p);

@@ -12,7 +12,7 @@ import GameOnboarding from './GameOnboarding';
 const KEEP_CLEAR = ['/login', '/register', '/admin'];
 
 /**
- * Порядок первого запуска: город → «включить игровой режим?» → сторона.
+ * Порядок: город → регистрация → «включить игровой режим?» → сторона.
  * Про режим спрашиваем один раз, выбор стороны можно отложить — тогда
  * предложим снова в следующий заход или из профиля.
  */
@@ -30,9 +30,11 @@ export default function GameGate() {
 
   if (KEEP_CLEAR.some((path) => pathname.startsWith(path))) return null;
   if (loading || !city || !available) return null;
+  // Гостю игру не предлагаем: включать режим и вставать за сторону некому —
+  // и то, и другое живёт в аккаунте. Спросим сразу после регистрации, а кто
+  // отказался — включит сам тумблером в профиле.
+  if (!user) return null;
   if (!asked) return <GameOnboarding onDone={() => {}} />;
-  // Гостю сторону тоже показываем: расклад сил виден сразу, а встать
-  // за фракцию он предложит через вход — иначе экран просто не появится
   if (enabled && faction === null && !factionPostponed) {
     return <FactionPicker onDone={() => setFactionPostponed(true)} />;
   }

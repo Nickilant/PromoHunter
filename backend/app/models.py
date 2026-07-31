@@ -229,6 +229,30 @@ class PromotionCity(Base):
     promotion: Mapped["Promotion"] = relationship(back_populates="cities")
 
 
+class City(Base):
+    """Справочник городов сервиса.
+
+    Город может существовать до первой точки: человек выбирает его при
+    регистрации и сам присылает заявку на первый ресторан. Поэтому список
+    городов — отдельная сущность, а не производная от таблицы ресторанов.
+
+    `key` — нормализованное имя (`services/scope.city_key`): по нему ловим
+    дубликаты вида «Санкт-Петербург» / «санкт-петербург».
+    """
+
+    __tablename__ = "cities"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    key: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default="true", nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 class ModeratorCity(Base):
     """Город, за который отвечает модератор. Строк нет — прав нет."""
 

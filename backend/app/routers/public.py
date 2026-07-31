@@ -5,7 +5,7 @@ from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.database import get_db
-from app.models import Brand, Promotion, Report, Restaurant
+from app.models import Brand, City, Promotion, Report, Restaurant
 from app.schemas import (
     BrandOut,
     CatalogBrand,
@@ -19,6 +19,7 @@ from app.schemas import (
     RestaurantShort,
 )
 from app.services.promo_scope import promotion_visible_in, visible_in_city_clause
+from app.services.scope import city_key
 from app.services.status import compute_statuses
 
 router = APIRouter(tags=["public"])
@@ -83,14 +84,38 @@ def telegram_info():
 
 @router.get("/cities", response_model=list[CityOut])
 def list_cities(db: Session = Depends(get_db)):
-    """Города, где есть активные точки, — для выбора города при входе."""
+    """Города для выбора при входе — по убыванию числа точек.
+
+    Город из справочника показывается, даже когда точек в нём ещё нет:
+    человек выбирает его и сам присылает заявку на первую точку. Города,
+    оставшиеся от точек до появления справочника, тоже не теряем.
+    """
     rows = db.execute(
         select(Restaurant.city, func.count(Restaurant.id))
         .where(Restaurant.is_active.is_(True))
         .group_by(Restaurant.city)
-        .order_by(func.count(Restaurant.id).desc(), Restaurant.city)
     ).all()
-    return [CityOut(name=city, restaurants_count=count) for city, count in rows]
+
+    by_key: dict[str, CityOut] = {}
+    for name, count in rows:
+        key = city_key(name)
+        found = by_key.get(key)
+        if found is None:
+            by_key[key] = CityOut(name=name, restaurants_count=count)
+        else:
+            found.restaurants_count += count
+
+    for city in db.scalars(select(City).where(City.is_active.is_(True))):
+        found = by_key.get(city.key)
+        if found is None:
+            by_key[city.key] = CityOut(name=city.name, restaurants_count=0)
+        else:
+            # Справочник — источник правды для написания названия
+            found.name = city.name
+
+    return sorted(
+        by_key.values(), key=lambda c: (-c.restaurants_count, c.name)
+    )
 
 
 @router.get("/catalog", response_model=list[CatalogBrand])

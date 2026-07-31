@@ -3,6 +3,7 @@ import { Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom';
 
 import AdminLayout from './admin/AdminLayout';
 import AdminBrands from './admin/AdminBrands';
+import AdminCities from './admin/AdminCities';
 import AdminPromotions from './admin/AdminPromotions';
 import AdminRestaurants from './admin/AdminRestaurants';
 import AdminRestaurantSuggestions from './admin/AdminRestaurantSuggestions';
@@ -112,6 +113,7 @@ export default function App() {
       >
         <Route index element={<Navigate to="brands" replace />} />
         <Route path="brands" element={<AdminBrands />} />
+        <Route path="cities" element={<AdminCities />} />
         <Route path="restaurants" element={<AdminRestaurants />} />
         <Route path="promotions" element={<AdminPromotions />} />
         <Route path="users" element={<AdminUsers />} />

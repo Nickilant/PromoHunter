@@ -2,7 +2,7 @@ import re
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.auth import require_admin
@@ -23,6 +23,7 @@ from app.services.scope import (
 )
 from app.models import (
     Brand,
+    City,
     ModeratorCity,
     Promotion,
     PromotionCity,
@@ -40,6 +41,7 @@ from app.models import (
 )
 from app.schemas import (
     AdminBrandOut,
+    AdminCityOut,
     AdminPromotionOut,
     AdminRestaurantOut,
     AdminRestaurantSuggestionOut,
@@ -47,6 +49,10 @@ from app.schemas import (
     AdminUserOut,
     BrandIn,
     BrandPatch,
+    CityBulkIn,
+    CityBulkOut,
+    CityIn,
+    CityPatch,
     PromotionCityToggleIn,
     PromotionIn,
     PromotionPatch,
@@ -195,6 +201,147 @@ def delete_brand(
             detail="У бренда есть рестораны — сначала удалите или перенесите их",
         )
     db.delete(brand)
+    db.commit()
+
+
+# --- cities ---
+
+SPLIT_CITIES = re.compile(r"[\n,;]+")
+
+
+def _city_counts(db: Session) -> dict[str, int]:
+    """Сколько активных точек в каждом городе — по нормализованному ключу."""
+    rows = db.execute(
+        select(Restaurant.city, func.count(Restaurant.id))
+        .where(Restaurant.is_active.is_(True))
+        .group_by(Restaurant.city)
+    ).all()
+    counts: dict[str, int] = {}
+    for city, count in rows:
+        counts[city_key(city)] = counts.get(city_key(city), 0) + count
+    return counts
+
+
+@router.get("/cities", response_model=list[AdminCityOut])
+def admin_cities(db: Session = Depends(get_db), scope: Scope = Depends(require_staff)):
+    """Справочник городов. Модератор видит только свои — чужие ему не нужны."""
+    counts = _city_counts(db)
+    cities = db.scalars(select(City).order_by(City.name)).all()
+    if scope.cities is not None:
+        allowed = {city_key(c) for c in scope.cities}
+        cities = [c for c in cities if c.key in allowed]
+    result = []
+    for city in cities:
+        out = AdminCityOut.model_validate(city)
+        out.restaurants_count = counts.get(city.key, 0)
+        result.append(out)
+    return result
+
+
+@router.post("/cities", response_model=AdminCityOut, status_code=status.HTTP_201_CREATED)
+def create_city(
+    payload: CityIn,
+    db: Session = Depends(get_db),
+    scope: Scope = Depends(require_staff),
+):
+    scope.require_global("Управление городами")
+    name = normalize_city(payload.name)
+    if not name:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Название города пустое")
+    if db.scalar(select(City).where(City.key == city_key(name))):
+        raise HTTPException(status.HTTP_409_CONFLICT, detail="Такой город уже есть")
+    city = City(name=name, key=city_key(name))
+    db.add(city)
+    db.commit()
+    db.refresh(city)
+    out = AdminCityOut.model_validate(city)
+    out.restaurants_count = _city_counts(db).get(city.key, 0)
+    return out
+
+
+@router.post("/cities/bulk", response_model=CityBulkOut)
+def create_cities_bulk(
+    payload: CityBulkIn,
+    db: Session = Depends(get_db),
+    scope: Scope = Depends(require_staff),
+):
+    """Пачка городов одним полем — их сотни, по одному добавлять невозможно."""
+    scope.require_global("Управление городами")
+    seen = {
+        key for key in db.scalars(select(City.key))
+    }
+    added: list[str] = []
+    skipped: list[str] = []
+    for raw in SPLIT_CITIES.split(payload.names):
+        name = normalize_city(raw)
+        if not name:
+            continue
+        key = city_key(name)
+        if key in seen:
+            skipped.append(name)
+            continue
+        seen.add(key)
+        db.add(City(name=name, key=key))
+        added.append(name)
+    db.commit()
+    return CityBulkOut(added=added, skipped=skipped)
+
+
+@router.patch("/cities/{city_id}", response_model=AdminCityOut)
+def update_city(
+    city_id: int,
+    payload: CityPatch,
+    db: Session = Depends(get_db),
+    scope: Scope = Depends(require_staff),
+):
+    scope.require_global("Управление городами")
+    city = db.get(City, city_id)
+    if city is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Город не найден")
+    data = payload.model_dump(exclude_unset=True)
+    if "name" in data and data["name"]:
+        name = normalize_city(data["name"])
+        if not name:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Название города пустое")
+        conflict = db.scalar(
+            select(City).where(City.key == city_key(name), City.id != city_id)
+        )
+        if conflict:
+            raise HTTPException(status.HTTP_409_CONFLICT, detail="Такой город уже есть")
+        # Точки и модераторы хранят город строкой — переименование тянет их за собой
+        db.execute(
+            update(Restaurant).where(Restaurant.city == city.name).values(city=name)
+        )
+        db.execute(
+            update(ModeratorCity).where(ModeratorCity.city == city.name).values(city=name)
+        )
+        city.name = name
+        city.key = city_key(name)
+    if "is_active" in data and data["is_active"] is not None:
+        city.is_active = data["is_active"]
+    db.commit()
+    db.refresh(city)
+    out = AdminCityOut.model_validate(city)
+    out.restaurants_count = _city_counts(db).get(city.key, 0)
+    return out
+
+
+@router.delete("/cities/{city_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_city(
+    city_id: int,
+    db: Session = Depends(get_db),
+    scope: Scope = Depends(require_staff),
+):
+    scope.require_global("Управление городами")
+    city = db.get(City, city_id)
+    if city is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Город не найден")
+    if _city_counts(db).get(city.key, 0):
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            detail="В городе есть точки — удалите их или выключите город",
+        )
+    db.delete(city)
     db.commit()
 
 
