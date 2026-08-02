@@ -140,9 +140,48 @@ def check_geo(restaurant: Restaurant, lat: float | None, lng: float | None) -> N
         )
 
 
-def receipt_moment(parsed: ParsedReceipt, restaurant: Restaurant) -> datetime:
+def offset_from_longitude(lng: float) -> int:
+    """Грубая оценка смещения точки по долготе, минуты.
+
+    Нужна не как значение, а как ограда: часовые пояса в целом следуют за
+    долготой, и отклонение больше пары часов означает, что клиент прислал
+    неправдоподобное смещение.
+    """
+    return int(round(lng / 15.0)) * 60
+
+
+def resolve_offset_minutes(
+    restaurant: Restaurant, client_offset_minutes: int | None
+) -> int:
+    """Смещение, в котором напечатано время на чеке.
+
+    В QR время местное и без зоны, поэтому кто-то должен сказать, какое оно.
+    Спрашиваем телефон: чек принимается только в трёхстах метрах от точки,
+    значит часовой пояс телефона и есть часовой пояс кассы. Поле у точки —
+    запасной вариант: его заполняют руками, и по умолчанию там Москва, из-за
+    чего во всех остальных поясах чек уезжал на часы.
+
+    Присланное смещение сверяем с долготой точки: без этого достаточно было
+    бы соврать про пояс, чтобы оживить вчерашний чек.
+    """
+    fallback = restaurant.utc_offset_minutes
+    if client_offset_minutes is None:
+        return fallback
+    if abs(client_offset_minutes) > 14 * 60:
+        return fallback
+    expected = offset_from_longitude(restaurant.lng)
+    if abs(client_offset_minutes - expected) > settings.receipt_offset_slack_minutes:
+        return fallback
+    return client_offset_minutes
+
+
+def receipt_moment(
+    parsed: ParsedReceipt,
+    restaurant: Restaurant,
+    client_offset_minutes: int | None = None,
+) -> datetime:
     """Время чека в UTC: снимаем местное смещение кассы точки."""
-    offset = timedelta(minutes=restaurant.utc_offset_minutes)
+    offset = timedelta(minutes=resolve_offset_minutes(restaurant, client_offset_minutes))
     return parsed.local_time.replace(tzinfo=timezone.utc) - offset
 
 

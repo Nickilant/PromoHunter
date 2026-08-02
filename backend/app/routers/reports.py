@@ -167,7 +167,15 @@ def create_report(
     if parsed is not None:
         try:
             result = game.apply_receipt(
-                db, user, restaurant, parsed, payload.lat, payload.lng, report, now
+                db,
+                user,
+                restaurant,
+                parsed,
+                payload.lat,
+                payload.lng,
+                report,
+                now,
+                payload.client_utc_offset_minutes,
             )
         except ReceiptError as error:
             db.rollback()

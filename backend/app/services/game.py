@@ -504,6 +504,7 @@ def apply_receipt(
     lng: float | None,
     report: Report | None,
     now: datetime,
+    client_offset_minutes: int | None = None,
 ) -> CaptureResult:
     """Принять чек: проверки, сила фракции, продвижение шкал, очки."""
     if not settings.game_enabled:
@@ -513,7 +514,7 @@ def apply_receipt(
 
     check_sum(parsed)
     check_geo(restaurant, lat, lng)
-    purchased_at = receipt_moment(parsed, restaurant)
+    purchased_at = receipt_moment(parsed, restaurant, client_offset_minutes)
     check_freshness(purchased_at, now)
     register_receipt(db, parsed, restaurant, user.id, purchased_at, now)
 

@@ -99,7 +99,15 @@ export default function ReportModal({ restaurant, promotion, onClose, onReported
           promotion_item_id: i.id,
           is_available: choices[i.id] === 'yes',
         })),
-        ...(receipt ? { receipt_qr: receipt, ...coords } : {}),
+        // Время в QR местное и без зоны. Пояс телефона и есть пояс кассы:
+        // чек принимается только в трёхстах метрах от точки
+        ...(receipt
+          ? {
+              receipt_qr: receipt,
+              client_utc_offset_minutes: -new Date().getTimezoneOffset(),
+              ...coords,
+            }
+          : {}),
       });
       const capture = report.capture;
       if (capture) {
@@ -233,7 +241,7 @@ export default function ReportModal({ restaurant, promotion, onClose, onReported
                     {hasYes
                       ? 'Для начала захвата отсканируйте QR-код на чеке с акционным ' +
                         `товаром не позднее чем через ${
-                          config?.receipt_max_age_minutes ?? 15
+                          config?.receipt_max_age_minutes ?? 30
                         } минут после покупки`
                       : 'Для начала захвата точки отметьте наличие и отсканируйте ' +
                         'QR на чеке с акционным товаром'}

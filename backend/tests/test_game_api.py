@@ -424,3 +424,65 @@ def test_points_include_untouched_ones(client, db):
     assert fresh["green_score"] == 0.0
     assert fresh["green_receipts"] == 0
     assert fresh["eta_seconds"] is None
+
+
+def test_client_timezone_saves_receipt_outside_moscow(client, db):
+    """Точка во Владивостоке, поле utc_offset_minutes никто не правил.
+    Без пояса от телефона свежий чек читается как семичасовой давности."""
+    restaurant, promotion, _ = make_fixtures(db)
+    restaurant.lat, restaurant.lng = 43.12, 131.9  # Владивосток
+    db.commit()
+    headers = register(client)
+    enable_game(client, headers, "green")
+    item = promotion.items[0]
+
+    # Касса печатает местное время: UTC+10
+    moment = datetime.now(timezone.utc) - timedelta(minutes=2)
+    local = moment + timedelta(minutes=600)
+    qr = QR_TEMPLATE.format(time=local.strftime("%Y%m%dT%H%M"), doc=910, drive=7)
+
+    body = {
+        "restaurant_id": restaurant.id,
+        "promotion_id": promotion.id,
+        "items": [{"promotion_item_id": item.id, "is_available": True}],
+        "lat": restaurant.lat,
+        "lng": restaurant.lng,
+        "receipt_qr": qr,
+    }
+
+    # Старое поведение: сервер считает точку московской и не принимает чек
+    resp = client.post("/api/reports", json=body, headers=headers)
+    assert resp.status_code == 400
+    assert "будущего" in resp.json()["detail"] or "старый" in resp.json()["detail"]
+
+    # Телефон сообщает свой пояс — чек проходит
+    resp = client.post(
+        "/api/reports", json=dict(body, client_utc_offset_minutes=600), headers=headers
+    )
+    assert resp.status_code == 201, resp.text
+    assert resp.json()["capture"]["faction"] == "green"
+
+
+def test_receipt_accepted_within_half_hour(client, db):
+    """Чек печатают сразу после оплаты, а заказ отдают позже."""
+    restaurant, promotion, _ = make_fixtures(db)
+    headers = register(client)
+    enable_game(client, headers, "green")
+    item = promotion.items[0]
+
+    body = {
+        "restaurant_id": restaurant.id,
+        "promotion_id": promotion.id,
+        "items": [{"promotion_item_id": item.id, "is_available": True}],
+        "lat": restaurant.lat,
+        "lng": restaurant.lng,
+        "receipt_qr": fresh_qr(restaurant, 920, drive=8, minutes_ago=25),
+    }
+    assert client.post("/api/reports", json=body, headers=headers).status_code == 201
+
+    stale = dict(
+        body, receipt_qr=fresh_qr(restaurant, 930, drive=9, minutes_ago=45)
+    )
+    resp = client.post("/api/reports", json=stale, headers=headers)
+    assert resp.status_code == 400
+    assert "старый" in resp.json()["detail"]

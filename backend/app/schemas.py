@@ -260,6 +260,9 @@ class ReportIn(BaseModel):
     # Строка из QR-кода чека: превращает отчёт в подтверждённый и даёт
     # силу фракции на точке (игровой режим)
     receipt_qr: str | None = Field(default=None, max_length=300)
+    # Часовой пояс телефона: время в QR местное и без зоны, а человек стоит
+    # на точке — значит его пояс и есть пояс кассы
+    client_utc_offset_minutes: int | None = Field(default=None, ge=-720, le=840)
 
 
 class ReportItemOut(BaseModel):

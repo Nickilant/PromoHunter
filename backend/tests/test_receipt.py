@@ -10,6 +10,7 @@ from app.services.receipt import (
     check_geo,
     check_sum,
     distance_m,
+    offset_from_longitude,
     parse_receipt,
     receipt_moment,
     register_receipt,
@@ -68,11 +69,52 @@ def test_local_time_is_read_in_point_timezone(db):
     )
 
 
+def test_client_timezone_wins_over_point_field(db):
+    """Поле у точки заполняют руками, и по умолчанию там Москва. Телефон
+    стоит на точке, поэтому его пояс и есть пояс кассы."""
+    restaurant, _, _ = make_fixtures(db)
+    restaurant.utc_offset_minutes = 180  # поле никто не менял
+    restaurant.lng = 131.9  # а точка во Владивостоке
+    parsed = parse_receipt(QR)
+
+    # без подсказки телефона чек уезжает на семь часов
+    assert receipt_moment(parsed, restaurant) == datetime(
+        2022, 7, 12, 19, 5, tzinfo=timezone.utc
+    )
+    assert receipt_moment(parsed, restaurant, 600) == datetime(
+        2022, 7, 12, 12, 5, tzinfo=timezone.utc
+    )
+
+
+def test_implausible_client_offset_ignored(db):
+    """Соврать про пояс, чтобы оживить вчерашний чек, нельзя: смещение
+    сверяется с долготой точки."""
+    restaurant, _, _ = make_fixtures(db)
+    restaurant.utc_offset_minutes = 180
+    restaurant.lng = 30.3  # Санкт-Петербург, ожидаем примерно +2
+    parsed = parse_receipt(QR)
+
+    # +14 при долготе Петербурга — откат к полю точки
+    assert receipt_moment(parsed, restaurant, 840) == receipt_moment(parsed, restaurant)
+    # +3 от Петербурга правдоподобно и принимается
+    assert receipt_moment(parsed, restaurant, 180) == datetime(
+        2022, 7, 12, 19, 5, tzinfo=timezone.utc
+    )
+
+
+def test_offset_from_longitude():
+    assert offset_from_longitude(30.3) == 120     # Петербург
+    assert offset_from_longitude(37.6) == 180     # Москва
+    assert offset_from_longitude(131.9) == 540    # Владивосток
+
+
 def test_freshness_window():
     now = datetime.now(timezone.utc)
     check_freshness(now - timedelta(minutes=1), now)
+    # заказ отдают позже чека — полчаса ещё в окне
+    check_freshness(now - timedelta(minutes=25), now)
     with pytest.raises(ReceiptError):
-        check_freshness(now - timedelta(hours=3), now)
+        check_freshness(now - timedelta(minutes=45), now)
     with pytest.raises(ReceiptError):
         check_freshness(now + timedelta(minutes=30), now)
 

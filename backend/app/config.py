@@ -82,8 +82,13 @@ class Settings(BaseSettings):
 
     # чек ФНС
     receipt_min_sum_kopeks: int = 5000        # 50 ₽ — ниже не считаем покупкой
-    receipt_max_age_minutes: int = 15         # чек должен быть свежим
+    # Чек печатают сразу после оплаты, а заказ отдают позже — окно считаем
+    # от кассы до момента, когда человек увидел, что ему досталось
+    receipt_max_age_minutes: int = 30
     receipt_future_tolerance_minutes: int = 5  # часы кассы могут спешить
+    # Насколько присланный телефоном часовой пояс может расходиться с
+    # оценкой по долготе точки, прежде чем мы перестанем ему верить
+    receipt_offset_slack_minutes: int = 150
     receipt_max_i_rate_per_minute: float = 20.0   # предел скорости счётчика ФД
     receipt_bind_confirmations: int = 3       # подтверждений привязки fn к точке
     receipt_bind_ttl_days: int = 365          # срок жизни привязки fn
