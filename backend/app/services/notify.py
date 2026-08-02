@@ -7,11 +7,22 @@
 """
 
 import logging
+from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, joinedload
 
-from app.models import Promotion, Restaurant, Subscription, User
+from app.config import settings
+from app.models import (
+    Faction,
+    PointControl,
+    Promotion,
+    Receipt,
+    Restaurant,
+    Subscription,
+    User,
+)
+from app.services.promo_scope import promotion_visible_in
 from app.telegram import send_batch_async
 
 logger = logging.getLogger("promohunter.notify")
@@ -20,6 +31,9 @@ STATUS_RU = {
     "available": "✅ Есть",
     "unavailable": "❌ Кончилось",
 }
+
+# Кого считаем защитниками точки: кто приносил сюда чеки в последние две недели
+DEFENDER_WINDOW_DAYS = 14
 
 
 def _restaurant_label(restaurant: Restaurant) -> str:
@@ -61,14 +75,21 @@ def _promotion_subscriber_chats(db: Session, promotion_id: int) -> list[int]:
 
 
 def notify_new_promotion(db: Session, promotion: Promotion) -> None:
-    """Новая акция сети → подписчикам её точек."""
+    """Новая акция сети → подписчикам её точек.
+
+    Точки в городах, где акция не проводится, из рассылки выпадают: обещать
+    людям то, чего у них не будет, хуже, чем промолчать.
+    """
     subscribers = _brand_restaurant_subscribers(db, promotion.brand_id)
     if not subscribers:
         return
     items = ", ".join(item.name for item in promotion.items[:5])
     messages = []
     for chat_id, restaurants in subscribers.items():
-        places = "\n".join(f"📍 {_restaurant_label(r)}" for r in restaurants[:5])
+        covered = [r for r in restaurants if promotion_visible_in(promotion, r.city)]
+        if not covered:
+            continue
+        places = "\n".join(f"📍 {_restaurant_label(r)}" for r in covered[:5])
         messages.append(
             (
                 chat_id,
@@ -120,3 +141,142 @@ def notify_status_flips(
         + "\n".join(lines)
     )
     send_batch_async([(chat_id, text) for chat_id in chats])
+
+
+# --- игровой режим ---
+
+FACTION_EMOJI = {Faction.green: "🟢", Faction.purple: "🟣"}
+
+
+def _faction_chats(
+    db: Session, restaurant_id: int, faction: Faction, since: datetime
+) -> list[int]:
+    """Чаты тех, кто приносил на эту точку чеки за свою сторону."""
+    return list(
+        db.scalars(
+            select(func.distinct(User.telegram_id))
+            .join(Receipt, Receipt.user_id == User.id)
+            .where(
+                Receipt.restaurant_id == restaurant_id,
+                Receipt.faction == faction,
+                Receipt.created_at >= since,
+                User.telegram_id.is_not(None),
+                User.is_blocked.is_(False),
+                User.game_mode.is_(True),
+                User.faction == faction,
+            )
+        )
+    )
+
+
+def notify_capture(
+    db: Session, restaurant: Restaurant, captured: bool, defended: bool
+) -> None:
+    """Итог битвы — обеим сторонам, которые за эту точку воевали."""
+    if not (captured or defended):
+        return
+    control = db.get(PointControl, restaurant.id)
+    if control is None or control.owner_faction is None:
+        return
+    owner = control.owner_faction
+    rival = Faction.purple if owner == Faction.green else Faction.green
+    since = datetime.now(timezone.utc) - timedelta(days=DEFENDER_WINDOW_DAYS)
+    label = _restaurant_label(restaurant)
+    emoji = FACTION_EMOJI[owner]
+
+    messages: list[tuple[int, str]] = []
+    if captured:
+        for chat_id in _faction_chats(db, restaurant.id, owner, since):
+            messages.append((chat_id, f"{emoji} Точка взята: {label}"))
+        for chat_id in _faction_chats(db, restaurant.id, rival, since):
+            messages.append(
+                (chat_id, f"💔 Точку у вас забрали: {label}\nМожно отбить — нужны чеки")
+            )
+    else:
+        for chat_id in _faction_chats(db, restaurant.id, owner, since):
+            messages.append((chat_id, f"🛡 Атака отбита, точка осталась за вами: {label}"))
+    if messages:
+        send_batch_async(messages)
+
+
+def notify_under_attack(
+    db: Session,
+    restaurant: Restaurant,
+    owner: Faction,
+    eta_text: str,
+    is_final: bool,
+) -> None:
+    """Владеющей стороне: точку захватывают, нужно перебить чеки."""
+    since = datetime.now(timezone.utc) - timedelta(days=DEFENDER_WINDOW_DAYS)
+    chats = _faction_chats(db, restaurant.id, owner, since)
+    if not chats:
+        return
+    label = _restaurant_label(restaurant)
+    if is_final:
+        text = (
+            f"⏳ Последний рубеж: {label}\n"
+            f"До перехода точки ~{eta_text}. Нужны чеки, иначе потеряем."
+        )
+    else:
+        text = (
+            f"⚔️ Вашу точку захватывают: {label}\n"
+            f"У противника перевес, до захвата ~{eta_text}. "
+            "Перебейте количество чеков, чтобы шкала пошла в вашу сторону."
+        )
+    send_batch_async([(chat_id, text) for chat_id in chats])
+
+
+def sweep_attack_notifications(db: Session, now: datetime | None = None) -> int:
+    """Разослать предупреждения по всем точкам под атакой (фоновая джоба).
+
+    Кулдаун держит частоту в разумных рамках, а отдельное финальное
+    предупреждение уходит один раз за битву.
+    """
+    from app.services import game
+
+    now = now or datetime.now(timezone.utc)
+    sent = 0
+    controls = (
+        db.scalars(
+            select(PointControl)
+            .options(joinedload(PointControl.restaurant).joinedload(Restaurant.brand))
+            .where(
+                PointControl.battle_started_at.is_not(None),
+                PointControl.owner_faction.is_not(None),
+            )
+        )
+        .unique()
+        .all()
+    )
+    cooldown = timedelta(hours=settings.capture_attack_notify_cooldown_hours)
+    warning = timedelta(minutes=settings.capture_attack_warning_minutes)
+
+    for control in controls:
+        restaurant = control.restaurant
+        if restaurant is None:
+            continue
+        view = game.project(control, restaurant, now)
+        # Шкала идёт в пользу владельца — тревожить некого
+        if not view.under_attack or view.leader == control.owner_faction:
+            continue
+        if view.eta_seconds is None:
+            continue
+
+        eta_text = game.format_eta(view.eta_seconds)
+        is_final = view.eta_seconds <= warning.total_seconds()
+        if is_final:
+            if control.warning_notified_at is not None:
+                continue
+            control.warning_notified_at = now
+        else:
+            last = control.attack_notified_at
+            if last is not None and now - last < cooldown:
+                continue
+            control.attack_notified_at = now
+
+        notify_under_attack(
+            db, restaurant, control.owner_faction, eta_text, is_final
+        )
+        sent += 1
+    db.commit()
+    return sent

@@ -9,6 +9,7 @@ import type { AdminOutletContext } from './AdminLayout';
 import CollapsibleGroup from './CollapsibleGroup';
 import PromotionForm, { fromLocalInput, PromotionFormValue } from './PromotionForm';
 import Icon from '../components/Icon';
+import AdminSearch, { matches } from './AdminSearch';
 
 const STATUS_LABELS: Record<string, { text: string; cls: string }> = {
   pending: { text: 'Ожидает', cls: 'warn' },
@@ -18,6 +19,7 @@ const STATUS_LABELS: Record<string, { text: string; cls: string }> = {
 
 export default function AdminSuggestions() {
   const [groups, setGroups] = useState<SuggestionGroup[]>([]);
+  const [query, setQuery] = useState('');
   const [brands, setBrands] = useState<AdminBrand[]>([]);
   const [statusFilter, setStatusFilter] = useState('pending');
   const [approving, setApproving] = useState<{
@@ -61,6 +63,11 @@ export default function AdminSuggestions() {
           .map((line) => line.trim())
           .filter(Boolean)
           .map((name) => ({ name })),
+        // Заявка пришла из конкретного города — предлагаем сузить охват до
+        // него, чтобы одобрение локальной заявки не стало федеральной акцией
+        scope: s.city
+          ? { mode: 'include' as const, cities: [s.city] }
+          : { mode: 'exclude' as const, cities: [] },
       },
     });
   };
@@ -76,6 +83,7 @@ export default function AdminSuggestions() {
         starts_at: fromLocalInput(value.starts_at),
         ends_at: fromLocalInput(value.ends_at),
         items: value.items.map((i) => i.name).filter(Boolean),
+        scope: value.scope,
       });
       setApproving(null);
       load();
@@ -104,6 +112,28 @@ export default function AdminSuggestions() {
     }
   };
 
+  // Фильтруем сами заявки, а группы без совпадений убираем целиком
+  const shownGroups = groups
+    .map((g) => ({
+      ...g,
+      suggestions: g.suggestions.filter((s) =>
+        matches(
+          query,
+          s.title,
+          s.description,
+          s.items_raw,
+          s.city,
+          s.brand_name_raw,
+          g.brand_name,
+          s.user.display_name,
+          s.user.phone,
+        ),
+      ),
+    }))
+    .filter((g) => g.suggestions.length > 0);
+  const total = groups.reduce((n, g) => n + g.suggestions.length, 0);
+  const found = shownGroups.reduce((n, g) => n + g.suggestions.length, 0);
+
   return (
     <div>
       <h1>Заявки на акции</h1>
@@ -123,7 +153,15 @@ export default function AdminSuggestions() {
         </div>
       )}
 
-      {groups.map((g) => (
+      <AdminSearch
+        value={query}
+        onChange={setQuery}
+        placeholder="Поиск по акции, товару, городу или автору"
+        found={found}
+        total={total}
+      />
+
+      {shownGroups.map((g) => (
         <CollapsibleGroup
           key={`${g.brand_id ?? 'raw'}-${g.brand_name}`}
           title={g.brand_name}

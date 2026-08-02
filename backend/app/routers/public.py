@@ -5,7 +5,7 @@ from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.database import get_db
-from app.models import Brand, Promotion, Report, Restaurant
+from app.models import Brand, City, Promotion, Report, Restaurant
 from app.schemas import (
     BrandOut,
     CatalogBrand,
@@ -18,6 +18,8 @@ from app.schemas import (
     RestaurantListItem,
     RestaurantShort,
 )
+from app.services.promo_scope import promotion_visible_in, visible_in_city_clause
+from app.services.scope import city_key
 from app.services.status import compute_statuses
 
 router = APIRouter(tags=["public"])
@@ -82,14 +84,38 @@ def telegram_info():
 
 @router.get("/cities", response_model=list[CityOut])
 def list_cities(db: Session = Depends(get_db)):
-    """Города, где есть активные точки, — для выбора города при входе."""
+    """Города для выбора при входе — по убыванию числа точек.
+
+    Город из справочника показывается, даже когда точек в нём ещё нет:
+    человек выбирает его и сам присылает заявку на первую точку. Города,
+    оставшиеся от точек до появления справочника, тоже не теряем.
+    """
     rows = db.execute(
         select(Restaurant.city, func.count(Restaurant.id))
         .where(Restaurant.is_active.is_(True))
         .group_by(Restaurant.city)
-        .order_by(func.count(Restaurant.id).desc(), Restaurant.city)
     ).all()
-    return [CityOut(name=city, restaurants_count=count) for city, count in rows]
+
+    by_key: dict[str, CityOut] = {}
+    for name, count in rows:
+        key = city_key(name)
+        found = by_key.get(key)
+        if found is None:
+            by_key[key] = CityOut(name=name, restaurants_count=count)
+        else:
+            found.restaurants_count += count
+
+    for city in db.scalars(select(City).where(City.is_active.is_(True))):
+        found = by_key.get(city.key)
+        if found is None:
+            by_key[city.key] = CityOut(name=city.name, restaurants_count=0)
+        else:
+            # Справочник — источник правды для написания названия
+            found.name = city.name
+
+    return sorted(
+        by_key.values(), key=lambda c: (-c.restaurants_count, c.name)
+    )
 
 
 @router.get("/catalog", response_model=list[CatalogBrand])
@@ -120,7 +146,11 @@ def catalog(
         db.scalars(
             select(Promotion)
             .options(selectinload(Promotion.items))
-            .where(Promotion.brand_id.in_(counts.keys()), active_promotion_clause(now))
+            .where(
+                Promotion.brand_id.in_(counts.keys()),
+                active_promotion_clause(now),
+                visible_in_city_clause(city),
+            )
             .order_by(Promotion.created_at.desc())
         )
         .unique()
@@ -256,7 +286,12 @@ def restaurant_detail(restaurant_id: int, db: Session = Depends(get_db)):
         db.scalars(
             select(Promotion)
             .options(selectinload(Promotion.items))
-            .where(Promotion.brand_id == restaurant.brand_id, active_promotion_clause(now))
+            .where(
+                Promotion.brand_id == restaurant.brand_id,
+                active_promotion_clause(now),
+                # Акция сети может не проводиться в этом городе
+                visible_in_city_clause(restaurant.city),
+            )
             .order_by(Promotion.created_at.desc())
         )
         .unique()
@@ -290,7 +325,8 @@ def feed(q: str | None = None, city: str | None = None, db: Session = Depends(ge
     promotions = (
         db.scalars(
             select(Promotion)
-            .options(selectinload(Promotion.items))
+            # cities — чтобы отфильтровать охват по городу каждой точки
+            .options(selectinload(Promotion.items), selectinload(Promotion.cities))
             .where(active_promotion_clause(now))
             .order_by(Promotion.created_at.desc())
         )
@@ -321,7 +357,13 @@ def feed(q: str | None = None, city: str | None = None, db: Session = Depends(ge
 
     entries: list[tuple[datetime | None, FeedEntry]] = []
     for restaurant in restaurants:
-        brand_promos = promos_by_brand.get(restaurant.brand_id, [])
+        # Лента может быть по всем городам сразу, поэтому охват проверяем
+        # для города каждой точки отдельно
+        brand_promos = [
+            p
+            for p in promos_by_brand.get(restaurant.brand_id, [])
+            if promotion_visible_in(p, restaurant.city)
+        ]
         if not brand_promos:
             continue
 

@@ -1,16 +1,15 @@
-"""Статусы наличия: сила голоса, направленные переходы, устойчивая память.
+"""Статусы наличия: определение истины, направленные переходы, уведомления.
 
 Спека: docs/trust-and-rating-spec.md (§3, §5).
 
-сила голоса = вес автора × свежесть × коэффициент канала
-вклад в кворум = sqrt(сила), один голос — не больше половины кворума.
+Арифметика живёт в app/services/truth.py — здесь только сбор голосов из базы,
+словарь статусов для карточки точки и решение «пора ли будить подписчиков».
 
 Статусы: available / unavailable / unknown (устойчивые) и
 maybe_gone / maybe_appeared / disputed (переходные). Направление переходного
 статуса берётся из последнего устойчивого (таблица item_status_states).
 """
 
-import math
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 
@@ -25,6 +24,7 @@ from app.models import (
     ReportItem,
     User,
 )
+from app.services.truth import Belief, Vote, believe, confident_status, time_in_status
 
 AVAILABLE = "available"
 UNAVAILABLE = "unavailable"
@@ -32,9 +32,6 @@ MAYBE_GONE = "maybe_gone"
 MAYBE_APPEARED = "maybe_appeared"
 DISPUTED = "disputed"
 UNKNOWN = "unknown"
-
-STABLE = {AVAILABLE, UNAVAILABLE, UNKNOWN}
-EPS = 0.05  # массы меньше — считаем стороной без голосов
 
 
 @dataclass
@@ -55,33 +52,9 @@ class StatusMap:
         return self.by_item.get(promotion_item_id) or ItemStatus()
 
 
-@dataclass
-class _Vote:
-    is_available: bool
-    contribution: float  # sqrt(силы), с капом
-    age_hours: float
-    channel: ReportChannel
-    created_at: datetime
-
-
-def _freshness(age_hours: float) -> float:
-    return 0.5 ** (age_hours / settings.vote_half_life_hours)
-
-
-def _channel_coef(channel: ReportChannel, is_available: bool) -> float:
-    if channel == ReportChannel.delivery:
-        # «мне привезли» — сильный сигнал, «в меню доставки нет» — слабый
-        return (
-            settings.channel_delivery_yes_coef
-            if is_available
-            else settings.channel_delivery_no_coef
-        )
-    return settings.channel_on_site_coef
-
-
 def _collect_votes(
     db: Session, restaurant_id: int, promotion_ids: list[int], now: datetime
-) -> dict[int, list[_Vote]]:
+) -> dict[int, list[Vote]]:
     """Голоса по товарам: последний отчёт каждого пользователя в окне."""
     window_start = now - timedelta(hours=settings.status_window_hours)
 
@@ -99,6 +72,7 @@ def _collect_votes(
             Report.id,
             Report.created_at,
             Report.channel,
+            Report.is_receipt_verified,
             User.weight,
             rn,
         )
@@ -107,6 +81,9 @@ def _collect_votes(
             Report.restaurant_id == restaurant_id,
             Report.promotion_id.in_(promotion_ids),
             Report.created_at >= window_start,
+            # Статус считается на момент now — то, что случится позже,
+            # в него не входит (важно для пересчёта задним числом)
+            Report.created_at <= now,
         )
         .subquery()
     )
@@ -117,75 +94,41 @@ def _collect_votes(
             ReportItem.is_available,
             latest.c.created_at,
             latest.c.channel,
+            latest.c.is_receipt_verified,
             latest.c.weight,
         )
         .join(latest, ReportItem.report_id == latest.c.id)
         .where(latest.c.rn == 1)
     ).all()
 
-    votes: dict[int, list[_Vote]] = {}
-    for item_id, is_available, created_at, channel, weight in rows:
-        age = max((now - created_at).total_seconds() / 3600.0, 0.0)
-        strength = weight * _freshness(age) * _channel_coef(channel, is_available)
+    votes: dict[int, list[Vote]] = {}
+    for item_id, is_available, created_at, channel, receipt_verified, weight in rows:
         votes.setdefault(item_id, []).append(
-            _Vote(
+            Vote(
+                at=created_at,
                 is_available=is_available,
-                contribution=math.sqrt(strength),
-                age_hours=age,
                 channel=channel,
-                created_at=created_at,
+                weight=weight,
+                receipt_verified=receipt_verified,
             )
         )
     return votes
 
 
-def _cap_contributions(item_votes: list[_Vote]) -> None:
-    """Один голос — не больше половины массы кворума (при ≥2 голосах)."""
-    if len(item_votes) < 2:
-        return
-    total = sum(v.contribution for v in item_votes)
-    for vote in item_votes:
-        others = total - vote.contribution
-        if vote.contribution > others:
-            vote.contribution = others
+def _display(stable: str, belief: Belief) -> str:
+    """Отображаемый статус: уверенный — сам за себя, спорный — по памяти.
 
-
-def _resolve(stable: str, item_votes: list[_Vote]) -> str:
-    yes = sum(v.contribution for v in item_votes if v.is_available)
-    no = sum(v.contribution for v in item_votes if not v.is_available)
-
-    if yes + no < EPS:
-        return UNKNOWN
-    if yes >= EPS and no < EPS:
-        return AVAILABLE  # только «есть» — в т.ч. одиночный голос против пустоты
-    if no >= EPS and yes < EPS:
-        return UNAVAILABLE
-
-    # обе стороны живы
-    yes_fresh = min((v.age_hours for v in item_votes if v.is_available), default=1e9)
-    no_fresh = min((v.age_hours for v in item_votes if not v.is_available), default=1e9)
-    ratio = settings.flip_ratio
-    stale = settings.stale_flip_hours
-
+    Переходный статус только сообщает о сомнении и никого не будит, поэтому
+    показывать его можно щедро: свежий «нет» против живого консенсуса — это
+    «возможно кончилось», даже если до переворота ещё далеко.
+    """
+    confident = confident_status(belief)
+    if confident is not None:
+        return confident
     if stable == AVAILABLE:
-        if no >= ratio * yes:
-            return UNAVAILABLE
-        # поддержка протухла, вызов свежий — переключаем одним голосом
-        if yes_fresh > stale and no_fresh <= stale:
-            return UNAVAILABLE
         return MAYBE_GONE
     if stable == UNAVAILABLE:
-        if yes >= ratio * no:
-            return AVAILABLE
-        if no_fresh > stale and yes_fresh <= stale:
-            return AVAILABLE
         return MAYBE_APPEARED
-
-    # устойчивого прошлого нет
-    if yes >= ratio * no:
-        return AVAILABLE
-    if no >= ratio * yes:
-        return UNAVAILABLE
     return DISPUTED
 
 
@@ -219,12 +162,10 @@ def compute_statuses(
     stables = _load_stables(db, restaurant_id, list(votes.keys()))
 
     for item_id, item_votes in votes.items():
-        _cap_contributions(item_votes)
         stable_row = stables.get(item_id)
         stable = stable_row.stable if stable_row else UNKNOWN
-        status = _resolve(stable, item_votes)
         result.by_item[item_id] = ItemStatus(
-            status=status,
+            status=_display(stable, believe(item_votes, now)),
             yes_count=sum(1 for v in item_votes if v.is_available),
             no_count=sum(1 for v in item_votes if not v.is_available),
             on_site_count=sum(
@@ -233,9 +174,28 @@ def compute_statuses(
             delivery_count=sum(
                 1 for v in item_votes if v.channel == ReportChannel.delivery
             ),
-            last_report_at=max(v.created_at for v in item_votes),
+            last_report_at=max(v.at for v in item_votes),
         )
     return result
+
+
+def _should_notify(row: ItemStatusState, belief: Belief, status: str, now: datetime) -> bool:
+    """Выдержка и кулдаун: карточку можно перерисовывать хоть каждую минуту,
+    а подписчиков дёргать — нет.
+
+    Выдержка накопительная в скользящем окне: одиночный «есть» посреди потока
+    «нет» (заказ, который долго готовили, и товар для него отложили) отнимает
+    от неё свои сорок секунд, но не обнуляет.
+    """
+    if status == row.notified:
+        return False
+    if row.notified_at is not None:
+        cooldown = timedelta(minutes=settings.notify_cooldown_minutes)
+        if now - row.notified_at < cooldown:
+            return False
+    since = now - timedelta(minutes=settings.notify_dwell_window_minutes)
+    held = time_in_status(belief, status, since, now)
+    return held >= settings.notify_dwell_minutes * 60
 
 
 def refresh_stable_statuses(
@@ -244,11 +204,11 @@ def refresh_stable_statuses(
     promotion_ids: list[int],
     now: datetime | None = None,
 ) -> list[tuple[int, str, str]]:
-    """Пересчитать и сохранить устойчивые статусы (вызывается при новом отчёте
-    и из фоновой джобы). Переходные статусы устойчивое состояние не меняют.
+    """Пересчитать устойчивые статусы (вызывается при новом отчёте и из фоновой
+    джобы). Переходные статусы устойчивое состояние не меняют.
 
-    Возвращает переключения: [(promotion_item_id, старый, новый), ...] —
-    на них подписчики акций получают уведомления.
+    Возвращает переключения, дозревшие до уведомления:
+    [(promotion_item_id, о чём говорили раньше, новый статус), ...]
     """
     now = now or datetime.now(timezone.utc)
     votes = _collect_votes(db, restaurant_id, promotion_ids, now)
@@ -256,28 +216,24 @@ def refresh_stable_statuses(
     flips: list[tuple[int, str, str]] = []
 
     for item_id, item_votes in votes.items():
-        _cap_contributions(item_votes)
-        stable_row = stables.get(item_id)
-        old_stable = stable_row.stable if stable_row else UNKNOWN
-        display = _resolve(old_stable, item_votes)
+        belief = believe(item_votes, now)
+        confident = confident_status(belief)
 
-        if display in (AVAILABLE, UNAVAILABLE):
-            new_stable = display
-        elif display == UNKNOWN:
-            new_stable = UNKNOWN  # всё протухло — сомнение съело уверенность
-        else:
-            new_stable = old_stable  # переходная фаза память не трогает
-
-        if new_stable != old_stable:
-            flips.append((item_id, old_stable, new_stable))
-        if stable_row is None:
-            db.add(
-                ItemStatusState(
-                    restaurant_id=restaurant_id,
-                    promotion_item_id=item_id,
-                    stable=new_stable,
-                )
+        row = stables.get(item_id)
+        if row is None:
+            row = ItemStatusState(
+                restaurant_id=restaurant_id,
+                promotion_item_id=item_id,
+                stable=UNKNOWN,
             )
-        elif stable_row.stable != new_stable:
-            stable_row.stable = new_stable
+            db.add(row)
+        if confident is not None and row.stable != confident:
+            row.stable = confident
+
+        if confident is None or not _should_notify(row, belief, confident, now):
+            continue
+        flips.append((item_id, row.notified or UNKNOWN, confident))
+        row.notified = confident
+        row.notified_at = now
+
     return flips

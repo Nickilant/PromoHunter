@@ -2,16 +2,20 @@
 // чтобы карту можно было заменить (например, на Яндекс.Карты), не трогая остальное.
 import 'leaflet/dist/leaflet.css';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import {
+  Circle,
   CircleMarker,
+  LayerGroup,
   MapContainer,
   TileLayer,
+  Tooltip,
   useMap,
   useMapEvents,
 } from 'react-leaflet';
 
-import type { RestaurantListItem } from '../types';
+import type { PointControl, RestaurantListItem } from '../types';
+import { FACTION_HEX, formatEtaShort, NEUTRAL_HEX } from '../utils/faction';
 import Icon from './Icon';
 
 const DEFAULT_CENTER: [number, number] = [59.935, 30.325]; // Санкт-Петербург
@@ -37,28 +41,76 @@ export interface MapFocus {
   zoom?: number;
 }
 
-function LocateButton() {
+export interface UserPosition {
+  lat: number;
+  lng: number;
+  /** Точность в метрах — рисуем кругом вокруг точки */
+  accuracy: number;
+}
+
+function LocateButton({ onLocated }: { onLocated: (p: UserPosition) => void }) {
   const map = useMap();
+  const [busy, setBusy] = useState(false);
   const locate = () => {
     if (!navigator.geolocation) return;
-    navigator.geolocation.getCurrentPosition((pos) => {
-      // Ничего не отправляем на сервер — только центрируем карту
-      map.flyTo([pos.coords.latitude, pos.coords.longitude], 15);
-    });
+    setBusy(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setBusy(false);
+        // Ничего не отправляем на сервер — только показываем и центрируем
+        onLocated({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          accuracy: pos.coords.accuracy,
+        });
+        map.flyTo([pos.coords.latitude, pos.coords.longitude], 15);
+      },
+      () => setBusy(false),
+      { enableHighAccuracy: true, timeout: 12000 },
+    );
   };
   return (
     <button
-      className="locate-btn"
-      style={{ zIndex: 1000 }}
+      className={`locate-btn${busy ? ' is-busy' : ''}`}
       onClick={(e) => {
         e.stopPropagation();
         locate();
       }}
+      disabled={busy}
       aria-label="Найти меня"
       title="Найти меня"
     >
-      <Icon name="locate" size={21} />
+      {busy ? <span className="spinner" /> : <Icon name="locate" size={21} />}
     </button>
+  );
+}
+
+/** Где стоит человек: синяя точка и круг точности, как в любых картах */
+function UserMarker({ position }: { position: UserPosition }) {
+  return (
+    <LayerGroup>
+      {position.accuracy > 25 && (
+        <Circle
+          center={[position.lat, position.lng]}
+          radius={Math.min(position.accuracy, 2000)}
+          pathOptions={{
+            color: '#3B82F6',
+            weight: 1,
+            fillColor: '#3B82F6',
+            fillOpacity: 0.12,
+          }}
+        />
+      )}
+      <CircleMarker
+        center={[position.lat, position.lng]}
+        radius={7}
+        pathOptions={{ color: '#fff', weight: 3, fillColor: '#3B82F6', fillOpacity: 1 }}
+      >
+        <Tooltip direction="top" offset={[0, -8]}>
+          Вы здесь
+        </Tooltip>
+      </CircleMarker>
+    </LayerGroup>
   );
 }
 
@@ -72,16 +124,103 @@ function FlyTo({ focus }: { focus: MapFocus | null }) {
 }
 
 /** Вписывает в экран все маркеры города при их смене */
-function FitToMarkers({ points }: { points: [number, number][] }) {
+function FitToMarkers({
+  points,
+  disabled = false,
+}: {
+  points: [number, number][];
+  disabled?: boolean;
+}) {
   const map = useMap();
   const key = points.map((p) => p.join(',')).join(';');
   useEffect(() => {
+    // Точки грузятся асинхронно, и без этого флага вписывание сработало бы
+    // уже после наводки на конкретную точку и отменило бы её
+    if (disabled) return;
     if (points.length > 0) {
       map.fitBounds(points, { padding: [48, 48], maxZoom: 14 });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, map]);
+  }, [key, map, disabled]);
   return null;
+}
+
+/**
+ * Слой принадлежности точек — отдельная группа поверх тайлов и под маркерами
+ * сетей: цветной ореол вокруг точки и подпись с таймером, если идёт битва.
+ * Скрывается кнопкой, ничего не зная про остальную карту.
+ */
+function OwnershipLayer({
+  restaurants,
+  points,
+}: {
+  restaurants: RestaurantListItem[];
+  points: Map<number, PointControl>;
+}) {
+  return (
+    <LayerGroup>
+      {restaurants.map((r) => {
+        const point = points.get(r.id);
+        if (!point) return null;
+        const battle = point.leader !== null;
+        if (point.owner === null && !battle) return null;
+        const color = point.owner ? FACTION_HEX[point.owner] : NEUTRAL_HEX;
+        const leaderColor = point.leader ? FACTION_HEX[point.leader] : color;
+        return (
+          <CircleMarker
+            key={`own-${r.id}`}
+            center={[r.lat, r.lng]}
+            radius={battle ? 22 : 18}
+            interactive={false}
+            className={battle ? 'own-halo pulsing' : 'own-halo'}
+            pathOptions={{
+              color: leaderColor,
+              weight: battle ? 3 : 2,
+              opacity: battle ? 0.95 : 0.55,
+              fillColor: color,
+              fillOpacity: point.owner ? 0.22 : 0.1,
+              dashArray: battle && point.owner ? '5 4' : undefined,
+            }}
+          >
+            {battle && point.is_active_now && (
+              <Tooltip
+                permanent
+                direction="top"
+                offset={[0, -20]}
+                className={`map-timer-tip ${point.leader}`}
+              >
+                {formatEtaShort(point.eta_seconds)}
+              </Tooltip>
+            )}
+          </CircleMarker>
+        );
+      })}
+    </LayerGroup>
+  );
+}
+
+/** Кнопка скрытия слоя владения — рядом с «найти меня» */
+function LayerToggle({
+  visible,
+  onToggle,
+}: {
+  visible: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      className={`layer-btn${visible ? ' on' : ''}`}
+      onClick={(e) => {
+        e.stopPropagation();
+        onToggle();
+      }}
+      aria-pressed={visible}
+      aria-label={visible ? 'Скрыть слой владения' : 'Показать слой владения'}
+      title={visible ? 'Скрыть слой владения' : 'Показать слой владения'}
+    >
+      <Icon name="layers" size={20} />
+    </button>
+  );
 }
 
 interface RestaurantsMapProps {
@@ -90,6 +229,12 @@ interface RestaurantsMapProps {
   onSelect: (id: number) => void;
   focus: MapFocus | null;
   searchPoint: MapFocus | null;
+  /** Игровой слой: пусто — карта ведёт себя как раньше */
+  points?: Map<number, PointControl>;
+  layerVisible?: boolean;
+  onToggleLayer?: () => void;
+  /** Карту открыли ради конкретной точки — общий обзор города не нужен */
+  keepFocus?: boolean;
 }
 
 export function RestaurantsMap({
@@ -98,13 +243,24 @@ export function RestaurantsMap({
   onSelect,
   focus,
   searchPoint,
+  points,
+  layerVisible = false,
+  onToggleLayer,
+  keepFocus = false,
 }: RestaurantsMapProps) {
+  const [me, setMe] = useState<UserPosition | null>(null);
   return (
     <MapContainer center={DEFAULT_CENTER} zoom={DEFAULT_ZOOM} zoomControl={false}>
       <TileLayer url={TILE_URL} attribution={TILE_ATTRIBUTION} />
       <CleanAttribution />
-      <FitToMarkers points={restaurants.map((r) => [r.lat, r.lng])} />
+      <FitToMarkers
+        points={restaurants.map((r) => [r.lat, r.lng])}
+        disabled={keepFocus}
+      />
       <FlyTo focus={focus} />
+      {points && layerVisible && (
+        <OwnershipLayer restaurants={restaurants} points={points} />
+      )}
       {searchPoint && (
         <CircleMarker
           center={[searchPoint.lat, searchPoint.lng]}
@@ -131,7 +287,11 @@ export function RestaurantsMap({
           eventHandlers={{ click: () => onSelect(r.id) }}
         />
       ))}
-      <LocateButton />
+      {me && <UserMarker position={me} />}
+      {points && onToggleLayer && (
+        <LayerToggle visible={layerVisible} onToggle={onToggleLayer} />
+      )}
+      <LocateButton onLocated={setMe} />
     </MapContainer>
   );
 }

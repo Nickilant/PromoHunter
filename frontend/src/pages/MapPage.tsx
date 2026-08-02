@@ -1,12 +1,14 @@
-import { FormEvent, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { FormEvent, useEffect, useRef, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import { api } from '../api/client';
+import CapturePanel from '../components/CapturePanel';
 import { MapFocus, RestaurantsMap } from '../components/MapView';
 import PromotionAccordion from '../components/PromotionAccordion';
 import ReportModal from '../components/ReportModal';
 import { useAuth } from '../hooks/useAuth';
 import { useCity } from '../hooks/useCity';
+import { useGame } from '../hooks/useGame';
 import { useSubscriptions } from '../hooks/useSubscriptions';
 import { geocodeAddress, geocodeCity } from '../utils/geocode';
 import type {
@@ -33,7 +35,29 @@ export default function MapPage() {
   const { user } = useAuth();
   const { city } = useCity();
   const { isSubscribedToRestaurant, toggleRestaurant } = useSubscriptions();
+  const { enabled: gameEnabled, points, layerVisible, toggleLayer } = useGame();
   const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
+  // ?point=<id> — карту открыли из карточки точки кнопкой «На карте»
+  const requestedPoint = params.get('point');
+  const focusedFromUrl = useRef(false);
+
+  useEffect(() => {
+    if (!requestedPoint || focusedFromUrl.current) return;
+    const id = Number(requestedPoint);
+    if (!Number.isFinite(id)) return;
+    focusedFromUrl.current = true;
+    api
+      .get<RestaurantDetail>(`/restaurants/${id}`)
+      .then((detail) => {
+        setSelectedId(detail.id);
+        setSelected(detail);
+        setFocus({ lat: detail.lat, lng: detail.lng, zoom: 16 });
+      })
+      .catch(() => {})
+      // Параметр одноразовый: иначе возврат на вкладку снова открывал бы точку
+      .finally(() => setParams({}, { replace: true }));
+  }, [requestedPoint, setParams]);
 
   useEffect(() => {
     if (!city) return;
@@ -94,10 +118,14 @@ export default function MapPage() {
     <div className="map-page">
       <RestaurantsMap
         restaurants={restaurants}
+        keepFocus={focusedFromUrl.current}
         selectedId={selectedId}
         onSelect={select}
         focus={focus}
         searchPoint={searchPoint}
+        points={gameEnabled ? points : undefined}
+        layerVisible={layerVisible}
+        onToggleLayer={toggleLayer}
       />
 
       <form className="map-search" onSubmit={submitSearch}>
@@ -147,9 +175,42 @@ export default function MapPage() {
                   />
                 </>
               )}
+              {/* Колокольчик — в одной строке с названием: отдельной строкой
+                  он налезал на состояние точки */}
+              {selected && selectedId !== null && (
+                <button
+                  className={`head-bell${
+                    isSubscribedToRestaurant(selectedId) ? ' on' : ''
+                  }`}
+                  style={{ marginLeft: 'auto' }}
+                  onClick={() => {
+                    if (!user) {
+                      navigate('/login');
+                      return;
+                    }
+                    toggleRestaurant(selectedId);
+                  }}
+                  aria-pressed={isSubscribedToRestaurant(selectedId)}
+                  aria-label={
+                    isSubscribedToRestaurant(selectedId)
+                      ? 'Отписаться от новостей точки'
+                      : 'Подписаться на новости точки'
+                  }
+                  title={
+                    isSubscribedToRestaurant(selectedId)
+                      ? 'Отписаться от новостей точки'
+                      : 'Подписаться на новости точки'
+                  }
+                >
+                  <Icon
+                    name={isSubscribedToRestaurant(selectedId) ? 'bell' : 'bellOff'}
+                    size={19}
+                  />
+                </button>
+              )}
               <button
                 className="modal-close"
-                style={{ marginLeft: 'auto' }}
+                style={selected ? undefined : { marginLeft: 'auto' }}
                 onClick={() => {
                   setSelectedId(null);
                   setSelected(null);
@@ -159,26 +220,7 @@ export default function MapPage() {
                 <Icon name="close" size={20} />
               </button>
             </div>
-            {selected && selectedId !== null && (
-              <button
-                className={`sub-row ${isSubscribedToRestaurant(selectedId) ? 'on' : ''}`}
-                onClick={() => {
-                  if (!user) {
-                    navigate('/login');
-                    return;
-                  }
-                  toggleRestaurant(selectedId);
-                }}
-              >
-                <Icon
-                  name={isSubscribedToRestaurant(selectedId) ? 'bell' : 'bellOff'}
-                  size={17}
-                />
-                {isSubscribedToRestaurant(selectedId)
-                  ? 'Вы подписаны на новые акции точки — отключить'
-                  : 'Сообщать о новых акциях этой точки'}
-              </button>
-            )}
+            {selectedId !== null && <CapturePanel restaurantId={selectedId} />}
             {/* скроллится только список акций — шапка и подписка закреплены */}
             <div className="bottom-sheet-scroll">
               {selected && selected.promotions.length === 0 && (

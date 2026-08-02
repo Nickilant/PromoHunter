@@ -16,10 +16,27 @@
   /* статусы */
   --status-available:      #7FB77E;
   --status-unavailable:    #DE8F8F;
+  /* Мягкая пара к статусу: подложка + чернила того же тона — той же формы,
+     что --primary/--primary-soft/--primary-ink. Белый по сплошной заливке
+     даёт около 2.3:1 и не проходит AA, эта пара — больше 5.7:1 */
+  --status-available-soft:   #E4F0E3;
+  --status-available-ink:    #3F7A3E;
+  --status-unavailable-soft: #F9E5E5;
+  --status-unavailable-ink:  #A34F4F;
   --status-disputed:       #E3BC79;
   --status-maybe-gone:     #E3A76B;   /* было и возможно кончилось */
   --status-maybe-appeared: #8FBFA9;   /* не было и возможно появилось */
   --status-unknown:        #BFB8AE;
+
+  /* фракции игрового режима: те же приглушённые тона, что и вся палитра,
+     но заметно различимые и на карте, и в списках */
+  --green-faction:      #4F9D69;
+  --green-faction-ink:  #35704A;
+  --green-faction-soft: #E4F0E7;
+  --purple-faction:     #8A6BBF;
+  --purple-faction-ink: #64499A;
+  --purple-faction-soft:#EDE7F6;
+  --neutral-faction:    #B4ADA3;
 
   /* форма */
   --radius-card: 16px;

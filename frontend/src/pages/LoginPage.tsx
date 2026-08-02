@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 
 import { useAuth } from '../hooks/useAuth';
 import { LogoMark } from '../components/Icon';
+import { DEVELOPER_TELEGRAM, DEVELOPER_TELEGRAM_URL } from '../utils/contacts';
 
 export default function LoginPage() {
   const [phone, setPhone] = useState('');
@@ -59,6 +60,12 @@ export default function LoginPage() {
       </form>
       <div className="auth-switch">
         Нет аккаунта? <Link to="/register">Зарегистрироваться</Link>
+      </div>
+      <div className="auth-help">
+        Разработчик:{' '}
+        <a href={DEVELOPER_TELEGRAM_URL} target="_blank" rel="noreferrer">
+          @{DEVELOPER_TELEGRAM}
+        </a>
       </div>
     </div>
   );

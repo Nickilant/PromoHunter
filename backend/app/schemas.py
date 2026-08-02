@@ -2,7 +2,13 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app.models import ReportChannel, SuggestionStatus, UserRole
+from app.models import (
+    Faction,
+    PromotionCityMode,
+    ReportChannel,
+    SuggestionStatus,
+    UserRole,
+)
 from app.phone import normalize_phone
 
 
@@ -33,6 +39,12 @@ class RegisterIn(PhoneMixin):
 
 class LoginIn(PhoneMixin):
     password: str
+
+
+class PasswordChangeIn(BaseModel):
+    # Пусто, если пароля ещё не было (аккаунт создан входом через Telegram)
+    current_password: str | None = None
+    new_password: str = Field(min_length=6, max_length=128)
 
 
 class PhoneVerificationRequestIn(PhoneMixin):
@@ -71,13 +83,30 @@ class UserOut(ORMModel):
     display_name: str
     city: str | None = None
     has_telegram: bool = Field(default=False, validation_alias="telegram_id")
+    # false — пароль ни разу не задавали (вход был через Telegram):
+    # профиль предложит задать его без ввода текущего
+    has_password: bool = Field(default=False, validation_alias="password_hash")
     role: UserRole
     is_blocked: bool
+    # игровой режим
+    game_mode: bool = False
+    game_asked: bool = Field(default=False, validation_alias="game_asked_at")
+    faction: Faction | None = None
     created_at: datetime
+
+    @field_validator("game_asked", mode="before")
+    @classmethod
+    def _from_game_asked_at(cls, value):
+        return bool(value)
 
     @field_validator("has_telegram", mode="before")
     @classmethod
     def _from_telegram_id(cls, value):
+        return bool(value)
+
+    @field_validator("has_password", mode="before")
+    @classmethod
+    def _from_password_hash(cls, value):
         return bool(value)
 
 
@@ -118,6 +147,37 @@ class RestaurantListItem(ORMModel):
 class CityOut(BaseModel):
     name: str
     restaurants_count: int
+
+
+class AdminCityOut(ORMModel):
+    id: int
+    name: str
+    is_active: bool
+    restaurants_count: int = 0
+
+
+class CityIn(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+
+
+class CityPatch(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=100)
+    is_active: bool | None = None
+
+
+class CityBulkIn(BaseModel):
+    """Пачка городов одним полем: их много, добавлять по одному невыносимо.
+
+    Разделители — перевод строки, запятая и точка с запятой: список обычно
+    приносят копипастой откуда-нибудь, и он бывает в любом из этих видов.
+    """
+
+    names: str = Field(min_length=1, max_length=20000)
+
+
+class CityBulkOut(BaseModel):
+    added: list[str]
+    skipped: list[str]  # уже были в справочнике
 
 
 class CatalogPromo(BaseModel):
@@ -197,6 +257,12 @@ class ReportIn(BaseModel):
     channel: ReportChannel = ReportChannel.on_site
     lat: float | None = None
     lng: float | None = None
+    # Строка из QR-кода чека: превращает отчёт в подтверждённый и даёт
+    # силу фракции на точке (игровой режим)
+    receipt_qr: str | None = Field(default=None, max_length=300)
+    # Часовой пояс телефона: время в QR местное и без зоны, а человек стоит
+    # на точке — значит его пояс и есть пояс кассы
+    client_utc_offset_minutes: int | None = Field(default=None, ge=-720, le=840)
 
 
 class ReportItemOut(BaseModel):
@@ -205,11 +271,25 @@ class ReportItemOut(BaseModel):
     is_available: bool
 
 
+class CaptureOut(BaseModel):
+    """Что дал чек: вклад, очки и изменившееся состояние точки."""
+
+    strength: float
+    points: int
+    faction: Faction
+    owner: Faction | None = None
+    captured: bool = False
+    defended: bool = False
+    refuted_denials: int = 0
+
+
 class ReportOut(BaseModel):
     id: int
     restaurant: RestaurantShort
     promotion_title: str
     items: list[ReportItemOut]
+    is_receipt_verified: bool = False
+    capture: CaptureOut | None = None
     created_at: datetime
 
 
@@ -232,11 +312,20 @@ class SuggestionOut(ORMModel):
     title: str
     description: str | None = None
     items_raw: str
+    city: str | None = None
     status: SuggestionStatus
     moderator_comment: str | None = None
     created_promotion_id: int | None = None
     created_at: datetime
     reviewed_at: datetime | None = None
+    reviewed_by_name: str | None = Field(
+        default=None, validation_alias="reviewed_by"
+    )
+
+    @field_validator("reviewed_by_name", mode="before")
+    @classmethod
+    def _reviewer_name(cls, value):
+        return getattr(value, "display_name", None) if value is not None else None
 
 
 # --- restaurant suggestions ---
@@ -265,6 +354,14 @@ class RestaurantSuggestionOut(ORMModel):
     created_restaurant_id: int | None = None
     created_at: datetime
     reviewed_at: datetime | None = None
+    reviewed_by_name: str | None = Field(
+        default=None, validation_alias="reviewed_by"
+    )
+
+    @field_validator("reviewed_by_name", mode="before")
+    @classmethod
+    def _reviewer_name(cls, value):
+        return getattr(value, "display_name", None) if value is not None else None
 
 
 class AdminRestaurantSuggestionOut(RestaurantSuggestionOut):
@@ -318,6 +415,8 @@ class RestaurantIn(BaseModel):
     lat: float
     lng: float
     is_active: bool = True
+    # Смещение часов кассы от UTC: время в QR чека местное и без зоны
+    utc_offset_minutes: int = Field(default=180, ge=-720, le=840)
 
 
 class RestaurantPatch(BaseModel):
@@ -328,6 +427,7 @@ class RestaurantPatch(BaseModel):
     lat: float | None = None
     lng: float | None = None
     is_active: bool | None = None
+    utc_offset_minutes: int | None = Field(default=None, ge=-720, le=840)
 
 
 class AdminRestaurantOut(ORMModel):
@@ -339,6 +439,7 @@ class AdminRestaurantOut(ORMModel):
     lat: float
     lng: float
     is_active: bool
+    utc_offset_minutes: int = 180
     created_at: datetime
 
 
@@ -349,6 +450,16 @@ class PromotionItemIn(BaseModel):
     name: str = Field(min_length=1, max_length=200)
 
 
+class PromotionCityScope(BaseModel):
+    """Охват акции: как читать список городов.
+
+    exclude + пустой список = федеральная акция.
+    """
+
+    mode: PromotionCityMode = PromotionCityMode.exclude
+    cities: list[str] = Field(default_factory=list)
+
+
 class PromotionIn(BaseModel):
     brand_id: int
     title: str = Field(min_length=1, max_length=200)
@@ -357,6 +468,7 @@ class PromotionIn(BaseModel):
     ends_at: datetime | None = None
     is_active: bool = True
     items: list[PromotionItemIn] = Field(min_length=1)
+    scope: PromotionCityScope = Field(default_factory=PromotionCityScope)
 
 
 class PromotionPatch(BaseModel):
@@ -367,6 +479,16 @@ class PromotionPatch(BaseModel):
     ends_at: datetime | None = None
     is_active: bool | None = None
     items: list[PromotionItemIn] | None = Field(default=None, min_length=1)
+    scope: PromotionCityScope | None = None
+
+
+class PromotionCityToggleIn(BaseModel):
+    """Точечная правка охвата: модератор трогает только свой город."""
+
+    city: str = Field(min_length=1, max_length=100)
+    # true — город в списке (для exclude это «убрать акцию из города»,
+    # для include — «показывать в городе»)
+    listed: bool
 
 
 class PromotionItemOut(ORMModel):
@@ -385,18 +507,34 @@ class AdminPromotionOut(ORMModel):
     is_active: bool
     created_at: datetime
     items: list[PromotionItemOut]
+    city_mode: PromotionCityMode = PromotionCityMode.exclude
+    scope_cities: list[str] = Field(default_factory=list)
+    scope_label: str = "вся страна"
+    # Может ли текущий сотрудник править саму акцию (а не только свой город)
+    can_edit: bool = True
 
 
 # --- admin: users ---
 
 class AdminUserOut(UserOut):
     reports_count: int = 0
+    moderator_cities: list[str] = Field(default_factory=list)
 
 
 class UserPatch(BaseModel):
     role: UserRole | None = None
     is_blocked: bool | None = None
     display_name: str | None = Field(default=None, min_length=1, max_length=100)
+    # Города модератора: список заменяется целиком
+    moderator_cities: list[str] | None = None
+
+
+class StaffScopeOut(BaseModel):
+    """Кто я в админке: глобальный админ или модератор своих городов."""
+
+    role: UserRole
+    is_global: bool
+    cities: list[str] = Field(default_factory=list)
 
 
 # --- admin: suggestions ---
@@ -415,6 +553,8 @@ class SuggestionGroupOut(BaseModel):
 
 class SuggestionApproveIn(BaseModel):
     brand_id: int
+    # Охват создаваемой акции; модератору он всё равно сузится до его городов
+    scope: PromotionCityScope = Field(default_factory=PromotionCityScope)
     title: str | None = Field(default=None, min_length=1, max_length=200)
     description: str | None = None
     starts_at: datetime | None = None
@@ -460,13 +600,19 @@ class RatingEntryOut(BaseModel):
     position: int
 
 
-class RatingMeOut(BaseModel):
+class RatingMeOut(RatingEntryOut):
+    """Своя строка — такая же, как в таблице, но приходит всегда.
+
+    position = None означает «очков в этом зачёте пока нет».
+    """
+
     position: int | None = None
-    points: int
 
 
 class RatingOut(BaseModel):
     entries: list[RatingEntryOut]
+    # Сколько всего людей в зачёте — по нему видно, есть ли что подгружать
+    total: int = 0
     me: RatingMeOut | None = None
 
 
@@ -491,3 +637,112 @@ class RatingCardOut(BaseModel):
     categories: list[RatingCategoryOut]
     # Полная лента — только владельцу карточки
     events: list[RatingEventOut] | None = None
+
+
+# --- игровой режим ---
+
+class FactionInfoOut(BaseModel):
+    key: Faction
+    title: str
+    members: int
+    share: float          # доля в городе, 0..1
+    join_blocked: bool    # набор закрыт: сторона перекошена
+    underdog_bonus: float  # прибавка к силе чека, 0..0.25
+
+
+class GameMeOut(BaseModel):
+    game_mode: bool
+    asked: bool
+    faction: Faction | None = None
+    can_switch_at: datetime | None = None
+
+
+class GameConfigOut(BaseModel):
+    enabled: bool                # фича включена на сервисе
+    city: str | None = None
+    season: str
+    factions: list[FactionInfoOut]
+    me: GameMeOut | None = None
+    bar_seconds: int
+    min_sum_rubles: int
+    receipt_max_age_minutes: int
+    geo_radius_m: float
+
+
+class GameModeIn(BaseModel):
+    enabled: bool
+
+
+class FactionJoinIn(BaseModel):
+    faction: Faction
+
+
+class PointControlOut(BaseModel):
+    restaurant_id: int
+    owner: Faction | None = None
+    green_score: float
+    purple_score: float
+    green_receipts: int
+    purple_receipts: int
+    green_progress: float   # 0..1
+    purple_progress: float
+    leader: Faction | None = None
+    under_attack: bool
+    eta_seconds: float | None = None
+    is_active_now: bool
+    truce_seconds: float | None = None
+    captured_at: datetime | None = None
+
+
+class PointControlDetailOut(PointControlOut):
+    my_receipts_today: int = 0
+    my_strength_today: float = 0.0
+    my_faction: Faction | None = None
+
+
+class FactionStandingOut(BaseModel):
+    faction: Faction
+    title: str
+    points_held: int
+    held_share: float   # средняя доля владения за сезон, 0..1
+    captures: int
+    defends: int
+
+
+class GameStandingsOut(BaseModel):
+    city: str
+    season: str
+    points_total: int
+    neutral: int
+    standings: list[FactionStandingOut]
+
+
+# --- промокоды ---
+
+class PromoCodeOut(BaseModel):
+    id: int
+    code: str
+    description: str
+    is_global: bool
+    cities: list[str] = []
+    author_name: str | None = None
+    # сколько раз подтверждали, что сработал
+    confirmations: int = 0
+    expires_at: datetime
+    created_at: datetime
+    # Подтверждал ли текущий пользователь этот код
+    confirmed_by_me: bool = False
+    is_mine: bool = False
+
+
+class PromoCodeIn(BaseModel):
+    brand_id: int
+    code: str = Field(min_length=2, max_length=64)
+    description: str = Field(min_length=3, max_length=200)
+    # false — код только для города, из которого его принесли
+    is_global: bool = True
+    city: str | None = Field(default=None, max_length=100)
+
+
+class PromoCodeVoteIn(BaseModel):
+    worked: bool

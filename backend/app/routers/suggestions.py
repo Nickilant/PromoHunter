@@ -6,6 +6,7 @@ from app.auth import get_current_user, require_not_blocked
 from app.database import get_db
 from app.models import Brand, PromotionSuggestion, Restaurant, User
 from app.schemas import SuggestionIn, SuggestionOut
+from app.services.scope import normalize_city
 
 router = APIRouter(prefix="/suggestions", tags=["suggestions"])
 
@@ -24,11 +25,11 @@ def create_suggestion(
         )
     if payload.brand_id is not None and db.get(Brand, payload.brand_id) is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Бренд не найден")
-    if (
-        payload.restaurant_id is not None
-        and db.get(Restaurant, payload.restaurant_id) is None
-    ):
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Точка не найдена")
+    restaurant = None
+    if payload.restaurant_id is not None:
+        restaurant = db.get(Restaurant, payload.restaurant_id)
+        if restaurant is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Точка не найдена")
     if not payload.items_raw.strip():
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST, detail="Укажите хотя бы один товар"
@@ -42,6 +43,9 @@ def create_suggestion(
         title=payload.title.strip(),
         description=(payload.description or "").strip() or None,
         items_raw=payload.items_raw.strip(),
+        # Город нужен, чтобы заявка попала к модератору этого города:
+        # у самой акции города нет, она принадлежит бренду
+        city=normalize_city(restaurant.city if restaurant else user.city),
     )
     db.add(suggestion)
     db.commit()

@@ -3,12 +3,15 @@ import { Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom';
 
 import AdminLayout from './admin/AdminLayout';
 import AdminBrands from './admin/AdminBrands';
+import AdminCities from './admin/AdminCities';
+import NearbyPage from './pages/NearbyPage';
 import AdminPromotions from './admin/AdminPromotions';
 import AdminRestaurants from './admin/AdminRestaurants';
 import AdminRestaurantSuggestions from './admin/AdminRestaurantSuggestions';
 import AdminSuggestions from './admin/AdminSuggestions';
 import AdminUsers from './admin/AdminUsers';
 import BottomNav from './components/BottomNav';
+import GameGate from './components/GameGate';
 import TelegramGate from './components/TelegramGate';
 import { useAuth } from './hooks/useAuth';
 import BrandPage from './pages/BrandPage';
@@ -42,10 +45,14 @@ function RequireAuth({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
-function RequireAdmin({ children }: { children: ReactNode }) {
+function RequireStaff({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
   if (loading) return null;
-  if (!user || user.role !== 'admin') return <Navigate to="/" replace />;
+  // Городской модератор тоже работает в админке — что ему доступно,
+  // решает сервер по его городам
+  if (!user || (user.role !== 'admin' && user.role !== 'moderator')) {
+    return <Navigate to="/" replace />;
+  }
   return <>{children}</>;
 }
 
@@ -53,11 +60,13 @@ export default function App() {
   return (
     <>
       <TelegramGate />
+      <GameGate />
       <Routes>
       <Route element={<UserShell />}>
         <Route path="/" element={<FeedPage />} />
         <Route path="/brand/:brandId" element={<BrandPage />} />
         <Route path="/map" element={<MapPage />} />
+        <Route path="/nearby" element={<NearbyPage />} />
         <Route path="/rating" element={<RatingPage />} />
         <Route
           path="/suggest"
@@ -99,13 +108,14 @@ export default function App() {
       <Route
         path="/admin"
         element={
-          <RequireAdmin>
+          <RequireStaff>
             <AdminLayout />
-          </RequireAdmin>
+          </RequireStaff>
         }
       >
         <Route index element={<Navigate to="brands" replace />} />
         <Route path="brands" element={<AdminBrands />} />
+        <Route path="cities" element={<AdminCities />} />
         <Route path="restaurants" element={<AdminRestaurants />} />
         <Route path="promotions" element={<AdminPromotions />} />
         <Route path="users" element={<AdminUsers />} />

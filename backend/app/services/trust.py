@@ -12,6 +12,8 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.config import settings
 from app.models import (
+    Promotion,
+    PromotionItem,
     RatingEvent,
     Report,
     ReportChannel,
@@ -21,7 +23,20 @@ from app.models import (
     User,
     VerdictOutcome,
 )
-from app.services.status import _channel_coef, refresh_stable_statuses
+from app.services.notify import notify_status_flips
+from app.services.status import refresh_stable_statuses
+
+
+def _channel_coef(channel: ReportChannel, is_available: bool) -> float:
+    """Вес голоса в консенсусе при дозревании вердикта."""
+    if channel == ReportChannel.delivery:
+        # «мне привезли» — сильный сигнал, «в меню нет» — слабый
+        return (
+            settings.channel_delivery_yes_coef
+            if is_available
+            else settings.channel_delivery_no_coef
+        )
+    return settings.channel_on_site_coef
 
 
 def _consensus_votes(
@@ -218,8 +233,12 @@ def drift_weights(db: Session, now: datetime | None = None) -> int:
 
 
 def refresh_recent_stables(db: Session, now: datetime | None = None) -> int:
-    """Обновить устойчивые статусы пар с недавней активностью
-    (ловит переключения, случившиеся из-за распада свежести без новых отчётов)."""
+    """Обновить устойчивые статусы пар с недавней активностью.
+
+    Джоба — единственное место, где дозревает выдержка уведомления: поток
+    отчётов обрывается в тот же момент, когда товар кончился, и без тика
+    подписчики не узнали бы об этом никогда.
+    """
     now = now or datetime.now(timezone.utc)
     since = now - timedelta(hours=settings.status_window_hours * 2)
     pairs = db.execute(
@@ -230,10 +249,48 @@ def refresh_recent_stables(db: Session, now: datetime | None = None) -> int:
     by_restaurant: dict[int, list[int]] = {}
     for restaurant_id, promotion_id in pairs:
         by_restaurant.setdefault(restaurant_id, []).append(promotion_id)
+
+    ripe: dict[int, list[tuple[int, str]]] = {}
     for restaurant_id, promotion_ids in by_restaurant.items():
-        refresh_stable_statuses(db, restaurant_id, promotion_ids, now)
+        flips = refresh_stable_statuses(db, restaurant_id, promotion_ids, now)
+        if flips:
+            ripe[restaurant_id] = [(item_id, new) for item_id, _, new in flips]
     db.commit()
+
+    for restaurant_id, items in ripe.items():
+        _notify_flips(db, restaurant_id, items)
     return len(pairs)
+
+
+def _notify_flips(db: Session, restaurant_id: int, items: list[tuple[int, str]]) -> None:
+    """Развести дозревшие переключения по акциям и разослать подписчикам."""
+    restaurant = db.scalar(
+        select(Restaurant)
+        .options(joinedload(Restaurant.brand))
+        .where(Restaurant.id == restaurant_id)
+    )
+    if restaurant is None:
+        return
+    promotions = (
+        db.scalars(
+            select(Promotion)
+            .options(joinedload(Promotion.brand), selectinload(Promotion.items))
+            .join(PromotionItem, PromotionItem.promotion_id == Promotion.id)
+            .where(PromotionItem.id.in_([item_id for item_id, _ in items]))
+            .distinct()
+        )
+        .unique()
+        .all()
+    )
+    status_of = dict(items)
+    for promotion in promotions:
+        lines = [
+            (item.name, status_of[item.id])
+            for item in promotion.items
+            if item.id in status_of
+        ]
+        if lines:
+            notify_status_flips(db, restaurant, promotion, lines)
 
 
 def run_trust_pass(db: Session, now: datetime | None = None) -> dict:

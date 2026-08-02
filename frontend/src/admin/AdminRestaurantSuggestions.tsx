@@ -13,6 +13,7 @@ import type { AdminOutletContext } from './AdminLayout';
 import CollapsibleGroup from './CollapsibleGroup';
 import RestaurantForm, { RestaurantFormValue } from './RestaurantForm';
 import Icon from '../components/Icon';
+import AdminSearch, { matches } from './AdminSearch';
 
 const STATUS_LABELS: Record<string, { text: string; cls: string }> = {
   pending: { text: 'Ожидает', cls: 'warn' },
@@ -22,6 +23,7 @@ const STATUS_LABELS: Record<string, { text: string; cls: string }> = {
 
 export default function AdminRestaurantSuggestions() {
   const [groups, setGroups] = useState<RestaurantSuggestionGroup[]>([]);
+  const [query, setQuery] = useState('');
   const [brands, setBrands] = useState<AdminBrand[]>([]);
   const [statusFilter, setStatusFilter] = useState('pending');
   const [approving, setApproving] = useState<{
@@ -107,6 +109,26 @@ export default function AdminRestaurantSuggestions() {
     }
   };
 
+  const shownGroups = groups
+    .map((g) => ({
+      ...g,
+      suggestions: g.suggestions.filter((s) =>
+        matches(
+          query,
+          s.title,
+          s.city,
+          s.address,
+          s.comment,
+          g.brand_name,
+          s.user.display_name,
+          s.user.phone,
+        ),
+      ),
+    }))
+    .filter((g) => g.suggestions.length > 0);
+  const total = groups.reduce((n, g) => n + g.suggestions.length, 0);
+  const found = shownGroups.reduce((n, g) => n + g.suggestions.length, 0);
+
   return (
     <div>
       <h1>Заявки на рестораны</h1>
@@ -126,7 +148,15 @@ export default function AdminRestaurantSuggestions() {
         </div>
       )}
 
-      {groups.map((g) => (
+      <AdminSearch
+        value={query}
+        onChange={setQuery}
+        placeholder="Поиск по адресу, городу, сети или автору"
+        found={found}
+        total={total}
+      />
+
+      {shownGroups.map((g) => (
         <CollapsibleGroup
           key={g.brand_id}
           title={g.brand_name}

@@ -13,6 +13,7 @@ from app.models import PhoneVerification, User, UserRole
 from app.phone import normalize_phone
 from app.schemas import (
     LoginIn,
+    PasswordChangeIn,
     PhoneVerificationConfirmIn,
     PhoneVerificationConfirmOut,
     PhoneVerificationRequestIn,
@@ -181,8 +182,50 @@ def register(payload: RegisterIn, db: Session = Depends(get_db)):
 @router.post("/login", response_model=TokenOut)
 def login(payload: LoginIn, db: Session = Depends(get_db)):
     user = db.scalar(select(User).where(User.phone == payload.phone))
+    if user is not None and user.password_hash is None:
+        # Аккаунт заведён входом через Telegram — пароля у него никогда не было
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED,
+            detail="Для этого номера пароль не задан — войдите через Telegram "
+            "и задайте пароль в профиле",
+        )
     if user is None or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Неверный номер или пароль")
+    return TokenOut(access_token=create_access_token(user), user=UserOut.model_validate(user))
+
+
+@router.post("/password", response_model=TokenOut)
+def change_password(
+    payload: PasswordChangeIn,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Сменить пароль из профиля.
+
+    Аккаунту, заведённому через Telegram, текущий пароль вводить нечего —
+    его не было. Всем остальным он обязателен.
+
+    В ответе — свежий токен: смена пароля обесценивает все выданные раньше,
+    включая тот, которым сделан этот запрос.
+    """
+    if user.password_hash is not None:
+        if not payload.current_password:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST, detail="Введите текущий пароль"
+            )
+        if not verify_password(payload.current_password, user.password_hash):
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST, detail="Текущий пароль неверный"
+            )
+        if verify_password(payload.new_password, user.password_hash):
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST, detail="Новый пароль совпадает с текущим"
+            )
+
+    user.password_hash = hash_password(payload.new_password)
+    user.password_changed_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(user)
     return TokenOut(access_token=create_access_token(user), user=UserOut.model_validate(user))
 
 
@@ -246,8 +289,9 @@ def telegram_contact_login(payload: TelegramContactIn, db: Session = Depends(get
         user = User(
             phone=phone,
             is_phone_verified=True,
-            # Пароль не используется при входе через Telegram; задать можно позже
-            password_hash=hash_password(secrets.token_urlsafe(16)),
+            # Пароля нет: вход по Telegram его не требует, а задать человек
+            # сможет в профиле — там текущий у него не спросят
+            password_hash=None,
             display_name=(tg_user.get("first_name") or "Пользователь")[:100],
             city=(payload.city or "").strip() or None,
             role=UserRole.admin if users_count == 0 else UserRole.user,

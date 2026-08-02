@@ -1,4 +1,21 @@
-export type Role = 'user' | 'admin';
+export type Role = 'user' | 'moderator' | 'admin';
+
+/** Кто я в админке: глобальный админ или модератор своих городов */
+export interface StaffScope {
+  role: Role;
+  is_global: boolean;
+  cities: string[];
+}
+
+/** Как читать список городов акции */
+export type PromotionCityMode = 'exclude' | 'include';
+
+export interface PromotionScope {
+  mode: PromotionCityMode;
+  cities: string[];
+}
+
+export type Faction = 'green' | 'purple';
 
 export interface User {
   id: number;
@@ -7,8 +24,12 @@ export interface User {
   display_name: string;
   city: string | null;
   has_telegram: boolean;
+  has_password: boolean;
   role: Role;
   is_blocked: boolean;
+  game_mode: boolean;
+  game_asked: boolean;
+  faction: Faction | null;
   created_at: string;
 }
 
@@ -46,6 +67,18 @@ export interface RestaurantShort {
 export interface RestaurantListItem extends RestaurantShort {
   active_promotions_count: number;
   last_report_at: string | null;
+}
+
+export interface AdminCity {
+  id: number;
+  name: string;
+  is_active: boolean;
+  restaurants_count: number;
+}
+
+export interface CityBulkResult {
+  added: string[];
+  skipped: string[];
 }
 
 export interface CityInfo {
@@ -117,11 +150,23 @@ export interface ReportItemOut {
   is_available: boolean;
 }
 
+export interface CaptureResult {
+  strength: number;
+  points: number;
+  faction: Faction;
+  owner: Faction | null;
+  captured: boolean;
+  defended: boolean;
+  refuted_denials: number;
+}
+
 export interface Report {
   id: number;
   restaurant: RestaurantShort;
   promotion_title: string;
   items: ReportItemOut[];
+  is_receipt_verified: boolean;
+  capture: CaptureResult | null;
   created_at: string;
 }
 
@@ -135,11 +180,13 @@ export interface Suggestion {
   title: string;
   description: string | null;
   items_raw: string;
+  city: string | null;
   status: SuggestionStatus;
   moderator_comment: string | null;
   created_promotion_id: number | null;
   created_at: string;
   reviewed_at: string | null;
+  reviewed_by_name: string | null;
 }
 
 export interface AdminSuggestion extends Suggestion {
@@ -168,6 +215,7 @@ export interface RestaurantSuggestion {
   created_restaurant_id: number | null;
   created_at: string;
   reviewed_at: string | null;
+  reviewed_by_name: string | null;
 }
 
 export interface AdminRestaurantSuggestion extends RestaurantSuggestion {
@@ -197,10 +245,16 @@ export interface AdminPromotion {
   is_active: boolean;
   created_at: string;
   items: PromotionItemAdmin[];
+  city_mode: PromotionCityMode;
+  scope_cities: string[];
+  scope_label: string;
+  /** Может ли текущий сотрудник править саму акцию, а не только свой город */
+  can_edit: boolean;
 }
 
 export interface AdminUser extends User {
   reports_count: number;
+  moderator_cities: string[];
 }
 
 export interface TelegramInfo {
@@ -227,6 +281,9 @@ export interface Subscription {
 
 export type RatingPeriod = 'month' | 'year';
 
+/** all — весь город, faction — только своя сторона */
+export type RatingScope = 'all' | 'faction';
+
 export interface RatingEntry {
   user_id: number;
   display_name: string;
@@ -236,9 +293,15 @@ export interface RatingEntry {
   position: number;
 }
 
+/** Своя строка приходит всегда; position = null — очков ещё нет */
+export interface RatingMe extends Omit<RatingEntry, 'position'> {
+  position: number | null;
+}
+
 export interface RatingResponse {
   entries: RatingEntry[];
-  me: { position: number | null; points: number } | null;
+  total: number;
+  me: RatingMe | null;
 }
 
 export interface RatingCategory {
@@ -261,4 +324,90 @@ export interface RatingCard {
   total_points: number;
   categories: RatingCategory[];
   events: RatingEventItem[] | null;
+}
+
+// --- игровой режим ---
+
+export interface FactionInfo {
+  key: Faction;
+  title: string;
+  members: number;
+  share: number;
+  join_blocked: boolean;
+  underdog_bonus: number;
+}
+
+export interface GameMe {
+  game_mode: boolean;
+  asked: boolean;
+  faction: Faction | null;
+  can_switch_at: string | null;
+}
+
+export interface GameConfig {
+  enabled: boolean;
+  city: string | null;
+  season: string;
+  factions: FactionInfo[];
+  me: GameMe | null;
+  bar_seconds: number;
+  min_sum_rubles: number;
+  receipt_max_age_minutes: number;
+  geo_radius_m: number;
+}
+
+export interface PointControl {
+  restaurant_id: number;
+  owner: Faction | null;
+  green_score: number;
+  purple_score: number;
+  green_receipts: number;
+  purple_receipts: number;
+  green_progress: number;
+  purple_progress: number;
+  leader: Faction | null;
+  under_attack: boolean;
+  eta_seconds: number | null;
+  is_active_now: boolean;
+  truce_seconds: number | null;
+  captured_at: string | null;
+}
+
+export interface PointControlDetail extends PointControl {
+  my_receipts_today: number;
+  my_strength_today: number;
+  my_faction: Faction | null;
+}
+
+export interface FactionStanding {
+  faction: Faction;
+  title: string;
+  points_held: number;
+  held_share: number;
+  captures: number;
+  defends: number;
+}
+
+export interface GameStandings {
+  city: string;
+  season: string;
+  points_total: number;
+  neutral: number;
+  standings: FactionStanding[];
+}
+
+// --- промокоды ---
+
+export interface PromoCode {
+  id: number;
+  code: string;
+  description: string;
+  is_global: boolean;
+  cities: string[];
+  author_name: string | null;
+  confirmations: number;
+  expires_at: string;
+  created_at: string;
+  confirmed_by_me: boolean;
+  is_mine: boolean;
 }

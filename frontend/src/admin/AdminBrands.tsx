@@ -4,6 +4,7 @@ import { api } from '../api/client';
 import { useToast } from '../components/Toast';
 import type { AdminBrand } from '../types';
 import Icon from '../components/Icon';
+import AdminSearch, { matches } from './AdminSearch';
 
 interface BrandForm {
   id: number | null;
@@ -16,6 +17,7 @@ const emptyForm: BrandForm = { id: null, name: '', color: '#6B9080', logo_url: '
 
 export default function AdminBrands() {
   const [brands, setBrands] = useState<AdminBrand[]>([]);
+  const [query, setQuery] = useState('');
   const [form, setForm] = useState<BrandForm | null>(null);
   const [error, setError] = useState<string | null>(null);
   const toast = useToast();
@@ -56,6 +58,8 @@ export default function AdminBrands() {
     }
   };
 
+  const shown = brands.filter((b) => matches(query, b.name, b.slug));
+
   return (
     <div>
       <h1>Бренды</h1>
@@ -70,6 +74,14 @@ export default function AdminBrands() {
           + Новый бренд
         </button>
       </div>
+      <AdminSearch
+        value={query}
+        onChange={setQuery}
+        placeholder="Поиск по названию или slug"
+        found={shown.length}
+        total={brands.length}
+      />
+
       <div className="admin-table-wrap">
         <table className="admin-table">
           <thead>
@@ -82,7 +94,7 @@ export default function AdminBrands() {
             </tr>
           </thead>
           <tbody>
-            {brands.map((b) => (
+            {shown.map((b) => (
               <tr key={b.id}>
                 <td>
                   <span className="color-dot" style={{ background: b.color }} />

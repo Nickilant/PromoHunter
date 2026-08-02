@@ -1,6 +1,9 @@
+from datetime import datetime, timedelta, timezone
+
 from sqlalchemy import select
 
 from app.models import User
+from app.services.trust import refresh_recent_stables
 from tests.test_status import make_fixtures
 
 
@@ -112,4 +115,15 @@ def test_notifications_sent(client, db, monkeypatch):
         headers=admin_headers,
     )
     assert resp.status_code == 201
+    # Сразу не будим: статусу надо выстояться (app/services/truth.py)
+    assert not sent
+
+    # Через выдержку фоновая джоба досылает уведомление
+    later = datetime.now(timezone.utc) + timedelta(minutes=12)
+    refresh_recent_stables(db, later)
     assert any(chat == 9100 and item.name in text for chat, text in sent)
+
+    # Повторный прогон ничего не дублирует
+    sent.clear()
+    refresh_recent_stables(db, later + timedelta(minutes=5))
+    assert not sent

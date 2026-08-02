@@ -413,8 +413,8 @@ input, textarea, select {
   opacity: 0.9;
 }
 
-.status-badge.available      { background: #E4F0E3; color: #3F7A3E; }
-.status-badge.unavailable    { background: #F9E5E5; color: #A34F4F; }
+.status-badge.available      { background: var(--status-available-soft); color: var(--status-available-ink); }
+.status-badge.unavailable    { background: var(--status-unavailable-soft); color: var(--status-unavailable-ink); }
 .status-badge.disputed       { background: #F8EDD8; color: #97702B; }
 .status-badge.maybe_gone     { background: #F9E9D8; color: #9A6330; }
 .status-badge.maybe_appeared { background: #E3EFEA; color: #3E7A64; }
@@ -643,55 +643,144 @@ input, textarea, select {
 
 /* ---------- модалка отчёта: тап-зоны ---------- */
 
+.report-list {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Товар и его ответ — одна группа, соседние отделены волоском.
+   Так восемь позиций читаются списком, а не стопкой карточек */
 .report-item {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
+  padding: 10px 0;
+}
+
+.report-item + .report-item {
+  border-top: 1px solid var(--border);
 }
 
 .report-item .name {
+  min-width: 0;
   font-weight: 600;
   font-size: 15px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
 }
 
-.tri-toggle {
+/* Один предмет вместо трёх кнопок: фон и рамка живут на дорожке, у сегментов
+   своих границ нет. «Не смотрел» стоит посередине — это значение по
+   умолчанию, и в покое бегунок стоит там же, но без цвета: видно, что ответа
+   ещё нет, а не что выбран третий вариант. */
+.mark-switch {
+  position: relative;
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 6px;
-}
-
-.tri-toggle button {
-  min-height: 46px;
-  border-radius: var(--radius-control);
+  grid-template-columns: repeat(3, 1fr);
+  padding: 3px;
+  border-radius: 999px;
   background: var(--surface-alt);
-  color: var(--text-muted);
-  font-weight: 600;
-  font-size: 14px;
   border: 1px solid var(--border);
-  transition: background-color 0.16s ease, border-color 0.16s ease,
-    color 0.16s ease, transform 0.14s ease;
+  /* Три цели вплотную: без этого быстрые тапы ловят зум по двойному тапу,
+     а долгое нажатие выделяет подпись как текст */
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
-.tri-toggle button:active {
-  transform: scale(0.97);
+/* Ширина считается от padding-box дорожки, поэтому шаг translateX(100%) —
+   ровно один сегмент, без пересчёта под ширину экрана */
+.mark-switch-thumb {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc((100% - 6px) / 3);
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: 0 1px 4px rgba(46, 42, 38, 0.16);
+  pointer-events: none;
+  /* Едет только положение. Если анимировать ещё и цвет, на полпути бегунок
+     стоит на «Не смотрел» уже покрашенным — ровно то, чего быть не должно */
+  transition: transform 0.26s cubic-bezier(0.32, 1.1, 0.4, 1);
 }
 
-.tri-toggle button.on-yes {
-  background: var(--status-available);
-  border-color: var(--status-available);
-  color: #fff;
+.mark-switch.is-yes .mark-switch-thumb {
+  transform: translateX(0);
+  background: var(--status-available-soft);
 }
 
-.tri-toggle button.on-no {
-  background: var(--status-unavailable);
-  border-color: var(--status-unavailable);
-  color: #fff;
+/* В покое бегунок глуше отвеченных: белая пилюля с полной тенью выпирала
+   сильнее, чем строки с ответом, и читалась как сделанный выбор */
+.mark-switch.is-skip .mark-switch-thumb {
+  transform: translateX(100%);
+  box-shadow: 0 1px 3px rgba(46, 42, 38, 0.09);
 }
 
-.tri-toggle button.on-skip {
-  background: var(--text-muted);
-  border-color: var(--text-muted);
-  color: #fff;
+.mark-switch.is-no .mark-switch-thumb {
+  transform: translateX(200%);
+  background: var(--status-unavailable-soft);
+}
+
+.mark-switch-option {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 4px;
+  border-radius: 999px;
+  font-size: clamp(12px, 3.4vw, 13px);
+  font-weight: 600;
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  color: var(--text-muted);
+  cursor: pointer;
+  /* Цвет догоняет бегунок с задержкой — переезд читается как движение,
+     а не как одновременная перекраска двух сегментов */
+  transition: color 0.22s ease 0.04s;
+}
+
+/* Цвет подписи только у отвеченного: «не смотрел» остаётся приглушённым
+   даже под бегунком — это покой, а не выбор */
+.mark-switch.is-yes .mark-switch-option.is-on {
+  color: var(--status-available-ink);
+}
+
+.mark-switch.is-no .mark-switch-option.is-on {
+  color: var(--status-unavailable-ink);
+}
+
+/* Толщина обводки значка — четвёртый признак выбора вдобавок к положению,
+   цвету и подписи: заливки «есть» и «нет» в оттенках серого почти совпадают */
+.mark-switch-option.is-on svg {
+  stroke-width: 2.6;
+}
+
+/* Радиокнопка растянута по сегменту и невидима: рамка фокуса рисуется прямо
+   на ней, и селектор :has() не нужен — в проекте он больше нигде не встречается
+   и не во всяком WebView работает */
+.mark-switch input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+}
+
+/* Тёмная, а не зелёная: глобальный --primary поверх зелёного бегунка
+   даёт полтора к одному и фокус пропадает */
+.mark-switch input:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+  border-radius: 999px;
 }
 
 /* ---------- плитки брендов ---------- */
@@ -951,14 +1040,54 @@ input, textarea, select {
 .rating-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   width: 100%;
+  min-height: 40px;
   background: var(--surface);
-  border-radius: var(--radius-card);
+  border-radius: 12px;
   box-shadow: var(--shadow-soft);
-  padding: 12px 16px;
+  padding: 6px 12px;
   text-align: left;
   transition: transform 0.15s;
+}
+
+/* Имя занимает всё свободное место и обрезается, а не переносится:
+   строка держит одну высоту, сколько бы длинным ни было имя */
+.rating-name {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 15px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rating-you {
+  flex: none;
+  background: var(--primary-soft);
+  color: var(--primary-ink);
+  border-radius: 6px;
+  padding: 0 5px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.rating-meta {
+  flex: none;
+  color: var(--text-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* На совсем узких экранах счётчик отчётов уступает место имени и очкам */
+@media (max-width: 359px) {
+  .rating-meta { display: none; }
 }
 
 .rating-row:active {
@@ -969,15 +1098,28 @@ input, textarea, select {
   outline: 2px solid var(--primary);
 }
 
+/* Своя строка окрашивается цветом своей стороны — но едва заметно: это
+   пометка «вы здесь», а не акцент, спорящий с обводкой и местами в топе */
+.rating-row.me.faction-green {
+  background: color-mix(in srgb, #4F9D69 10%, var(--surface));
+  outline-color: #4F9D69;
+}
+
+.rating-row.me.faction-purple {
+  background: color-mix(in srgb, #8A6BBF 10%, var(--surface));
+  outline-color: #8A6BBF;
+}
+
 .rating-pos {
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   flex-shrink: 0;
-  border-radius: 50%;
+  border-radius: 9px;
   background: var(--surface-alt);
   color: var(--text-muted);
-  font-weight: 600;
-  font-size: 14px;
+  font-weight: 700;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1105,16 +1247,24 @@ select.city-chip {
   inset: 0;
 }
 
+/* Карта — единый слой в самом низу: своим z-index (0) она замыкает внутри
+   себя всю нумерацию Leaflet (панели 200–700, контролы 800) и собственные
+   плавающие кнопки. Иначе они спорили бы со шторкой и модалками, а маркеры
+   перекрывали бы кнопки. */
 .map-page .leaflet-container {
   width: 100%;
   height: 100%;
+  position: relative;
+  z-index: 0;
 }
 
+/* Кнопки карты внутри её слоя: выше маркеров и подсказок, но вся карта
+   целиком остаётся под шторкой точки и под модалками */
 .locate-btn {
   position: absolute;
   right: 12px;
   top: calc(70px + env(safe-area-inset-top));
-  z-index: 400;
+  z-index: 900;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 16px;
@@ -1226,6 +1376,141 @@ select.city-chip {
   color: var(--text-muted);
 }
 
+/* Карточка «кто я»: имя крупно, остальное подписью */
+.profile-id {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--surface);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-soft);
+  padding: 16px;
+}
+
+.profile-avatar {
+  flex-shrink: 0;
+  width: 52px;
+  height: 52px;
+  border-radius: 18px;
+  background: var(--primary-soft);
+  color: var(--primary-ink);
+  display: grid;
+  place-items: center;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.profile-id-body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.profile-name {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.profile-id-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  flex-wrap: wrap;
+}
+
+.profile-id-meta.muted {
+  color: var(--text-muted);
+}
+
+/* Три плитки активности — вместо строки «Отчётов отправлено» в таблице */
+.profile-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.profile-stat {
+  background: var(--surface);
+  border-radius: var(--radius-control);
+  box-shadow: var(--shadow-soft);
+  padding: 12px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.profile-stat-value {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.profile-stat-label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* Сворачиваемые разделы активности */
+.profile-section {
+  background: var(--surface);
+  border-radius: var(--radius-control);
+  box-shadow: var(--shadow-soft);
+  overflow: hidden;
+}
+
+.profile-section-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 13px 14px;
+  text-align: left;
+}
+
+.profile-section-title {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.profile-section-count {
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--surface-alt);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  display: grid;
+  place-items: center;
+}
+
+.profile-section-head .chevron {
+  margin-left: auto;
+  display: flex;
+  color: var(--text-muted);
+  transition: transform 0.2s;
+}
+
+.profile-section-head .chevron.open {
+  transform: rotate(180deg);
+}
+
+.profile-section-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 8px 10px;
+}
+
+/* Выход — не акцент: он в самом низу и не должен спорить с настройками */
+.profile-logout {
+  margin-top: 4px;
+  color: var(--text-muted);
+}
+
 .verify-block {
   background: #F7EBD9;
   color: #A87B33;
@@ -1253,6 +1538,302 @@ select.city-chip {
   text-decoration: underline;
   font-size: inherit;
   padding: 0;
+}
+
+.password-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Отмена и сохранение в одну строку: форма короткая, кнопки во всю ширину
+   выглядели бы тяжелее самой формы */
+.password-form-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.password-form-actions .btn {
+  flex: 1;
+}
+
+/* Заголовок страницы с подзаголовком — там, где рядом нет чипа города
+   и обычный page-header смотрится куцым */
+.page-intro {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.page-intro h1 {
+  margin: 0;
+}
+
+.page-intro p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+/* Список «рядом»: расстояние слева фиксированной колонкой, чтобы адреса
+   выстраивались по одной линии и список читался сверху вниз */
+/* ---------- промокоды ---------- */
+
+.promo-code {
+  background: var(--surface-alt);
+  border-radius: var(--radius-control);
+  overflow: hidden;
+}
+
+.promo-code.selected {
+  outline: 2px solid var(--primary);
+}
+
+.promo-code-main {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  padding: 12px 14px;
+  text-align: left;
+}
+
+/* Моноширинный: код переписывают глазами, и «0» с «O» путать нельзя */
+.promo-code-value {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+}
+
+.promo-code-desc {
+  font-size: 14px;
+}
+
+.promo-code-meta {
+  font-size: 12px;
+}
+
+.promo-code-actions {
+  display: flex;
+  gap: 8px;
+  padding: 0 14px 12px;
+}
+
+.promo-code-actions .btn {
+  flex: 1;
+}
+
+.promo-code-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.promo-code-form-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.promo-code-form-actions .btn {
+  flex: 1;
+}
+
+/* Выбор охвата при добавлении: та же пара кнопок, что у канала отчёта */
+.scope-choice {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.scope-choice button {
+  min-height: 44px;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--border);
+  background: var(--surface-alt);
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 0 8px;
+}
+
+.scope-choice button.on {
+  background: var(--primary-soft);
+  border-color: var(--primary);
+  color: var(--primary-ink);
+}
+
+.scope-choice button:disabled {
+  opacity: 0.5;
+}
+
+/* «На карте» — рядом с адресом в шапке карточки точки. Мелкая и вторичная:
+   основное действие в карточке — акции, а не переход на карту */
+.show-on-map {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--surface-alt);
+  color: var(--primary-ink);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.show-on-map:active {
+  transform: scale(0.96);
+}
+
+.nearby-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  background: var(--surface);
+  border-radius: var(--radius-control);
+  box-shadow: var(--shadow-soft);
+  padding: 12px 14px;
+  text-align: left;
+  transition: transform 0.15s;
+}
+
+.nearby-item:active {
+  transform: scale(0.99);
+}
+
+.nearby-distance {
+  flex-shrink: 0;
+  width: 56px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--primary-ink);
+}
+
+.nearby-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.nearby-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.nearby-name {
+  font-size: 14px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nearby-address {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.nearby-meta {
+  font-size: 12px;
+}
+
+.brand-chip.small {
+  font-size: 11px;
+  padding: 2px 8px;
+}
+
+.suggest-pending {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--primary-soft);
+  border-radius: var(--radius-control);
+  padding: 12px 14px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.suggest-pending .chevron-right {
+  margin-left: auto;
+}
+
+.suggest-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.suggest-steps li {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  background: var(--surface);
+  border-radius: var(--radius-control);
+  box-shadow: var(--shadow-soft);
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.suggest-step-num {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  background: var(--primary-soft);
+  color: var(--primary-ink);
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* Экран последнего рубежа: показывается вместо всего приложения, поэтому
+   рассчитывает только на себя — без токенов раскладки страниц */
+.crash-screen {
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 32px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.crash-detail {
+  background: var(--surface-alt);
+  border-radius: var(--radius-control);
+  padding: 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 40vh;
+  overflow: auto;
+}
+
+.about-card {
+  background: var(--surface);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-soft);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-size: 13px;
+  line-height: 1.45;
 }
 
 .section-title {
@@ -1310,6 +1891,14 @@ select.city-chip {
 .auth-switch {
   text-align: center;
   font-size: 14px;
+  color: var(--text-muted);
+}
+
+/* Подсказка под формой входа: мельче переключателя, чтобы не спорить с ним */
+.auth-help {
+  text-align: center;
+  font-size: 12px;
+  line-height: 1.5;
   color: var(--text-muted);
 }
 
@@ -1385,6 +1974,26 @@ select.city-chip {
 
 .city-item.current {
   outline: 2px solid var(--primary);
+}
+
+/* Строка автоопределённого города и кнопка определения — первыми в списке,
+   поэтому выделены мягкой заливкой, а не обводкой */
+.city-item.detected,
+.city-item.detect {
+  background: var(--primary-soft);
+}
+
+.city-item span:first-child {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.city-more {
+  padding: 4px 4px 8px;
+  font-size: 12px;
+  text-align: center;
 }
 
 .city-item.other {
@@ -1779,4 +2388,1004 @@ select.city-chip {
 
 .btn:disabled:not(.is-busy) {
   opacity: 0.55;
+}
+
+/* ---------- игровой режим: онбординг и выбор стороны ---------- */
+
+.game-onboarding,
+.faction-picker {
+  position: fixed;
+  inset: 0;
+  z-index: 1120;
+  background: var(--bg);
+  overflow-y: auto;
+  animation: fade-in 0.18s ease;
+}
+
+.game-onboarding-inner,
+.faction-picker-inner {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: calc(28px + env(safe-area-inset-top)) 16px
+    calc(32px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Две «стороны» лицом к лицу — сразу видно, о чём игра */
+.game-hero {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.game-hero-half {
+  width: 62px;
+  height: 62px;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: hero-in 0.4s cubic-bezier(0.22, 1.1, 0.36, 1) both;
+}
+
+.game-hero-half.green {
+  background: var(--green-faction-soft);
+  color: var(--green-faction-ink);
+}
+
+.game-hero-half.purple {
+  background: var(--purple-faction-soft);
+  color: var(--purple-faction-ink);
+  animation-delay: 0.08s;
+}
+
+.game-hero-clash {
+  color: var(--text-muted);
+  animation: hero-in 0.4s cubic-bezier(0.22, 1.1, 0.36, 1) 0.16s both;
+}
+
+@keyframes hero-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.9); }
+  to   { opacity: 1; transform: none; }
+}
+
+.game-onboarding h1,
+.faction-picker-head h1 {
+  font-size: 24px;
+  text-align: center;
+}
+
+.faction-picker-head {
+  text-align: center;
+}
+
+.faction-picker-head .subtitle {
+  color: var(--text-muted);
+  font-size: 14px;
+  margin-top: 4px;
+}
+
+.game-onboarding-lead {
+  color: var(--text-muted);
+  font-size: 15px;
+  line-height: 1.5;
+  text-align: center;
+  margin: 0;
+}
+
+.game-facts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--surface);
+  border-radius: var(--radius-card);
+  padding: 14px;
+  box-shadow: var(--shadow-soft);
+}
+
+.game-facts li {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.game-facts svg {
+  flex: none;
+  margin-top: 1px;
+  color: var(--primary-ink);
+}
+
+.game-onboarding-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.game-onboarding-note {
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.faction-guest {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--primary-soft);
+  color: var(--primary-ink);
+  border-radius: var(--radius-control);
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.faction-guest svg {
+  flex: none;
+}
+
+.faction-guest .btn {
+  flex: none;
+  margin-left: auto;
+}
+
+.faction-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.faction-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  background: var(--surface);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-card);
+  padding: 14px;
+  overflow: hidden;
+  transition: transform 0.15s, border-color 0.2s;
+}
+
+.faction-card:active:not(:disabled) {
+  transform: scale(0.985);
+}
+
+.faction-card.green {
+  border-color: color-mix(in srgb, var(--green-faction) 35%, var(--border));
+}
+
+.faction-card.purple {
+  border-color: color-mix(in srgb, var(--purple-faction) 35%, var(--border));
+}
+
+.faction-card.blocked {
+  opacity: 0.6;
+}
+
+.faction-card-mark {
+  width: 48px;
+  height: 48px;
+  flex: none;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.faction-card.green .faction-card-mark {
+  background: var(--green-faction-soft);
+  color: var(--green-faction-ink);
+}
+
+.faction-card.purple .faction-card-mark {
+  background: var(--purple-faction-soft);
+  color: var(--purple-faction-ink);
+}
+
+.faction-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.faction-card-title {
+  font-weight: 600;
+  font-size: 16px;
+}
+
+.faction-card-meta {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.faction-card-note {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.faction-card-note.bonus {
+  color: var(--primary-ink);
+  font-weight: 600;
+}
+
+.faction-card-note.blocked {
+  color: #A05252;
+}
+
+/* Тонкая полоска доли фракции по низу карточки */
+.faction-card-share {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: var(--surface-alt);
+}
+
+.faction-card-share-fill {
+  display: block;
+  height: 100%;
+  transition: width 0.4s ease;
+}
+
+.faction-card-share-fill.green { background: var(--green-faction); }
+.faction-card-share-fill.purple { background: var(--purple-faction); }
+
+.faction-picker-note {
+  font-size: 13px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* ---------- игровой режим: плашки, шкалы, таймеры ---------- */
+
+.faction-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 8px;
+  padding: 3px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.faction-chip.small {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 7px;
+}
+
+.faction-chip.green {
+  background: var(--green-faction-soft);
+  color: var(--green-faction-ink);
+}
+
+.faction-chip.purple {
+  background: var(--purple-faction-soft);
+  color: var(--purple-faction-ink);
+}
+
+.faction-chip.neutral {
+  background: var(--surface-alt);
+  color: var(--text-muted);
+}
+
+.capture-timer {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 8px;
+  padding: 3px 7px;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  background: var(--surface-alt);
+  color: var(--text-muted);
+}
+
+.capture-timer.green {
+  background: var(--green-faction-soft);
+  color: var(--green-faction-ink);
+}
+
+.capture-timer.purple {
+  background: var(--purple-faction-soft);
+  color: var(--purple-faction-ink);
+}
+
+/* Точку забирают — единственное место, где допускаем тревожный тон */
+.capture-timer.attack {
+  background: #F8E6E0;
+  color: #A2543C;
+  animation: timer-pulse 1.8s ease-in-out infinite;
+}
+
+.capture-timer.truce {
+  background: var(--primary-soft);
+  color: var(--primary-ink);
+}
+
+.capture-timer.paused {
+  animation: none;
+  opacity: 0.8;
+}
+
+.capture-timer.full {
+  padding: 6px 10px;
+  font-size: 13px;
+  border-radius: var(--radius-control);
+}
+
+@keyframes timer-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.62; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .capture-timer.attack { animation: none; }
+}
+
+/* Соотношение сил: одна полоса на две стороны */
+.force-bar {
+  display: flex;
+  height: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--surface-alt);
+}
+
+.force-bar > span {
+  transition: flex-grow 0.5s ease;
+}
+
+.force-green { background: var(--green-faction); }
+.force-purple { background: var(--purple-faction); }
+
+.capture-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.capture-bar-row {
+  display: grid;
+  grid-template-columns: 78px 1fr 38px;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.capture-bar-label {
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.capture-bar-track {
+  height: 10px;
+  border-radius: 5px;
+  background: var(--surface-alt);
+  overflow: hidden;
+}
+
+.capture-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 5px;
+  transition: width 0.6s linear;
+}
+
+.capture-bar-fill.green { background: var(--green-faction); }
+.capture-bar-fill.purple { background: var(--purple-faction); }
+
+/* Шкала, которая едет прямо сейчас, слегка «дышит» — видно, кто наступает */
+.capture-bar-fill.moving {
+  animation: bar-breathe 2.4s ease-in-out infinite;
+}
+
+@keyframes bar-breathe {
+  0%, 100% { filter: brightness(1); }
+  50%      { filter: brightness(1.12); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .capture-bar-fill.moving { animation: none; }
+}
+
+.capture-bar-value {
+  text-align: right;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- игровой режим: панель точки ---------- */
+
+.capture-panel {
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.capture-panel-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: none;
+  border: none;
+  text-align: left;
+}
+
+.capture-panel-state {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.capture-panel.battle .capture-panel-state {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.capture-panel-head .chevron {
+  display: flex;
+  color: var(--text-muted);
+  transition: transform 0.24s ease;
+}
+
+.capture-panel-head .chevron.open {
+  transform: rotate(180deg);
+}
+
+.capture-panel-body {
+  padding: 0 16px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  animation: fade-in 0.18s ease;
+}
+
+.capture-forces {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.capture-force {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  border-radius: var(--radius-control);
+  padding: 8px 10px;
+}
+
+.capture-force.green {
+  background: var(--green-faction-soft);
+  color: var(--green-faction-ink);
+}
+
+.capture-force.purple {
+  background: var(--purple-faction-soft);
+  color: var(--purple-faction-ink);
+}
+
+.capture-force-title {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.capture-force-you {
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 5px;
+  padding: 0 4px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.capture-force-score {
+  font-size: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.capture-force-meta {
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+.capture-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.capture-note svg {
+  flex: none;
+  margin-top: 1px;
+}
+
+/* ---------- игровой режим: чек в модалке отчёта ---------- */
+
+.capture-attach {
+  margin-top: 4px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-card);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.capture-attach-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.capture-attach-head svg {
+  color: var(--primary-ink);
+}
+
+.capture-attach-head .faction-chip {
+  margin-left: auto;
+}
+
+.capture-attach-hint {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.capture-attached {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.capture-attached .btn {
+  margin-left: auto;
+}
+
+.receipt-scanner {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.receipt-manual {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.receipt-input {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  resize: vertical;
+}
+
+.receipt-manual-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.receipt-manual-actions .btn {
+  flex: 1;
+}
+
+/* ---------- игровой режим: карта ---------- */
+
+.layer-btn {
+  position: absolute;
+  right: 12px;
+  top: calc(124px + env(safe-area-inset-top));
+  z-index: 900;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  width: 46px;
+  height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  box-shadow: 0 4px 14px rgba(46, 42, 38, 0.12);
+  transition: transform 0.15s, color 0.2s, background 0.2s;
+}
+
+.layer-btn.on {
+  color: var(--primary);
+  background: var(--primary-soft);
+  border-color: color-mix(in srgb, var(--primary) 30%, var(--border));
+}
+
+.layer-btn:active {
+  transform: scale(0.93);
+}
+
+/* Ореол владения под маркером сети: клики сквозь него проходят */
+.own-halo {
+  pointer-events: none;
+}
+
+.own-halo.pulsing {
+  animation: halo-pulse 2.6s ease-in-out infinite;
+}
+
+@keyframes halo-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.5; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .own-halo.pulsing { animation: none; }
+}
+
+/* Таймер прямо на карте — без «пузыря» Leaflet, только плашка */
+.leaflet-tooltip.map-timer-tip {
+  background: var(--surface);
+  border: none;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(46, 42, 38, 0.22);
+  padding: 2px 7px;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.leaflet-tooltip.map-timer-tip::before {
+  display: none;
+}
+
+.leaflet-tooltip.map-timer-tip.green { color: var(--green-faction-ink); }
+.leaflet-tooltip.map-timer-tip.purple { color: var(--purple-faction-ink); }
+
+/* ---------- игровой режим: настройки в профиле ---------- */
+
+.game-settings {
+  background: var(--surface);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-soft);
+  padding: 4px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.game-toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 12px 0;
+  text-align: left;
+}
+
+.game-toggle-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.game-toggle-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.game-toggle-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.game-switch {
+  flex: none;
+  margin-left: auto;
+  width: 46px;
+  height: 28px;
+  border-radius: 10px;
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  padding: 3px;
+  display: flex;
+  transition: background 0.22s ease, border-color 0.22s ease;
+}
+
+.game-toggle.on .game-switch {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+.game-switch-knob {
+  width: 20px;
+  height: 20px;
+  border-radius: 7px;
+  background: var(--surface);
+  box-shadow: 0 1px 3px rgba(46, 42, 38, 0.25);
+  transition: transform 0.22s cubic-bezier(0.32, 1.1, 0.4, 1);
+}
+
+.game-toggle.on .game-switch-knob {
+  transform: translateX(18px);
+}
+
+.game-side-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+  font-size: 14px;
+}
+
+.game-settings-note {
+  font-size: 12px;
+}
+
+.standings-card {
+  background: var(--surface);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-soft);
+  padding: 14px;
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.standings-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.standings-row {
+  display: grid;
+  grid-template-columns: 88px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.standings-title {
+  font-weight: 600;
+}
+
+.standings-row.green .standings-title { color: var(--green-faction-ink); }
+.standings-row.purple .standings-title { color: var(--purple-faction-ink); }
+
+.standings-bar {
+  height: 10px;
+  border-radius: 5px;
+  background: var(--surface-alt);
+  overflow: hidden;
+}
+
+.standings-fill {
+  display: block;
+  height: 100%;
+  border-radius: 5px;
+  transition: width 0.5s ease;
+}
+
+.standings-fill.green { background: var(--green-faction); }
+.standings-fill.purple { background: var(--purple-faction); }
+
+.standings-value {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.standings-foot {
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+/* Игровые плашки в строке адреса не должны ломать её на узких экранах */
+.address-card-game {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.game-onboarding.closing,
+.faction-picker.closing {
+  animation: fade-out 0.2s ease forwards;
+}
+
+/* ---------- рейтинг: своё место, «…», зачёт по фракции ---------- */
+
+/* Первая десятка влезает без прокрутки; она появляется, только когда
+   человек сам подгрузил следующие места кнопкой «…» */
+/* Список ограничен экраном, а не количеством строк: десятка, «…» и своё
+   место укладываются без прокрутки, а прокрутка появляется сама, когда
+   человек подгрузил ещё места (или экран совсем небольшой).
+   292px — шапка страницы с переключателями плюс место под доком; замерено. */
+.rating-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: calc(min(100vh, 100dvh) - 322px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* тени строк обрезались бы краем области прокрутки */
+  padding: 2px;
+  margin: -2px;
+}
+
+/* Многоточие-разрыв между таблицей и своей строкой */
+.rating-gap {
+  align-self: center;
+  min-width: 72px;
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: 999px;
+  background: var(--surface-alt);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  padding-bottom: 4px;
+  transition: transform 0.15s, background 0.15s, color 0.15s;
+}
+
+.rating-gap:hover {
+  background: var(--primary-soft);
+  color: var(--primary-ink);
+}
+
+.rating-gap:active {
+  transform: scale(0.94);
+}
+
+.rating-gap.is-busy {
+  padding-bottom: 0;
+}
+
+/* Своя строка ниже разрыва — заметная, но не крикливая */
+.rating-list .rating-row.me {
+  outline: 2px solid var(--primary);
+  outline-offset: 0;
+}
+
+/* Зачёт «все / своя фракция» — компактный слайдер: рядом с выбором периода
+   он второстепенен, большие кнопки на него тратить незачем */
+.scope-switch-row {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.scope-switch {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+}
+
+.scope-switch button {
+  position: relative;
+  z-index: 1;
+  min-width: 76px;
+  min-height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+  transition: color 0.22s ease 0.04s;
+}
+
+.scope-switch button.on {
+  color: var(--text);
+}
+
+/* Бегунок переезжает так же, как подсветка в доке */
+.scope-switch-thumb {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc((100% - 6px) / 2);
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: 0 1px 4px rgba(46, 42, 38, 0.16);
+  pointer-events: none;
+  transition: transform 0.26s cubic-bezier(0.32, 1.1, 0.4, 1);
+}
+
+/* Когда выбран зачёт своей фракции, бегунок берёт её цвет */
+.scope-switch.green button.on:last-child {
+  color: var(--green-faction-ink);
+}
+
+.scope-switch.purple button.on:last-child {
+  color: var(--purple-faction-ink);
+}
+
+/* ---------- колокольчик в шапке точки ---------- */
+
+.head-bell {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  background: var(--surface-alt);
+  transition: background 0.18s, color 0.18s, transform 0.15s;
+}
+
+.head-bell.on {
+  background: var(--primary-soft);
+  color: var(--primary-ink);
+}
+
+.head-bell:active {
+  transform: scale(0.92);
+}
+
+/* Две кнопки в подвале модалки — «отправить» и «назад» */
+.modal-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }

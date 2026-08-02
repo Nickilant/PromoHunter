@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import { api } from '../api/client';
+import { CaptureTimer, OwnerChip } from '../components/GameBits';
 import RestaurantModal from '../components/RestaurantModal';
 import { useCity } from '../hooks/useCity';
+import { useGame } from '../hooks/useGame';
 import type { RestaurantListItem } from '../types';
 import { timeAgo } from '../utils/time';
 import Icon from '../components/Icon';
@@ -14,7 +16,9 @@ export default function BrandPage() {
   const { brandId } = useParams();
   const [restaurants, setRestaurants] = useState<RestaurantListItem[] | null>(null);
   const [openId, setOpenId] = useState<number | null>(null);
+  const [query, setQuery] = useState('');
   const { city } = useCity();
+  const { enabled: gameEnabled, pointOf } = useGame();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -27,6 +31,17 @@ export default function BrandPage() {
   }, [city, brandId]);
 
   const brand = restaurants?.[0]?.brand ?? null;
+
+  // У крупных сетей в городе десятки адресов — глазами не найти
+  const q = query.trim().toLowerCase();
+  const shown = (restaurants ?? []).filter(
+    (r) =>
+      !q ||
+      r.address.toLowerCase().includes(q) ||
+      (r.title ?? '').toLowerCase().includes(q),
+  );
+  // Строку поиска показываем, когда искать есть в чём
+  const searchable = (restaurants?.length ?? 0) > 5;
 
   return (
     <div className="page">
@@ -55,6 +70,16 @@ export default function BrandPage() {
         </div>
       )}
 
+      {searchable && (
+        <input
+          className="search-input"
+          type="search"
+          value={query}
+          placeholder="Адрес или название точки"
+          onChange={(e) => setQuery(e.target.value)}
+        />
+      )}
+
       {restaurants !== null && restaurants.length === 0 && (
         <div className="empty-state">
           <div className="big"><Icon name="city" size={44} strokeWidth={1.4} /></div>
@@ -62,8 +87,19 @@ export default function BrandPage() {
         </div>
       )}
 
-      {restaurants?.map((r) => {
+      {restaurants !== null && restaurants.length > 0 && shown.length === 0 && (
+        <div className="empty-state">
+          <div className="big"><Icon name="search" size={44} strokeWidth={1.4} /></div>
+          <div>Ничего не нашлось по запросу «{query.trim()}»</div>
+          <button className="btn btn-ghost" onClick={() => setQuery('')}>
+            Показать все адреса
+          </button>
+        </div>
+      )}
+
+      {shown.map((r) => {
         const updated = timeAgo(r.last_report_at);
+        const point = gameEnabled ? pointOf(r.id) : undefined;
         return (
           <button key={r.id} className="address-card" onClick={() => setOpenId(r.id)}>
             <span className="address-card-body">
@@ -74,6 +110,12 @@ export default function BrandPage() {
               <span className="brand-card-meta">
                 {updated ? `отчёты ${updated}` : 'отчётов ещё не было'}
               </span>
+              {point && (
+                <span className="address-card-game">
+                  <OwnerChip owner={point.owner} size="small" />
+                  <CaptureTimer point={point} />
+                </span>
+              )}
             </span>
             <span className="chevron-right"><Icon name="chevronRight" size={20} /></span>
           </button>
