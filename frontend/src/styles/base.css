@@ -1578,6 +1578,96 @@ select.city-chip {
 
 /* Список «рядом»: расстояние слева фиксированной колонкой, чтобы адреса
    выстраивались по одной линии и список читался сверху вниз */
+/* ---------- промокоды ---------- */
+
+.promo-code {
+  background: var(--surface-alt);
+  border-radius: var(--radius-control);
+  overflow: hidden;
+}
+
+.promo-code.selected {
+  outline: 2px solid var(--primary);
+}
+
+.promo-code-main {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  padding: 12px 14px;
+  text-align: left;
+}
+
+/* Моноширинный: код переписывают глазами, и «0» с «O» путать нельзя */
+.promo-code-value {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+}
+
+.promo-code-desc {
+  font-size: 14px;
+}
+
+.promo-code-meta {
+  font-size: 12px;
+}
+
+.promo-code-actions {
+  display: flex;
+  gap: 8px;
+  padding: 0 14px 12px;
+}
+
+.promo-code-actions .btn {
+  flex: 1;
+}
+
+.promo-code-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.promo-code-form-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.promo-code-form-actions .btn {
+  flex: 1;
+}
+
+/* Выбор охвата при добавлении: та же пара кнопок, что у канала отчёта */
+.scope-choice {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.scope-choice button {
+  min-height: 44px;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--border);
+  background: var(--surface-alt);
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 0 8px;
+}
+
+.scope-choice button.on {
+  background: var(--primary-soft);
+  border-color: var(--primary);
+  color: var(--primary-ink);
+}
+
+.scope-choice button:disabled {
+  opacity: 0.5;
+}
+
 /* «На карте» — рядом с адресом в шапке карточки точки. Мелкая и вторичная:
    основное действие в карточке — акции, а не переход на карту */
 .show-on-map {

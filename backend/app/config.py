@@ -63,6 +63,15 @@ class Settings(BaseSettings):
     rating_spam_points: int = -10
     rating_daily_base_cap: int = 10       # отчётов в день с базовыми очками
 
+    # --- промокоды (отдельная сущность, см. services/promo_code.py) ---
+    promo_code_ttl_days: float = 5.0          # столько живёт код без подтверждений
+    # Пол продления: n-е подтверждение одного человека даёт ttl / 2^(n-1),
+    # но не меньше этого — держать код в одиночку можно, но дёшево не выйдет
+    promo_code_ttl_floor_hours: float = 12.0
+    promo_code_fail_votes: int = 2            # столько разных жалоб убивают код
+    promo_code_author_points: int = 5         # автору, один раз за жизнь кода
+    promo_code_daily_limit: int = 10          # сколько кодов человек добавит за сутки
+
     # --- фоновый пересчёт ---
     trust_job_interval_seconds: int = 300  # 0 — выключить фоновую джобу
 

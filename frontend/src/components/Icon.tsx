@@ -36,6 +36,7 @@ export type IconName =
   | 'city'
   | 'logout'
   | 'lock'
+  | 'ticket'
   | 'shield'
   | 'flag'
   | 'swords'
@@ -188,6 +189,13 @@ const PATHS: Record<IconName, ReactNode> = {
     </>
   ),
 
+  // Купон с фигурным вырезом по бокам — узнаваемая форма скидки
+  ticket: (
+    <>
+      <path d="M3.6 9.2V6.8a1.6 1.6 0 0 1 1.6-1.6h13.6a1.6 1.6 0 0 1 1.6 1.6v2.4a2.8 2.8 0 0 0 0 5.6v2.4a1.6 1.6 0 0 1-1.6 1.6H5.2a1.6 1.6 0 0 1-1.6-1.6v-2.4a2.8 2.8 0 0 0 0-5.6Z" />
+      <path d="M14 8.6v1.6m0 3.6v1.6" />
+    </>
+  ),
   lock: (
     <>
       <rect x="4.2" y="10.4" width="15.6" height="10" rx="2.2" />

@@ -393,7 +393,7 @@ class RatingEvent(Base):
     )
     city: Mapped[str | None] = mapped_column(String(100))
     # report_base | report_confirmed | pioneer | scout | suggestion_approved |
-    # report_refuted | suggestion_spam
+    # report_refuted | suggestion_spam | promo_code_used
     type: Mapped[str] = mapped_column(String(32), nullable=False)
     points: Mapped[int] = mapped_column(Integer, nullable=False)
     report_id: Mapped[int | None] = mapped_column(
@@ -738,5 +738,99 @@ class FactionStanding(Base):
     captures: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     defends: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class PromoCode(Base):
+    """Промокод на скидку у сети.
+
+    Отдельная сущность со своей жизнью: ни к игровому режиму, ни к весам
+    пользователей, ни к статусам наличия не привязана. Код — не предмет на
+    полке конкретной точки, а информация, которая либо работает у всей сети,
+    либо нет; поэтому и живёт он у бренда, а не у ресторана.
+
+    Свежесть: код протухает через `expires_at`, каждое подтверждение
+    использования продлевает срок (см. services/promo_code.py). Мёртвые
+    строки не удаляем, а прячем — иначе тот же код добавляли бы заново ради
+    очков автору, и терялась бы защита от дублей.
+    """
+
+    __tablename__ = "promo_codes"
+    __table_args__ = (
+        # Один код на сеть: два человека, принёсшие «SALE20», должны попасть
+        # в одну строку, а не завести две
+        UniqueConstraint("brand_id", "code_key", name="uq_promo_codes_brand_code"),
+        Index("ix_promo_codes_brand_expires", "brand_id", "expires_at"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    brand_id: Mapped[int] = mapped_column(
+        ForeignKey("brands.id", ondelete="CASCADE"), nullable=False
+    )
+    code: Mapped[str] = mapped_column(String(64), nullable=False)
+    # Нормализованный код для сравнения: регистр и пробелы не разводят один
+    # код на два — тот же приём, что у городов
+    code_key: Mapped[str] = mapped_column(String(64), nullable=False)
+    description: Mapped[str] = mapped_column(String(200), nullable=False)
+    author_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )
+    # true — работает по всей стране; false — только в городах из promo_code_cities
+    is_global: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default="true", nullable=False
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    # +5 автору начисляются один раз за всю жизнь кода
+    author_awarded: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false", nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    brand: Mapped["Brand"] = relationship()
+    author: Mapped["User | None"] = relationship()
+    cities: Mapped[list["PromoCodeCity"]] = relationship(
+        back_populates="promo_code", cascade="all, delete-orphan"
+    )
+
+
+class PromoCodeCity(Base):
+    """Город регионального кода. Для глобального строк нет."""
+
+    __tablename__ = "promo_code_cities"
+
+    promo_code_id: Mapped[int] = mapped_column(
+        ForeignKey("promo_codes.id", ondelete="CASCADE"), primary_key=True
+    )
+    city: Mapped[str] = mapped_column(String(100), primary_key=True)
+
+    promo_code: Mapped["PromoCode"] = relationship(back_populates="cities")
+
+
+class PromoCodeVote(Base):
+    """«Сработал» / «не сработал» по коду.
+
+    Хранятся все, а не только последний по человеку: номер подтверждения
+    внутри пары (код, человек) задаёт, насколько сильно оно продлевает срок.
+    """
+
+    __tablename__ = "promo_code_votes"
+    __table_args__ = (
+        Index("ix_promo_code_votes_code_user", "promo_code_id", "user_id"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    promo_code_id: Mapped[int] = mapped_column(
+        ForeignKey("promo_codes.id", ondelete="CASCADE"), nullable=False
+    )
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    worked: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

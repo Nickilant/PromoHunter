@@ -395,3 +395,19 @@ export interface GameStandings {
   neutral: number;
   standings: FactionStanding[];
 }
+
+// --- промокоды ---
+
+export interface PromoCode {
+  id: number;
+  code: string;
+  description: string;
+  is_global: boolean;
+  cities: string[];
+  author_name: string | null;
+  confirmations: number;
+  expires_at: string;
+  created_at: string;
+  confirmed_by_me: boolean;
+  is_mine: boolean;
+}

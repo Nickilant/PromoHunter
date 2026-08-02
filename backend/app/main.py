@@ -12,6 +12,7 @@ from app.routers import (
     admin,
     auth,
     game,
+    promo_codes,
     public,
     rating,
     reports,
@@ -96,6 +97,7 @@ app.include_router(suggestions.router, prefix="/api")
 app.include_router(restaurant_suggestions.router, prefix="/api")
 app.include_router(subscriptions.router, prefix="/api")
 app.include_router(rating.router, prefix="/api")
+app.include_router(promo_codes.router, prefix="/api")
 app.include_router(game.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
 

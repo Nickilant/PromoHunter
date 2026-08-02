@@ -24,6 +24,7 @@ const TYPE_LABELS: Record<string, string> = {
   scout: 'Разведка новых точек',
   suggestion_approved: 'Одобренные акции',
   restaurant_approved: 'Добавленные рестораны',
+  promo_code_used: 'Промокоды, которыми воспользовались',
   report_refuted: 'Опровергнутые отчёты',
   suggestion_spam: 'Заявки-спам',
   restaurant_spam: 'Заявки на рестораны — спам',

@@ -11,6 +11,7 @@ import type {
 } from '../types';
 import CapturePanel from './CapturePanel';
 import Overlay from './Overlay';
+import PromoCodesModal from './PromoCodesModal';
 import PromotionAccordion from './PromotionAccordion';
 import ReportModal from './ReportModal';
 import Icon from './Icon';
@@ -28,6 +29,7 @@ export default function RestaurantModal({ restaurantId, onClose }: Props) {
     restaurant: RestaurantShort;
     promotion: PromotionWithStatuses;
   } | null>(null);
+  const [codesOpen, setCodesOpen] = useState(false);
   const { user } = useAuth();
   const { isSubscribedToRestaurant, toggleRestaurant } = useSubscriptions();
   const navigate = useNavigate();
@@ -94,6 +96,18 @@ export default function RestaurantModal({ restaurantId, onClose }: Props) {
                 />
               </div>
             )}
+            {/* Промокоды сети — рядом с колокольчиком: человек уже выбрал
+                точку и вот-вот сделает заказ */}
+            {detail && (
+              <button
+                className="head-bell"
+                onClick={() => setCodesOpen(true)}
+                aria-label="Промокоды сети"
+                title="Промокоды сети"
+              >
+                <Icon name="ticket" size={19} />
+              </button>
+            )}
             {/* Колокольчик — в строке с названием, а не отдельной полосой */}
             {detail && (
               <button
@@ -148,6 +162,10 @@ export default function RestaurantModal({ restaurantId, onClose }: Props) {
         </div>
       </div>
       </Overlay>
+
+      {codesOpen && detail && (
+        <PromoCodesModal brand={detail.brand} onClose={() => setCodesOpen(false)} />
+      )}
 
       {/* Отметка наличия — свой оверлей со своим порталом, вкладывать её
           в портал карточки нельзя (см. комментарий в Overlay.tsx) */}

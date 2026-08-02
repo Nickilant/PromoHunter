@@ -715,3 +715,34 @@ class GameStandingsOut(BaseModel):
     points_total: int
     neutral: int
     standings: list[FactionStandingOut]
+
+
+# --- промокоды ---
+
+class PromoCodeOut(BaseModel):
+    id: int
+    code: str
+    description: str
+    is_global: bool
+    cities: list[str] = []
+    author_name: str | None = None
+    # сколько раз подтверждали, что сработал
+    confirmations: int = 0
+    expires_at: datetime
+    created_at: datetime
+    # Подтверждал ли текущий пользователь этот код
+    confirmed_by_me: bool = False
+    is_mine: bool = False
+
+
+class PromoCodeIn(BaseModel):
+    brand_id: int
+    code: str = Field(min_length=2, max_length=64)
+    description: str = Field(min_length=3, max_length=200)
+    # false — код только для города, из которого его принесли
+    is_global: bool = True
+    city: str | None = Field(default=None, max_length=100)
+
+
+class PromoCodeVoteIn(BaseModel):
+    worked: bool
