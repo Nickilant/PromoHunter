@@ -486,3 +486,130 @@ def test_receipt_accepted_within_half_hour(client, db):
     resp = client.post("/api/reports", json=stale, headers=headers)
     assert resp.status_code == 400
     assert "старый" in resp.json()["detail"]
+
+
+# --- послабления для админа ----------------------------------------------
+
+
+def make_admin(db, phone):
+    from sqlalchemy import select
+
+    from app.models import UserRole
+
+    user = db.scalar(select(User).where(User.phone == phone))
+    user.role = UserRole.admin
+    db.commit()
+    return user
+
+
+def test_admin_receipt_counts_when_old_and_far(client, db):
+    """Админ проверяет механику, не выходя из дома и не бегая за чеком."""
+    restaurant, promotion, _ = make_fixtures(db)
+    phone = "+79165559001"
+    headers = register(client, phone)
+    make_admin(db, phone)
+    enable_game(client, headers, "green")
+    item = promotion.items[0]
+
+    body = {
+        "restaurant_id": restaurant.id,
+        "promotion_id": promotion.id,
+        "items": [{"promotion_item_id": item.id, "is_available": True}],
+        # координат нет вовсе, чек трёхдневной давности
+        "receipt_qr": fresh_qr(restaurant, 940, drive=1, minutes_ago=3 * 24 * 60),
+    }
+    resp = client.post("/api/reports", json=body, headers=headers)
+    assert resp.status_code == 201, resp.text
+    assert resp.json()["capture"]["faction"] == "green"
+
+    control = db.get(PointControl, restaurant.id)
+    assert control.green_score > 0
+
+
+def test_admin_may_bring_receipts_out_of_order(client, db):
+    """Старый чек имеет меньший номер документа — без послабления
+    монотонность отвергла бы его, и «любой давности» не работало бы."""
+    restaurant, promotion, _ = make_fixtures(db)
+    phone = "+79165559002"
+    headers = register(client, phone)
+    make_admin(db, phone)
+    enable_game(client, headers, "green")
+    item = promotion.items[0]
+
+    body = {
+        "restaurant_id": restaurant.id,
+        "promotion_id": promotion.id,
+        "items": [{"promotion_item_id": item.id, "is_available": True}],
+        "lat": restaurant.lat,
+        "lng": restaurant.lng,
+    }
+    assert client.post(
+        "/api/reports",
+        json=dict(body, receipt_qr=fresh_qr(restaurant, 900, drive=2)),
+        headers=headers,
+    ).status_code == 201
+    # номер меньше уже виденного
+    assert client.post(
+        "/api/reports",
+        json=dict(body, receipt_qr=fresh_qr(restaurant, 800, drive=2, minutes_ago=200)),
+        headers=headers,
+    ).status_code == 201
+
+    # но планка кассы не опустилась: обычному человеку старый номер не пройдёт
+    from sqlalchemy import select
+
+    from app.models import FiscalDrive
+
+    drive = db.scalar(select(FiscalDrive).where(FiscalDrive.fn.like("%2")))
+    assert drive.max_doc_number == 900
+
+
+def test_admin_still_cannot_reuse_one_receipt(client, db):
+    """Уникальность не снимается: дважды один чек — это испорченные данные."""
+    restaurant, promotion, _ = make_fixtures(db)
+    phone = "+79165559003"
+    headers = register(client, phone)
+    make_admin(db, phone)
+    enable_game(client, headers, "green")
+    item = promotion.items[0]
+
+    qr = fresh_qr(restaurant, 950, drive=3)
+    body = {
+        "restaurant_id": restaurant.id,
+        "promotion_id": promotion.id,
+        "items": [{"promotion_item_id": item.id, "is_available": True}],
+        "receipt_qr": qr,
+    }
+    assert client.post("/api/reports", json=body, headers=headers).status_code == 201
+    resp = client.post("/api/reports", json=body, headers=headers)
+    assert resp.status_code == 400
+    assert "уже предъявляли" in resp.json()["detail"]
+
+
+def test_plain_user_keeps_all_checks(client, db):
+    """Послабление именно для админа, а не для всех подряд."""
+    restaurant, promotion, _ = make_fixtures(db)
+    register(client, "+79165559004")  # первый регистрируется админом
+    headers = register(client, "+79165559005")
+    enable_game(client, headers, "green")
+    item = promotion.items[0]
+
+    body = {
+        "restaurant_id": restaurant.id,
+        "promotion_id": promotion.id,
+        "items": [{"promotion_item_id": item.id, "is_available": True}],
+        "lat": restaurant.lat,
+        "lng": restaurant.lng,
+        "receipt_qr": fresh_qr(restaurant, 960, drive=4, minutes_ago=3 * 24 * 60),
+    }
+    resp = client.post("/api/reports", json=body, headers=headers)
+    assert resp.status_code == 400
+    assert "старый" in resp.json()["detail"]
+
+    # и без координат тоже не пустит
+    fresh = dict(body, receipt_qr=fresh_qr(restaurant, 961, drive=4))
+    fresh.pop("lat")
+    fresh.pop("lng")
+    resp = client.post("/api/reports", json=fresh, headers=headers)
+    assert resp.status_code == 400
+    assert "геолокации" in resp.json()["detail"]

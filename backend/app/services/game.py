@@ -40,6 +40,7 @@ from app.models import (
     ReportVerdict,
     Restaurant,
     User,
+    UserRole,
     VerdictOutcome,
 )
 from app.services.receipt import (
@@ -512,11 +513,16 @@ def apply_receipt(
     if not user.game_mode or user.faction is None:
         raise ReceiptError("Сначала включите игровой режим и выберите сторону")
 
+    # Админ проверяет механику, не выходя из дома и не бегая за свежим чеком:
+    # ему снимаем свежесть, гео и «номер документа растёт». Уникальность чека
+    # остаётся — дважды один и тот же не засчитается никому.
+    trusted = user.role == UserRole.admin
+
     check_sum(parsed)
-    check_geo(restaurant, lat, lng)
+    check_geo(restaurant, lat, lng, trusted)
     purchased_at = receipt_moment(parsed, restaurant, client_offset_minutes)
-    check_freshness(purchased_at, now)
-    register_receipt(db, parsed, restaurant, user.id, purchased_at, now)
+    check_freshness(purchased_at, now, trusted)
+    register_receipt(db, parsed, restaurant, user.id, purchased_at, now, trusted)
 
     faction = user.faction
     control = get_control(db, restaurant.id, now)

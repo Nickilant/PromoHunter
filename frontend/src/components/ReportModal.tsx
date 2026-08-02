@@ -13,6 +13,7 @@ import type { IconName } from './Icon';
 import Overlay from './Overlay';
 import ReceiptScanner from './ReceiptScanner';
 import { useDismiss } from '../hooks/useDismiss';
+import { useAuth } from '../hooks/useAuth';
 import { useGame } from '../hooks/useGame';
 import { FACTION_TITLE } from '../utils/faction';
 
@@ -60,6 +61,10 @@ export default function ReportModal({ restaurant, promotion, onClose, onReported
   const [locating, setLocating] = useState(false);
   const toast = useToast();
   const { enabled: gameEnabled, faction, config, refreshPoints } = useGame();
+  const { user } = useAuth();
+  // Админу сервер засчитывает чек без гео и без ограничения по свежести —
+  // значит и здесь не требуем координат, иначе до сервера дело не дойдёт
+  const isAdmin = user?.role === 'admin';
 
   const { closing, dismiss, onAnimationEnd } = useDismiss(onClose);
 
@@ -79,9 +84,13 @@ export default function ReportModal({ restaurant, promotion, onClose, onReported
       });
       setReceipt(raw);
     } catch {
-      setError(
-        'Нужно разрешить доступ к геолокации — чек засчитываем только на точке',
-      );
+      if (isAdmin) {
+        setReceipt(raw);
+      } else {
+        setError(
+          'Нужно разрешить доступ к геолокации — чек засчитываем только на точке',
+        );
+      }
     } finally {
       setLocating(false);
     }
@@ -238,13 +247,16 @@ export default function ReportModal({ restaurant, promotion, onClose, onReported
               {receipt === null ? (
                 <>
                   <div className="capture-attach-hint">
-                    {hasYes
-                      ? 'Для начала захвата отсканируйте QR-код на чеке с акционным ' +
-                        `товаром не позднее чем через ${
-                          config?.receipt_max_age_minutes ?? 30
-                        } минут после покупки`
-                      : 'Для начала захвата точки отметьте наличие и отсканируйте ' +
-                        'QR на чеке с акционным товаром'}
+                    {!hasYes
+                      ? 'Для начала захвата точки отметьте наличие и отсканируйте ' +
+                        'QR на чеке с акционным товаром'
+                      : isAdmin
+                        ? 'Права админа: чек засчитывается любой давности и из ' +
+                          'любого места'
+                        : 'Для начала захвата отсканируйте QR-код на чеке с ' +
+                          `акционным товаром не позднее чем через ${
+                            config?.receipt_max_age_minutes ?? 30
+                          } минут после покупки`}
                   </div>
                   {hasYes && (
                     <>

@@ -125,8 +125,13 @@ def distance_m(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
     return 2 * r * math.asin(math.sqrt(a))
 
 
-def check_geo(restaurant: Restaurant, lat: float | None, lng: float | None) -> None:
-    if not settings.capture_require_geo:
+def check_geo(
+    restaurant: Restaurant,
+    lat: float | None,
+    lng: float | None,
+    trusted: bool = False,
+) -> None:
+    if trusted or not settings.capture_require_geo:
         return
     if lat is None or lng is None:
         raise ReceiptError(
@@ -185,7 +190,9 @@ def receipt_moment(
     return parsed.local_time.replace(tzinfo=timezone.utc) - offset
 
 
-def check_freshness(purchased_at: datetime, now: datetime) -> None:
+def check_freshness(purchased_at: datetime, now: datetime, trusted: bool = False) -> None:
+    if trusted:
+        return
     age = now - purchased_at
     if age > timedelta(minutes=settings.receipt_max_age_minutes):
         raise ReceiptError(
@@ -208,6 +215,7 @@ def _check_drive(
     restaurant: Restaurant,
     purchased_at: datetime,
     now: datetime,
+    trusted: bool = False,
 ) -> FiscalDrive:
     """Проверки по кассе: привязка к точке, монотонность и скорость счётчика."""
     drive = db.scalar(select(FiscalDrive).where(FiscalDrive.fn == parsed.fn))
@@ -230,6 +238,12 @@ def _check_drive(
     if drive.is_bound and drive.restaurant_id != restaurant.id:
         raise ReceiptError("Эта касса закреплена за другой точкой — чек не подходит")
 
+    # Обе проверки ниже — про «этот чек новее уже виденных». У старого чека
+    # номер документа заведомо меньше, поэтому доверенному отправителю их
+    # снимаем: иначе разрешение приносить старые чеки не работало бы.
+    if trusted:
+        return drive
+
     if drive.max_doc_number and parsed.doc_number <= drive.max_doc_number:
         raise ReceiptError("Такой чек с этой кассы уже был — номер документа не растёт")
 
@@ -251,11 +265,15 @@ def register_receipt(
     user_id: int,
     purchased_at: datetime,
     now: datetime,
+    trusted: bool = False,
 ) -> FiscalDrive:
     """Провести все проверки кассы и обновить её состояние.
 
     Дубликат (fn, i) отсекается уникальным индексом, но раннюю проверку тоже
     делаем — чтобы вернуть человеку понятную причину, а не 500.
+
+    Уникальность не снимается даже для доверенного отправителя: один и тот же
+    чек, засчитанный дважды, — это уже не послабление, а испорченные данные.
     """
     exists_already = db.scalar(
         select(Receipt.id).where(
@@ -265,9 +283,12 @@ def register_receipt(
     if exists_already is not None:
         raise ReceiptError("Этот чек уже предъявляли")
 
-    drive = _check_drive(db, parsed, restaurant, purchased_at, now)
-    drive.max_doc_number = parsed.doc_number
-    drive.max_doc_at = purchased_at
+    drive = _check_drive(db, parsed, restaurant, purchased_at, now, trusted)
+    # Планка кассы только растёт: старый чек, принесённый админом, не должен
+    # опускать её и облегчать жизнь тому, кто потом придёт с подделкой
+    if not drive.max_doc_number or parsed.doc_number > drive.max_doc_number:
+        drive.max_doc_number = parsed.doc_number
+        drive.max_doc_at = purchased_at
     drive.last_seen_at = now
 
     if not drive.is_bound:
