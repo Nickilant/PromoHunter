@@ -54,11 +54,6 @@ export default function BottomNav() {
     return () => cancelAnimationFrame(id);
   }, []);
 
-  // Указатель увели с кнопки — перехода не будет, подсветку возвращаем на
-  // место. Иначе после «нажал и провёл пальцем мимо» плашка оставалась на
-  // кнопке, хотя вкладка не переключилась.
-  const cancelPress = () => setPressed(null);
-
   const renderItem = (item: NavItem) => {
     const isActive = active?.to === item.to;
     // На центральной вкладке индикатор скрыт — обычные пункты не должны
@@ -70,16 +65,9 @@ export default function BottomNav() {
         to={item.to}
         className={`dock-item ${isActive ? 'active' : ''} ${isTarget ? 'lit' : ''}`}
         aria-current={isActive ? 'page' : undefined}
-        onPointerDown={(e) => {
-          // Тач по умолчанию захватывает указатель целью, и pointerleave до
-          // неё не доходит — снимаем захват, иначе отмену не поймать
-          if (e.currentTarget.hasPointerCapture?.(e.pointerId)) {
-            e.currentTarget.releasePointerCapture(e.pointerId);
-          }
-          setPressed(item.slot);
-        }}
-        onPointerLeave={cancelPress}
-        onPointerCancel={cancelPress}
+        // click подтверждает полноценный тап. pointerdown/pointerleave в
+        // мобильных WebView могут приходить подряд и дёргать индикатор назад.
+        onClick={() => setPressed(item.slot)}
       >
         <Icon name={item.icon} size={22} />
         <span>{item.label}</span>
@@ -105,7 +93,7 @@ export default function BottomNav() {
         className={`dock-action${pathname.startsWith('/nearby') ? ' active' : ''}`}
         aria-label="Точки рядом со мной"
         aria-current={pathname.startsWith('/nearby') ? 'page' : undefined}
-        onPointerDown={() => setPressed(null)}
+        onClick={() => setPressed(null)}
       >
         <Icon name="locate" size={24} strokeWidth={2} />
       </Link>
