@@ -304,9 +304,9 @@ export default function MapPage() {
                 </div>
               )}
             </div>
-            {selectedId !== null && <CapturePanel restaurantId={selectedId} />}
-            {/* скроллится только список акций — шапка и подписка закреплены */}
+            {/* Шапка закреплена, всё изменяемое по высоте прокручивается вместе. */}
             <div className="bottom-sheet-scroll">
+              {selectedId !== null && <CapturePanel restaurantId={selectedId} />}
               {selected && selected.promotions.length === 0 && (
                 <div className="empty-state" style={{ padding: '16px 24px 24px' }}>
                   Сейчас в этой точке нет действующих акций

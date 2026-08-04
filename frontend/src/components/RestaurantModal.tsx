@@ -159,8 +159,8 @@ export default function RestaurantModal({ restaurantId, onClose }: Props) {
               </button>
             </div>}
           </div>
-          <CapturePanel restaurantId={restaurantId} />
-          <div className="modal-body" style={{ paddingBottom: 16 }}>
+          <div className="modal-body restaurant-modal-scroll" style={{ paddingBottom: 16 }}>
+            <CapturePanel restaurantId={restaurantId} />
             {detail && detail.promotions.length === 0 && (
               <div className="empty-state">Сейчас в этой точке нет действующих акций</div>
             )}

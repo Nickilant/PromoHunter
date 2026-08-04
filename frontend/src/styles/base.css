@@ -629,6 +629,7 @@ input, textarea, select {
 }
 
 .modal-body {
+  flex: 1;
   padding: 8px 16px;
   overflow-y: auto;
   display: flex;
@@ -1909,6 +1910,14 @@ select.city-chip {
   padding: 2px 8px;
 }
 
+.nearby-title .brand-chip.small {
+  max-width: 100%;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  line-height: 1.2;
+}
+
 .suggest-pending {
   display: flex;
   align-items: center;
@@ -2481,7 +2490,10 @@ select.city-chip {
 }
 
 .bottom-sheet-scroll {
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -2978,6 +2990,15 @@ select.city-chip {
   background: var(--surface-alt);
   overflow: hidden;
   box-shadow: var(--shadow-soft);
+}
+
+.restaurant-modal-scroll > .capture-panel {
+  margin: 0 0 12px;
+  flex: none;
+}
+
+.bottom-sheet-scroll > .capture-panel {
+  flex: none;
 }
 
 .capture-panel-head {
