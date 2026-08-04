@@ -88,6 +88,7 @@ export default function RestaurantModal({ restaurantId, onClose }: Props) {
           className={`modal${closing ? ' closing' : ''}`}
           onClick={(e) => e.stopPropagation()}
         >
+          <div className="restaurant-point-summary">
           <div className="modal-head restaurant-modal-head">
             {detail ? (
               <div className="restaurant-modal-identity">
@@ -159,20 +160,20 @@ export default function RestaurantModal({ restaurantId, onClose }: Props) {
               </button>
             </div>}
           </div>
+          <CapturePanel restaurantId={restaurantId} />
+          </div>
           <div className="modal-body restaurant-modal-scroll" style={{ paddingBottom: 16 }}>
-            <CapturePanel restaurantId={restaurantId} />
             {detail && detail.promotions.length === 0 && (
               <div className="empty-state">Сейчас в этой точке нет действующих акций</div>
             )}
             {detail?.promotions.map((promo) => (
-              <div className="promo-in-modal" key={promo.id}>
-                <PromotionAccordion
-                  restaurant={detail}
-                  promotion={promo}
-                  onReport={openReport}
-                  defaultOpen={detail.promotions.length === 1}
-                />
-              </div>
+              <PromotionAccordion
+                key={promo.id}
+                restaurant={detail}
+                promotion={promo}
+                onReport={openReport}
+                defaultOpen={detail.promotions.length === 1}
+              />
             ))}
             {detail && <button className="data-issue-link data-issue-link-bottom" onClick={() => {
               if (!user) { navigate('/login'); return; }

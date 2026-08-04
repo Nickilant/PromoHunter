@@ -1356,6 +1356,7 @@ select.city-chip {
   box-shadow: 0 -4px 24px rgba(46, 42, 38, 0.18);
   overflow-y: auto;
   animation: slide-up 0.2s ease;
+  transition: max-height 0.2s ease;
 }
 
 .bottom-sheet-grip {
@@ -2497,6 +2498,10 @@ select.city-chip {
   -webkit-overflow-scrolling: touch;
 }
 
+.bottom-sheet-inner:has(.map-point-summary .capture-panel-head[aria-expanded='true']) {
+  max-height: calc(100dvh - 112px - env(safe-area-inset-bottom));
+}
+
 /* Заметный фокус на полях при работе с клавиатуры */
 .search-input:focus-visible,
 .field input:focus-visible,
@@ -2992,13 +2997,32 @@ select.city-chip {
   box-shadow: var(--shadow-soft);
 }
 
-.restaurant-modal-scroll > .capture-panel {
-  margin: 0 0 12px;
+.restaurant-point-summary,
+.map-point-summary {
   flex: none;
 }
 
-.bottom-sheet-scroll > .capture-panel {
-  flex: none;
+.restaurant-point-summary > .capture-panel {
+  margin: 0 16px 12px;
+}
+
+.map-point-summary > .capture-panel {
+  margin-bottom: 12px;
+}
+
+.restaurant-modal-scroll {
+  gap: 0;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.restaurant-modal-scroll > .empty-state {
+  margin: 0 16px;
+}
+
+.restaurant-modal-scroll > .data-issue-link-bottom {
+  margin-left: 16px;
+  margin-right: 16px;
 }
 
 .capture-panel-head {

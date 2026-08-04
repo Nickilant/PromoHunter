@@ -214,6 +214,7 @@ export default function MapPage() {
         <div className="bottom-sheet">
           <div className="bottom-sheet-inner" key={selectedId}>
             <div className="bottom-sheet-grip" />
+            <div className="map-point-summary">
             <div className="rest-card-head restaurant-modal-head map-point-head">
               {selected ? (
                 <div className="restaurant-modal-identity">
@@ -304,9 +305,10 @@ export default function MapPage() {
                 </div>
               )}
             </div>
-            {/* Шапка закреплена, всё изменяемое по высоте прокручивается вместе. */}
+            {selectedId !== null && <CapturePanel restaurantId={selectedId} />}
+            </div>
+            {/* Адрес, действия и игра закреплены; прокручивается список акций. */}
             <div className="bottom-sheet-scroll">
-              {selectedId !== null && <CapturePanel restaurantId={selectedId} />}
               {selected && selected.promotions.length === 0 && (
                 <div className="empty-state" style={{ padding: '16px 24px 24px' }}>
                   Сейчас в этой точке нет действующих акций
