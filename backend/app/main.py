@@ -2,8 +2,10 @@ import logging
 import threading
 import time
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import select, func
 
 from app.config import settings
@@ -90,6 +92,10 @@ app = FastAPI(
     openapi_url="/api/openapi.json",
     lifespan=lifespan,
 )
+
+uploads_dir = Path(settings.upload_dir)
+uploads_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/api/uploads", StaticFiles(directory=uploads_dir), name="uploads")
 
 app.include_router(auth.router, prefix="/api")
 app.include_router(public.router, prefix="/api")

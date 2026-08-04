@@ -11,6 +11,12 @@ RUN groupadd -g ${GID} app || true \
  && python -m venv /opt/venv \
  && chown -R ${UID}:${GID} /opt/venv
 
+# entrypoint запускается от root только для подготовки прав persistent volume,
+# затем gosu без оболочки переключает процесс обратно на пользователя app.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends gosu \
+ && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 COPY requirements.txt ./
 RUN /opt/venv/bin/pip install --no-cache-dir -r requirements.txt
@@ -19,7 +25,6 @@ COPY entrypoint.sh /entrypoint.sh
 # sed: страховка от CRLF после checkout на Windows — иначе ломается шебанг
 RUN sed -i 's/\r$//' /entrypoint.sh && chmod +x /entrypoint.sh
 
-USER app
 ENTRYPOINT ["/entrypoint.sh"]
 
 # --- dev: код приходит bind-mount'ом, uvicorn --reload из compose ---

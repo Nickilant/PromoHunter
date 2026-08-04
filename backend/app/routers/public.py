@@ -4,8 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session, joinedload, selectinload
 
+from app.auth import get_current_user_optional
 from app.database import get_db
-from app.models import Brand, City, Promotion, PromotionItem, Report, ReportItem, Restaurant
+from app.models import Brand, City, Promotion, PromotionItem, Report, ReportItem, Restaurant, User
 from app.schemas import (
     BrandOut,
     CatalogBrand,
@@ -21,6 +22,7 @@ from app.schemas import (
     RestaurantShort,
 )
 from app.services.promo_scope import promotion_visible_in, visible_in_city_clause
+from app.services.brand_visibility import can_see_private_brands
 from app.services.scope import city_key
 from app.services.status import compute_statuses
 
@@ -69,8 +71,14 @@ def promotion_with_statuses(
 
 
 @router.get("/brands", response_model=list[BrandOut])
-def list_brands(db: Session = Depends(get_db)):
-    return db.scalars(select(Brand).order_by(Brand.name)).all()
+def list_brands(
+    db: Session = Depends(get_db),
+    user: User | None = Depends(get_current_user_optional),
+):
+    stmt = select(Brand).order_by(Brand.name)
+    if not can_see_private_brands(user):
+        stmt = stmt.where(Brand.is_public.is_(True))
+    return db.scalars(stmt).all()
 
 
 @router.get("/telegram/info")
@@ -85,18 +93,25 @@ def telegram_info():
 
 
 @router.get("/cities", response_model=list[CityOut])
-def list_cities(db: Session = Depends(get_db)):
+def list_cities(
+    db: Session = Depends(get_db),
+    user: User | None = Depends(get_current_user_optional),
+):
     """Города для выбора при входе — по убыванию числа точек.
 
     Город из справочника показывается, даже когда точек в нём ещё нет:
     человек выбирает его и сам присылает заявку на первую точку. Города,
     оставшиеся от точек до появления справочника, тоже не теряем.
     """
-    rows = db.execute(
+    rows_stmt = (
         select(Restaurant.city, func.count(Restaurant.id))
+        .join(Brand)
         .where(Restaurant.is_active.is_(True))
         .group_by(Restaurant.city)
-    ).all()
+    )
+    if not can_see_private_brands(user):
+        rows_stmt = rows_stmt.where(Brand.is_public.is_(True))
+    rows = db.execute(rows_stmt).all()
 
     by_key: dict[str, CityOut] = {}
     for name, count in rows:
@@ -122,7 +137,10 @@ def list_cities(db: Session = Depends(get_db)):
 
 @router.get("/catalog", response_model=list[CatalogBrand])
 def catalog(
-    city: str, q: str | None = None, db: Session = Depends(get_db)
+    city: str,
+    q: str | None = None,
+    db: Session = Depends(get_db),
+    user: User | None = Depends(get_current_user_optional),
 ):
     """Каталог: сети с действующими акциями в выбранном городе.
 
@@ -131,13 +149,15 @@ def catalog(
     """
     now = datetime.now(timezone.utc)
 
-    counts = dict(
-        db.execute(
-            select(Restaurant.brand_id, func.count(Restaurant.id))
-            .where(Restaurant.is_active.is_(True), Restaurant.city == city)
-            .group_by(Restaurant.brand_id)
-        ).all()
+    counts_stmt = (
+        select(Restaurant.brand_id, func.count(Restaurant.id))
+        .join(Brand)
+        .where(Restaurant.is_active.is_(True), Restaurant.city == city)
+        .group_by(Restaurant.brand_id)
     )
+    if not can_see_private_brands(user):
+        counts_stmt = counts_stmt.where(Brand.is_public.is_(True))
+    counts = dict(db.execute(counts_stmt).all())
     if not counts:
         return []
 
@@ -220,6 +240,7 @@ def list_restaurants(
     brand_id: int | None = None,
     city: str | None = None,
     db: Session = Depends(get_db),
+    user: User | None = Depends(get_current_user_optional),
 ):
     now = datetime.now(timezone.utc)
     active_count = (
@@ -241,6 +262,8 @@ def list_restaurants(
         .where(Restaurant.is_active.is_(True))
         .order_by(Brand.name, Restaurant.address)
     )
+    if not can_see_private_brands(user):
+        stmt = stmt.where(Brand.is_public.is_(True))
     if brand_id is not None:
         stmt = stmt.where(Restaurant.brand_id == brand_id)
     if city:
@@ -276,11 +299,19 @@ def list_restaurants(
 
 
 @router.get("/restaurants/{restaurant_id}", response_model=RestaurantDetail)
-def restaurant_detail(restaurant_id: int, db: Session = Depends(get_db)):
+def restaurant_detail(
+    restaurant_id: int,
+    db: Session = Depends(get_db),
+    user: User | None = Depends(get_current_user_optional),
+):
     restaurant = db.get(
         Restaurant, restaurant_id, options=[joinedload(Restaurant.brand)]
     )
-    if restaurant is None or not restaurant.is_active:
+    if (
+        restaurant is None
+        or not restaurant.is_active
+        or (not restaurant.brand.is_public and not can_see_private_brands(user))
+    ):
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Точка не найдена")
 
     now = datetime.now(timezone.utc)
@@ -312,15 +343,24 @@ def restaurant_detail(restaurant_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/feed", response_model=list[FeedEntry])
-def feed(q: str | None = None, city: str | None = None, brand_id: int | None = None, db: Session = Depends(get_db)):
+def feed(
+    q: str | None = None,
+    city: str | None = None,
+    brand_id: int | None = None,
+    db: Session = Depends(get_db),
+    user: User | None = Depends(get_current_user_optional),
+):
     """Поисковый эндпоинт: карточки ресторанов с вложенными акциями."""
     now = datetime.now(timezone.utc)
 
     restaurants_stmt = (
         select(Restaurant)
+        .join(Brand)
         .options(joinedload(Restaurant.brand))
         .where(Restaurant.is_active.is_(True))
     )
+    if not can_see_private_brands(user):
+        restaurants_stmt = restaurants_stmt.where(Brand.is_public.is_(True))
     if city:
         restaurants_stmt = restaurants_stmt.where(Restaurant.city == city)
     if brand_id is not None:
@@ -400,11 +440,20 @@ def feed(q: str | None = None, city: str | None = None, brand_id: int | None = N
 
 
 @router.get("/restaurants/{restaurant_id}/history", response_model=RestaurantHistory)
-def restaurant_history(restaurant_id: int, days: int = 7, db: Session = Depends(get_db)):
+def restaurant_history(
+    restaurant_id: int,
+    days: int = 7,
+    db: Session = Depends(get_db),
+    user: User | None = Depends(get_current_user_optional),
+):
     """Краткая фактическая сводка по отчётам точки за ограниченный период."""
     days = max(1, min(days, 30))
-    restaurant = db.get(Restaurant, restaurant_id)
-    if restaurant is None or not restaurant.is_active:
+    restaurant = db.get(Restaurant, restaurant_id, options=[joinedload(Restaurant.brand)])
+    if (
+        restaurant is None
+        or not restaurant.is_active
+        or (not restaurant.brand.is_public and not can_see_private_brands(user))
+    ):
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Точка не найдена")
     since = datetime.now(timezone.utc) - timedelta(days=days)
     rows = db.execute(

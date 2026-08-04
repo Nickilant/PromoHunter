@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     status_window_hours: int = 24
     report_cooldown_minutes: int = 30
     seed_on_start: bool = False
+    upload_dir: str = "uploads"
 
     # --- сила голоса при дозревании вердиктов (см. docs/trust-and-rating-spec.md) ---
     channel_on_site_coef: float = 1.0

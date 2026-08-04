@@ -52,6 +52,7 @@ export interface Brand extends BrandShort {
 export interface AdminBrand extends Brand {
   created_at: string;
   restaurants_count: number;
+  is_public: boolean;
 }
 
 export interface RestaurantShort {

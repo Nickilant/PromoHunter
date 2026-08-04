@@ -452,6 +452,91 @@
   align-items: flex-start;
 }
 
+.brand-logo-field {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+}
+
+.brand-logo-field legend {
+  padding: 0 5px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.brand-logo-modes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
+
+.brand-logo-modes label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 40px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  cursor: pointer;
+}
+
+.brand-logo-modes label.on {
+  border-color: var(--primary);
+  color: var(--primary-ink);
+  background: var(--primary-soft);
+}
+
+.brand-logo-modes input,
+.brand-visibility-toggle input {
+  width: auto;
+}
+
+.brand-logo-upload {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.brand-logo-upload input {
+  padding: 8px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface-alt);
+}
+
+.brand-logo-upload small,
+.brand-visibility-toggle small {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.brand-visibility-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  border-radius: var(--radius-control);
+  background: var(--primary-soft);
+  cursor: pointer;
+}
+
+.brand-visibility-toggle input {
+  margin-top: 3px;
+}
+
+.brand-visibility-toggle span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
 /* ---------- охват акции и города модератора ---------- */
 
 /* Город модератора в шапке боковой панели: сразу видно, за что отвечаешь */

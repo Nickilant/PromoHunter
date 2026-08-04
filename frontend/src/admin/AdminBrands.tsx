@@ -11,14 +11,26 @@ interface BrandForm {
   name: string;
   color: string;
   logo_url: string;
+  is_public: boolean;
 }
 
-const emptyForm: BrandForm = { id: null, name: '', color: '#6B9080', logo_url: '' };
+type LogoMode = 'url' | 'file';
+
+const emptyForm: BrandForm = {
+  id: null,
+  name: '',
+  color: '#6B9080',
+  logo_url: '',
+  is_public: false,
+};
 
 export default function AdminBrands() {
   const [brands, setBrands] = useState<AdminBrand[]>([]);
   const [query, setQuery] = useState('');
   const [form, setForm] = useState<BrandForm | null>(null);
+  const [logoMode, setLogoMode] = useState<LogoMode>('url');
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const toast = useToast();
 
@@ -32,19 +44,32 @@ export default function AdminBrands() {
     e.preventDefault();
     if (!form) return;
     setError(null);
-    const body = {
-      name: form.name,
-      color: form.color,
-      logo_url: form.logo_url || null,
-    };
+    setSaving(true);
     try {
+      let logoUrl = form.logo_url || null;
+      if (logoMode === 'file') {
+        if (!logoFile) throw new Error('Выберите файл логотипа');
+        const data = new FormData();
+        data.append('logo', logoFile);
+        const uploaded = await api.upload<{ logo_url: string }>('/admin/brand-logos', data);
+        logoUrl = uploaded.logo_url;
+      }
+      const body = {
+        name: form.name,
+        color: form.color,
+        logo_url: logoUrl,
+        is_public: form.is_public,
+      };
       if (form.id === null) await api.post('/admin/brands', body);
       else await api.patch(`/admin/brands/${form.id}`, body);
       setForm(null);
+      setLogoFile(null);
       load();
       toast('Сохранено');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ошибка');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -69,6 +94,8 @@ export default function AdminBrands() {
           onClick={() => {
             setError(null);
             setForm(emptyForm);
+            setLogoMode('url');
+            setLogoFile(null);
           }}
         >
           + Новый бренд
@@ -90,6 +117,7 @@ export default function AdminBrands() {
               <th>Slug</th>
               <th>Точек</th>
               <th>Логотип</th>
+              <th>Публикация</th>
               <th></th>
             </tr>
           </thead>
@@ -112,6 +140,11 @@ export default function AdminBrands() {
                   )}
                 </td>
                 <td>
+                  <span className={`tag ${b.is_public ? 'ok' : 'warn'}`}>
+                    {b.is_public ? 'Виден всем' : 'Только команде'}
+                  </span>
+                </td>
+                <td>
                   <div className="actions">
                     <button
                       className="btn btn-ghost btn-small"
@@ -122,7 +155,10 @@ export default function AdminBrands() {
                           name: b.name,
                           color: b.color,
                           logo_url: b.logo_url ?? '',
+                          is_public: b.is_public,
                         });
+                        setLogoMode('url');
+                        setLogoFile(null);
                       }}
                     >
                       Изменить
@@ -169,16 +205,64 @@ export default function AdminBrands() {
                     style={{ height: 44, padding: 4 }}
                   />
                 </div>
-                <div className="field">
-                  <label>Логотип (URL, необязательно)</label>
+                <fieldset className="brand-logo-field">
+                  <legend>Логотип</legend>
+                  <div className="brand-logo-modes" role="radiogroup" aria-label="Источник логотипа">
+                    <label className={logoMode === 'url' ? 'on' : ''}>
+                      <input
+                        type="radio"
+                        name="logo-mode"
+                        checked={logoMode === 'url'}
+                        onChange={() => setLogoMode('url')}
+                      />
+                      Ссылка
+                    </label>
+                    <label className={logoMode === 'file' ? 'on' : ''}>
+                      <input
+                        type="radio"
+                        name="logo-mode"
+                        checked={logoMode === 'file'}
+                        onChange={() => setLogoMode('file')}
+                      />
+                      Файл
+                    </label>
+                  </div>
+                  {logoMode === 'url' ? (
+                    <input
+                      type="url"
+                      value={form.logo_url}
+                      onChange={(e) => setForm({ ...form, logo_url: e.target.value })}
+                      placeholder="https://…"
+                    />
+                  ) : (
+                    <div className="brand-logo-upload">
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        onChange={(e) => setLogoFile(e.target.files?.[0] ?? null)}
+                        required
+                      />
+                      <small>PNG, JPEG или WebP, не больше 5 МБ</small>
+                    </div>
+                  )}
+                </fieldset>
+                <label className="brand-visibility-toggle">
                   <input
-                    value={form.logo_url}
-                    onChange={(e) => setForm({ ...form, logo_url: e.target.value })}
-                    placeholder="https://…"
+                    type="checkbox"
+                    checked={form.is_public}
+                    onChange={(e) => setForm({ ...form, is_public: e.target.checked })}
                   />
-                </div>
+                  <span>
+                    <strong>Показывать бренд пользователям</strong>
+                    <small>
+                      Если выключить, бренд, его точки и акции увидят только администраторы и модераторы.
+                    </small>
+                  </span>
+                </label>
                 {error && <div className="form-error">{error}</div>}
-                <button className="btn btn-primary">Сохранить</button>
+                <button className="btn btn-primary" disabled={saving}>
+                  {saving ? 'Сохраняем…' : 'Сохранить'}
+                </button>
               </form>
             </div>
           </div>

@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.auth import get_current_user, get_current_user_optional, require_not_blocked
 from app.config import settings
 from app.database import get_db
-from app.models import Faction, FactionStanding, PointControl, Restaurant, User
+from app.models import Brand, Faction, FactionStanding, PointControl, Restaurant, User
 from app.schemas import (
     FactionInfoOut,
     FactionJoinIn,
@@ -23,6 +23,7 @@ from app.schemas import (
     UserOut,
 )
 from app.services import game
+from app.services.brand_visibility import brand_is_visible, can_see_private_brands
 
 router = APIRouter(prefix="/game", tags=["game"])
 
@@ -164,7 +165,11 @@ def join_faction(
 
 
 @router.get("/points", response_model=list[PointControlOut])
-def city_points(city: str, db: Session = Depends(get_db)):
+def city_points(
+    city: str,
+    db: Session = Depends(get_db),
+    user: User | None = Depends(get_current_user_optional),
+):
     """Табло всех точек города: владение, шкалы, таймеры.
 
     Чтение ничего не пишет: состояние проецируется на текущий момент, а
@@ -172,13 +177,23 @@ def city_points(city: str, db: Session = Depends(get_db)):
     """
     if not settings.game_enabled:
         return []
-    return [_point_out(view) for view in game.city_points(db, city)]
+    views = game.city_points(db, city)
+    if not can_see_private_brands(user):
+        public_ids = set(
+            db.scalars(
+                select(Restaurant.id)
+                .join(Brand)
+                .where(Brand.is_public.is_(True), Restaurant.city == city)
+            ).all()
+        )
+        views = [view for view in views if view.restaurant_id in public_ids]
+    return [_point_out(view) for view in views]
 
 
-def _detail_of(db: Session, restaurant_id: int) -> PointControlDetailOut:
+def _detail_of(db: Session, restaurant_id: int, user: User | None) -> PointControlDetailOut:
     """Состояние точки на текущий момент, без записи."""
     restaurant = db.get(Restaurant, restaurant_id)
-    if restaurant is None or not restaurant.is_active:
+    if restaurant is None or not restaurant.is_active or not brand_is_visible(restaurant.brand, user):
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Точка не найдена")
     now = datetime.now(timezone.utc)
     control = db.get(PointControl, restaurant_id) or game.blank_control(
@@ -189,8 +204,12 @@ def _detail_of(db: Session, restaurant_id: int) -> PointControlDetailOut:
 
 
 @router.get("/points/{restaurant_id}", response_model=PointControlDetailOut)
-def point_detail(restaurant_id: int, db: Session = Depends(get_db)):
-    return _detail_of(db, restaurant_id)
+def point_detail(
+    restaurant_id: int,
+    db: Session = Depends(get_db),
+    user: User | None = Depends(get_current_user_optional),
+):
+    return _detail_of(db, restaurant_id, user)
 
 
 @router.get("/points/{restaurant_id}/me", response_model=PointControlDetailOut)
@@ -200,7 +219,7 @@ def my_point_detail(
     db: Session = Depends(get_db),
 ):
     """То же плюс собственный вклад за сутки."""
-    detail = _detail_of(db, restaurant_id)
+    detail = _detail_of(db, restaurant_id, user)
     receipts, strength = game.contribution(db, restaurant_id, user.id)
     detail.my_receipts_today = receipts
     detail.my_strength_today = round(strength, 2)
@@ -209,28 +228,35 @@ def my_point_detail(
 
 
 @router.get("/standings", response_model=GameStandingsOut)
-def standings(city: str, db: Session = Depends(get_db)):
+def standings(
+    city: str,
+    db: Session = Depends(get_db),
+    user: User | None = Depends(get_current_user_optional),
+):
     """Сезонный зачёт города: средняя доля удержанных точек."""
     now = datetime.now(timezone.utc)
     season = game.season_of(now)
 
-    points_total = db.scalar(
-        select(func.count(Restaurant.id)).where(
+    points_total_stmt = select(func.count(Restaurant.id)).join(Brand).where(
             Restaurant.city == city, Restaurant.is_active.is_(True)
         )
-    ) or 0
-    owned = dict(
-        db.execute(
-            select(PointControl.owner_faction, func.count(PointControl.restaurant_id))
+    if not can_see_private_brands(user):
+        points_total_stmt = points_total_stmt.where(Brand.is_public.is_(True))
+    points_total = db.scalar(points_total_stmt) or 0
+    owned_stmt = (
+        select(PointControl.owner_faction, func.count(PointControl.restaurant_id))
             .join(Restaurant, Restaurant.id == PointControl.restaurant_id)
+            .join(Brand, Brand.id == Restaurant.brand_id)
             .where(
                 Restaurant.city == city,
                 Restaurant.is_active.is_(True),
                 PointControl.owner_faction.is_not(None),
             )
             .group_by(PointControl.owner_faction)
-        ).all()
     )
+    if not can_see_private_brands(user):
+        owned_stmt = owned_stmt.where(Brand.is_public.is_(True))
+    owned = dict(db.execute(owned_stmt).all())
     rows = db.scalars(
         select(FactionStanding).where(
             FactionStanding.city == city, FactionStanding.season == season

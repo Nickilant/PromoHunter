@@ -9,6 +9,7 @@ from app.database import get_db
 from app.models import DataIssue, IssueStatus, Promotion, Restaurant, User
 from app.schemas import AdminDataIssueOut, DataIssueIn, DataIssueOut, DataIssueReviewIn
 from app.services.scope import Scope, city_filter, require_staff
+from app.services.brand_visibility import brand_is_visible
 
 router = APIRouter(tags=["issues"])
 
@@ -44,7 +45,7 @@ def create_issue(
     db: Session = Depends(get_db),
 ):
     restaurant = db.get(Restaurant, payload.restaurant_id)
-    if restaurant is None or not restaurant.is_active:
+    if restaurant is None or not restaurant.is_active or not brand_is_visible(restaurant.brand, user):
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Точка не найдена")
     if payload.type not in ISSUE_TYPES:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Неизвестный тип ошибки")

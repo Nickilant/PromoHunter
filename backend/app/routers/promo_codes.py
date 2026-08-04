@@ -28,6 +28,7 @@ from app.services.promo_code import (
     normalize_code,
 )
 from app.services.scope import normalize_city
+from app.services.brand_visibility import brand_is_visible
 
 router = APIRouter(prefix="/promo-codes", tags=["promo-codes"])
 
@@ -66,6 +67,9 @@ def list_promo_codes(
     viewer: User | None = Depends(get_current_user_optional),
 ):
     """Живые коды сети, видимые в этом городе."""
+    brand = db.get(Brand, brand_id)
+    if brand is None or not brand_is_visible(brand, viewer):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Сеть не найдена")
     now = datetime.now(timezone.utc)
     codes = live_codes(db, brand_id, normalize_city(city), now)
     # Автор и города нужны каждой строке — подтягиваем разом
@@ -87,7 +91,7 @@ def add_promo_code(
     """Добавить код. Тот же код у той же сети — оживление старой строки."""
     now = datetime.now(timezone.utc)
     brand = db.get(Brand, payload.brand_id)
-    if brand is None:
+    if brand is None or not brand_is_visible(brand, user):
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Сеть не найдена")
 
     try:

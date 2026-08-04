@@ -6,6 +6,7 @@ from app.auth import get_current_user, require_not_blocked
 from app.database import get_db
 from app.models import Promotion, Restaurant, Subscription, User
 from app.schemas import SubscriptionIn, SubscriptionOut
+from app.services.brand_visibility import brand_is_visible
 
 router = APIRouter(prefix="/subscriptions", tags=["subscriptions"])
 
@@ -25,7 +26,7 @@ def _load(db: Session, subscription_id: int) -> Subscription:
 def my_subscriptions(
     user: User = Depends(get_current_user), db: Session = Depends(get_db)
 ):
-    return (
+    subscriptions = (
         db.scalars(
             select(Subscription)
             .options(
@@ -38,6 +39,14 @@ def my_subscriptions(
         .unique()
         .all()
     )
+    return [
+        item
+        for item in subscriptions
+        if brand_is_visible(
+            item.restaurant.brand if item.restaurant else item.promotion.brand,
+            user,
+        )
+    ]
 
 
 @router.post("", response_model=SubscriptionOut, status_code=status.HTTP_201_CREATED)
@@ -59,7 +68,8 @@ def subscribe(
         )
 
     if payload.restaurant_id is not None:
-        if db.get(Restaurant, payload.restaurant_id) is None:
+        restaurant = db.get(Restaurant, payload.restaurant_id)
+        if restaurant is None or not brand_is_visible(restaurant.brand, user):
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Точка не найдена")
         existing = db.scalar(
             select(Subscription).where(
@@ -68,7 +78,8 @@ def subscribe(
             )
         )
     else:
-        if db.get(Promotion, payload.promotion_id) is None:
+        promotion = db.get(Promotion, payload.promotion_id)
+        if promotion is None or not brand_is_visible(promotion.brand, user):
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Акция не найдена")
         existing = db.scalar(
             select(Subscription).where(

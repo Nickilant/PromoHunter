@@ -7,6 +7,7 @@ from app.database import get_db
 from app.models import Brand, PromotionSuggestion, Restaurant, User
 from app.schemas import SuggestionIn, SuggestionOut
 from app.services.scope import normalize_city
+from app.services.brand_visibility import brand_is_visible
 
 router = APIRouter(prefix="/suggestions", tags=["suggestions"])
 
@@ -23,12 +24,14 @@ def create_suggestion(
             status.HTTP_400_BAD_REQUEST,
             detail="Укажите бренд из списка или введите его название",
         )
-    if payload.brand_id is not None and db.get(Brand, payload.brand_id) is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Бренд не найден")
+    if payload.brand_id is not None:
+        brand = db.get(Brand, payload.brand_id)
+        if brand is None or not brand_is_visible(brand, user):
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Бренд не найден")
     restaurant = None
     if payload.restaurant_id is not None:
         restaurant = db.get(Restaurant, payload.restaurant_id)
-        if restaurant is None:
+        if restaurant is None or not brand_is_visible(restaurant.brand, user):
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Точка не найдена")
     if not payload.items_raw.strip():
         raise HTTPException(

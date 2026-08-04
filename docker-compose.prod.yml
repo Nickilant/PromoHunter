@@ -14,7 +14,8 @@ services:
     environment:
       SEED_ON_START: "false"
     # !reset: иначе compose домёрживает bind-mount'ы и порты из базового файла
-    volumes: !reset []
+    volumes: !reset
+      - brand_uploads:/app/uploads
     ports: !reset []
     # Число воркеров настраивается в .env (UVICORN_WORKERS);
     # 2 достаточно для MVP и не съедает память маленького VPS

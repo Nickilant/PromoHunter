@@ -10,6 +10,11 @@ __pycache__/
 node_modules/
 dist/
 
+# Загружаемые пользователями изображения хранятся на сервере/volume,
+# а не в Git. Файл-заглушка оставляет структуру каталога в репозитории.
+backend/uploads/*
+!backend/uploads/.gitkeep
+
 # IDE / OS
 .idea/
 .vscode/

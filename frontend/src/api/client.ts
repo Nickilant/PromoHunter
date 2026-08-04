@@ -53,9 +53,23 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   return data as T;
 }
 
+async function upload<T>(path: string, body: FormData): Promise<T> {
+  const headers: Record<string, string> = {};
+  const token = getToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const resp = await fetch(`/api${path}`, { method: 'POST', headers, body });
+  const data = await resp.json().catch(() => null);
+  if (!resp.ok) {
+    const detail = typeof data?.detail === 'string' ? data.detail : 'Не удалось загрузить файл';
+    throw new ApiError(resp.status, detail);
+  }
+  return data as T;
+}
+
 export const api = {
   get: <T>(path: string) => request<T>('GET', path),
   post: <T>(path: string, body?: unknown) => request<T>('POST', path, body),
   patch: <T>(path: string, body?: unknown) => request<T>('PATCH', path, body),
   delete: <T>(path: string) => request<T>('DELETE', path),
+  upload,
 };

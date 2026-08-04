@@ -29,6 +29,7 @@ from app.services.notify import notify_capture, notify_status_flips
 from app.services.promo_scope import promotion_visible_in
 from app.services.receipt import ReceiptError, parse_receipt
 from app.services.status import refresh_stable_statuses
+from app.services.brand_visibility import brand_is_visible
 
 router = APIRouter(prefix="/reports", tags=["reports"])
 
@@ -59,7 +60,7 @@ def create_report(
     db: Session = Depends(get_db),
 ):
     restaurant = db.get(Restaurant, payload.restaurant_id)
-    if restaurant is None or not restaurant.is_active:
+    if restaurant is None or not restaurant.is_active or not brand_is_visible(restaurant.brand, user):
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Точка не найдена")
 
     now = datetime.now(timezone.utc)

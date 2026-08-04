@@ -447,6 +447,7 @@ class BrandIn(BaseModel):
     slug: str | None = Field(default=None, max_length=120)
     color: str = Field(default="#6B9080", pattern=r"^#[0-9a-fA-F]{6}$")
     logo_url: str | None = Field(default=None, max_length=500)
+    is_public: bool = False
 
 
 class BrandPatch(BaseModel):
@@ -454,11 +455,13 @@ class BrandPatch(BaseModel):
     slug: str | None = Field(default=None, max_length=120)
     color: str | None = Field(default=None, pattern=r"^#[0-9a-fA-F]{6}$")
     logo_url: str | None = Field(default=None, max_length=500)
+    is_public: bool | None = None
 
 
 class AdminBrandOut(BrandOut):
     created_at: datetime
     restaurants_count: int = 0
+    is_public: bool
 
 
 # --- admin: restaurants ---

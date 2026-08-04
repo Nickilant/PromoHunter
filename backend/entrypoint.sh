@@ -1,6 +1,15 @@
 #!/bin/sh
 set -e
 
+# Новый named volume создаётся Docker с владельцем root. Подготавливаем его
+# до запуска приложения, затем повторно входим в entrypoint уже как app.
+if [ "$(id -u)" = "0" ]; then
+    upload_dir="${UPLOAD_DIR:-/app/uploads}"
+    mkdir -p "$upload_dir"
+    chown -R app:app "$upload_dir"
+    exec gosu app "$0" "$@"
+fi
+
 echo "==> Waiting for database..."
 python - <<'PY'
 import sys

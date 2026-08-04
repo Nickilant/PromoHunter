@@ -1,7 +1,9 @@
 import re
 from datetime import datetime, timezone
+from pathlib import Path
+from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session, joinedload, selectinload
 
@@ -102,6 +104,47 @@ def slugify(name: str) -> str:
 
 # --- brands ---
 
+MAX_LOGO_BYTES = 5 * 1024 * 1024
+LOGO_SIGNATURES = {
+    "image/png": (b"\x89PNG\r\n\x1a\n", ".png"),
+    "image/jpeg": (b"\xff\xd8\xff", ".jpg"),
+    "image/webp": (b"RIFF", ".webp"),
+}
+
+
+@router.post("/brand-logos", status_code=status.HTTP_201_CREATED)
+def upload_brand_logo(
+    logo: UploadFile = File(...),
+    scope: Scope = Depends(require_staff),
+):
+    scope.require_global("Управление брендами")
+    signature = LOGO_SIGNATURES.get(logo.content_type or "")
+    if signature is None:
+        raise HTTPException(
+            status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail="Поддерживаются только PNG, JPEG и WebP",
+        )
+    content = logo.file.read(MAX_LOGO_BYTES + 1)
+    if not content:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Файл логотипа пуст")
+    if len(content) > MAX_LOGO_BYTES:
+        raise HTTPException(
+            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="Логотип должен быть не больше 5 МБ",
+        )
+    magic, extension = signature
+    valid = content.startswith(magic)
+    if logo.content_type == "image/webp":
+        valid = valid and len(content) >= 12 and content[8:12] == b"WEBP"
+    if not valid:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Содержимое файла не соответствует формату")
+
+    directory = Path(settings.upload_dir) / "brand-logos"
+    directory.mkdir(parents=True, exist_ok=True)
+    filename = f"{uuid4().hex}{extension}"
+    (directory / filename).write_bytes(content)
+    return {"logo_url": f"/api/uploads/brand-logos/{filename}"}
+
 def _brand_out(db: Session, brand: Brand) -> AdminBrandOut:
     count = db.scalar(
         select(func.count(Restaurant.id)).where(Restaurant.brand_id == brand.id)
@@ -144,6 +187,7 @@ def create_brand(
         slug=(payload.slug or "").strip() or slugify(name),
         color=payload.color,
         logo_url=payload.logo_url,
+        is_public=payload.is_public,
     )
     db.add(brand)
     db.commit()
@@ -177,6 +221,8 @@ def update_brand(
         brand.color = data["color"]
     if "logo_url" in data:
         brand.logo_url = data["logo_url"]
+    if "is_public" in data and data["is_public"] is not None:
+        brand.is_public = data["is_public"]
     db.commit()
     db.refresh(brand)
     return _brand_out(db, brand)

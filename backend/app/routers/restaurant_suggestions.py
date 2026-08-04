@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.auth import get_current_user, require_not_blocked
 from app.database import get_db
 from app.models import Brand, RestaurantSuggestion, User
+from app.services.brand_visibility import brand_is_visible
 from app.services.scope import normalize_city
 from app.schemas import RestaurantSuggestionIn, RestaurantSuggestionOut
 
@@ -17,7 +18,8 @@ def create_restaurant_suggestion(
     user: User = Depends(require_not_blocked),
     db: Session = Depends(get_db),
 ):
-    if db.get(Brand, payload.brand_id) is None:
+    brand = db.get(Brand, payload.brand_id)
+    if brand is None or not brand_is_visible(brand, user):
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Бренд не найден")
 
     suggestion = RestaurantSuggestion(

@@ -41,6 +41,7 @@ services:
       # Живая правка кода. Зависимости стоят в /opt/venv (вне /app),
       # поэтому bind-mount их не затирает.
       - ./backend:/app
+      - brand_uploads:/app/uploads
     ports:
       - "8000:8000"
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
@@ -65,3 +66,4 @@ services:
 
 volumes:
   pgdata:
+  brand_uploads:

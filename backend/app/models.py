@@ -135,6 +135,9 @@ class Brand(Base):
     slug: Mapped[str] = mapped_column(String(120), unique=True, nullable=False)
     color: Mapped[str] = mapped_column(String(7), default="#6B9080", nullable=False)
     logo_url: Mapped[str | None] = mapped_column(String(500))
+    is_public: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default="true", nullable=False
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
