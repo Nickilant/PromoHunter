@@ -2,12 +2,14 @@
 // чтобы карту можно было заменить (например, на Яндекс.Карты), не трогая остальное.
 import 'leaflet/dist/leaflet.css';
 
-import { useEffect, useState } from 'react';
+import { divIcon } from 'leaflet';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Circle,
   CircleMarker,
   LayerGroup,
   MapContainer,
+  Marker,
   TileLayer,
   Tooltip,
   useMap,
@@ -223,6 +225,85 @@ function LayerToggle({
   );
 }
 
+function brandInitials(name: string): string {
+  return name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join('')
+    .toUpperCase();
+}
+
+function createRestaurantMarkerElement(
+  restaurant: RestaurantListItem,
+  color: string,
+  selected: boolean,
+): HTMLElement {
+  const pin = document.createElement('span');
+  pin.className = `restaurant-map-pin${selected ? ' selected' : ''}`;
+
+  const shape = document.createElement('span');
+  shape.className = 'restaurant-map-pin-shape';
+  shape.style.backgroundColor = color;
+
+  const logo = document.createElement('span');
+  logo.className = 'restaurant-map-pin-logo';
+
+  const initials = document.createElement('span');
+  initials.className = 'restaurant-map-pin-initials';
+  initials.textContent = brandInitials(restaurant.brand.name);
+  logo.append(initials);
+
+  if (restaurant.brand.logo_url) {
+    const image = document.createElement('img');
+    image.src = restaurant.brand.logo_url;
+    image.alt = '';
+    logo.append(image);
+  }
+
+  shape.append(logo);
+  pin.append(shape);
+  return pin;
+}
+
+function RestaurantMarker({
+  restaurant,
+  point,
+  selected,
+  onSelect,
+}: {
+  restaurant: RestaurantListItem;
+  point?: PointControl;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  // Без игры и у свободной игровой точки цвет одинаково нейтральный.
+  // Цвет фракции появляется только у фактического владельца, не у атакующего.
+  const color = point?.owner ? FACTION_HEX[point.owner] : NEUTRAL_HEX;
+  const markerIcon = useMemo(
+    () =>
+      divIcon({
+        className: 'restaurant-marker-container',
+        iconSize: [46, 52],
+        iconAnchor: [23, 50],
+        popupAnchor: [0, -48],
+        html: createRestaurantMarkerElement(restaurant, color, selected),
+      }),
+    [color, restaurant.brand.logo_url, restaurant.brand.name, selected],
+  );
+
+  return (
+    <Marker
+      position={[restaurant.lat, restaurant.lng]}
+      icon={markerIcon}
+      title={`${restaurant.brand.name}, ${restaurant.address}`}
+      zIndexOffset={selected ? 500 : 0}
+      eventHandlers={{ click: onSelect }}
+    />
+  );
+}
+
 function BrandFilterButton({ count, onOpen }: { count: number; onOpen: () => void }) {
   return (
     <button
@@ -297,17 +378,12 @@ export function RestaurantsMap({
         />
       )}
       {restaurants.map((r) => (
-        <CircleMarker
+        <RestaurantMarker
           key={r.id}
-          center={[r.lat, r.lng]}
-          radius={selectedId === r.id ? 13 : 10}
-          pathOptions={{
-            color: '#fff',
-            weight: 2,
-            fillColor: r.brand.color,
-            fillOpacity: 1,
-          }}
-          eventHandlers={{ click: () => onSelect(r.id) }}
+          restaurant={r}
+          point={points?.get(r.id)}
+          selected={selectedId === r.id}
+          onSelect={() => onSelect(r.id)}
         />
       ))}
       {me && <UserMarker position={me} />}

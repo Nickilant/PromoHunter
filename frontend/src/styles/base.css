@@ -1359,6 +1359,73 @@ select.city-chip {
   transition: max-height 0.2s ease;
 }
 
+/* Маркер ресторана как в навигаторах: капля указывает точную координату,
+   а белая внутренняя площадка сохраняет читаемость любого логотипа. */
+.restaurant-marker-container {
+  border: 0;
+  background: transparent;
+}
+
+.restaurant-map-pin {
+  display: block;
+  width: 46px;
+  height: 52px;
+  filter: drop-shadow(0 3px 5px rgba(46, 42, 38, 0.25));
+}
+
+.restaurant-map-pin-shape {
+  position: absolute;
+  top: 3px;
+  left: 5px;
+  display: flex;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--surface);
+  border-radius: 50% 50% 50% 5px;
+  transform: rotate(-45deg);
+  transition: transform 0.16s ease, filter 0.16s ease;
+}
+
+.restaurant-map-pin-logo {
+  position: relative;
+  display: flex;
+  width: 25px;
+  height: 25px;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--surface);
+  transform: rotate(45deg);
+}
+
+.restaurant-map-pin-logo img {
+  position: absolute;
+  inset: 2px;
+  width: calc(100% - 4px);
+  height: calc(100% - 4px);
+  object-fit: contain;
+  background: var(--surface);
+}
+
+.restaurant-map-pin-initials {
+  color: var(--text-muted);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+}
+
+.restaurant-map-pin.selected .restaurant-map-pin-shape {
+  transform: rotate(-45deg) scale(1.15);
+  filter: brightness(1.04);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .restaurant-map-pin-shape { transition: none; }
+}
+
 .bottom-sheet-grip {
   width: 40px;
   height: 4px;
