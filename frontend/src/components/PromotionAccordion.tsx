@@ -38,6 +38,9 @@ export default function PromotionAccordion({
   return (
     <div className="promo-block">
       <button className="promo-toggle" onClick={() => setOpen(!open)} aria-expanded={open}>
+        <span className="promo-heading-icon">
+          <Icon name="tag" size={17} />
+        </span>
         <div>
           <div className="promo-title">{promotion.title}</div>
           {promotion.ends_at && (

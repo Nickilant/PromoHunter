@@ -161,10 +161,6 @@ export default function RestaurantModal({ restaurantId, onClose }: Props) {
           </div>
           <CapturePanel restaurantId={restaurantId} />
           <div className="modal-body" style={{ paddingBottom: 16 }}>
-            {detail && <button className="data-issue-link" onClick={() => {
-              if (!user) { navigate('/login'); return; }
-              setIssueOpen(true);
-            }}><Icon name="alert" size={16} />Сообщить об ошибке в данных</button>}
             {detail && detail.promotions.length === 0 && (
               <div className="empty-state">Сейчас в этой точке нет действующих акций</div>
             )}
@@ -178,6 +174,10 @@ export default function RestaurantModal({ restaurantId, onClose }: Props) {
                 />
               </div>
             ))}
+            {detail && <button className="data-issue-link data-issue-link-bottom" onClick={() => {
+              if (!user) { navigate('/login'); return; }
+              setIssueOpen(true);
+            }}><Icon name="alert" size={16} />Сообщить об ошибке в данных</button>}
           </div>
         </div>
       </div>

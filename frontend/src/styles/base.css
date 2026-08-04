@@ -328,7 +328,15 @@ input, textarea, select {
 }
 
 .promo-toggle > div {
+  flex: 1;
   min-width: 0;
+}
+
+.promo-heading-icon {
+  display: flex;
+  flex: none;
+  color: var(--text-muted);
+  opacity: 0.72;
 }
 
 .promo-toggle .promo-title {
@@ -1766,6 +1774,7 @@ select.city-chip {
 
 .restaurant-modal-actions button,
 .restaurant-modal-actions a {
+  width: 100%;
   min-width: 0;
   min-height: 48px;
   padding: 6px 3px;
@@ -1779,15 +1788,18 @@ select.city-chip {
   background: var(--surface-alt);
   font-size: 10px;
   font-weight: 600;
+  text-align: center;
   transition: background 0.16s, color 0.16s, transform 0.12s;
 }
 
 .restaurant-modal-actions button span,
 .restaurant-modal-actions a span {
+  width: 100%;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   line-height: 1.15;
+  text-align: center;
   white-space: normal;
 }
 
@@ -1862,17 +1874,10 @@ select.city-chip {
   min-width: 0;
 }
 
-.nearby-name {
-  font-size: 14px;
-  font-weight: 600;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .nearby-address {
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--text-muted);
 }
 
 .nearby-meta {
@@ -2968,9 +2973,11 @@ select.city-chip {
 /* ---------- игровой режим: панель точки ---------- */
 
 .capture-panel {
-  border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
-  background: var(--surface);
+  margin: 0 16px 12px;
+  border-radius: var(--radius-control);
+  background: var(--surface-alt);
+  overflow: hidden;
+  box-shadow: var(--shadow-soft);
 }
 
 .capture-panel-head {
@@ -3500,6 +3507,14 @@ select.city-chip {
 }
 
 .data-issue-link:hover { color: var(--primary); }
+
+.data-issue-link-bottom {
+  margin: 12px 0 4px;
+}
+
+.bottom-sheet-scroll .data-issue-link-bottom {
+  margin: 14px 16px calc(16px + env(safe-area-inset-bottom));
+}
 
 .history-body { gap: 14px; }
 

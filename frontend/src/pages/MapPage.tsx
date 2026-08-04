@@ -307,10 +307,6 @@ export default function MapPage() {
             {selectedId !== null && <CapturePanel restaurantId={selectedId} />}
             {/* скроллится только список акций — шапка и подписка закреплены */}
             <div className="bottom-sheet-scroll">
-              {selected && <button className="data-issue-link" style={{ margin: '0 16px 4px' }} onClick={() => {
-                if (!user) { navigate('/login'); return; }
-                setIssueOpen(true);
-              }}><Icon name="alert" size={16} />Сообщить об ошибке в данных</button>}
               {selected && selected.promotions.length === 0 && (
                 <div className="empty-state" style={{ padding: '16px 24px 24px' }}>
                   Сейчас в этой точке нет действующих акций
@@ -325,6 +321,10 @@ export default function MapPage() {
                   defaultOpen={selected.promotions.length === 1}
                 />
               ))}
+              {selected && <button className="data-issue-link data-issue-link-bottom" onClick={() => {
+                if (!user) { navigate('/login'); return; }
+                setIssueOpen(true);
+              }}><Icon name="alert" size={16} />Сообщить об ошибке в данных</button>}
             </div>
           </div>
         </div>

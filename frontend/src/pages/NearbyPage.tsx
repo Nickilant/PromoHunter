@@ -90,10 +90,6 @@ export default function NearbyPage() {
     <div className="page">
       <div className="page-intro">
         <h1>Рядом с вами</h1>
-        <p className="muted">
-          Ближайшая точка каждой сети. Откройте карточку с акциями или сразу
-          постройте маршрут.
-        </p>
       </div>
 
       {locating && (
@@ -148,7 +144,6 @@ export default function NearbyPage() {
                   >
                     {r.brand.name}
                   </span>
-                  {r.title && <span className="nearby-name">{r.title}</span>}
                 </span>
                 <span className="nearby-address">{r.address}</span>
                 <span className="nearby-meta muted">
