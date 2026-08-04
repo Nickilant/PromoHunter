@@ -5,15 +5,18 @@ import { api } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
 import { useSubscriptions } from '../hooks/useSubscriptions';
 import type {
+  Brand,
   PromotionWithStatuses,
   RestaurantDetail,
   RestaurantShort,
 } from '../types';
 import CapturePanel from './CapturePanel';
+import DataIssueModal from './DataIssueModal';
 import Overlay from './Overlay';
 import PromoCodesModal from './PromoCodesModal';
 import PromotionAccordion from './PromotionAccordion';
 import ReportModal from './ReportModal';
+import RestaurantHistoryModal from './RestaurantHistoryModal';
 import Icon from './Icon';
 import { useDismiss } from '../hooks/useDismiss';
 
@@ -30,6 +33,9 @@ export default function RestaurantModal({ restaurantId, onClose }: Props) {
     promotion: PromotionWithStatuses;
   } | null>(null);
   const [codesOpen, setCodesOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [issueOpen, setIssueOpen] = useState(false);
+  const [brandLogoUrl, setBrandLogoUrl] = useState<string | null>(null);
   const { user } = useAuth();
   const { isSubscribedToRestaurant, toggleRestaurant } = useSubscriptions();
   const navigate = useNavigate();
@@ -41,6 +47,26 @@ export default function RestaurantModal({ restaurantId, onClose }: Props) {
   }, [restaurantId]);
 
   useEffect(load, [load]);
+
+  useEffect(() => {
+    if (!detail) return;
+    if (detail.brand.logo_url) {
+      setBrandLogoUrl(detail.brand.logo_url);
+      return;
+    }
+
+    let cancelled = false;
+    api.get<Brand[]>('/brands').then((brands) => {
+      if (cancelled) return;
+      setBrandLogoUrl(
+        brands.find((brand) => brand.id === detail.brand.id)?.logo_url ?? null,
+      );
+    }).catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [detail]);
 
   const openReport = (restaurant: RestaurantShort, promotion: PromotionWithStatuses) => {
     if (!user) {
@@ -62,58 +88,55 @@ export default function RestaurantModal({ restaurantId, onClose }: Props) {
           className={`modal${closing ? ' closing' : ''}`}
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="modal-head">
+          <div className="modal-head restaurant-modal-head">
             {detail ? (
-              <div className="rest-card-head" style={{ padding: 0 }}>
-                <span className="brand-chip" style={{ background: detail.brand.color }}>
-                  {detail.brand.name}
-                </span>
-                <div className="rest-card-titles">
-                  {detail.title && <div className="title">{detail.title}</div>}
-                  <div className="address">
-                    {detail.address}
-                    {/* Карточку открыли из списка — где это на карте, неочевидно.
-                        С самой карты сюда не попадают: там своя шторка */}
-                    <button
-                      className="show-on-map"
-                      onClick={() => navigate(`/map?point=${restaurantId}`)}
-                    >
-                      <Icon name="map" size={13} strokeWidth={2} />
-                      На карте
-                    </button>
-                  </div>
+              <div className="restaurant-modal-identity">
+                {brandLogoUrl ? (
+                  <img
+                    className="restaurant-modal-logo"
+                    src={brandLogoUrl}
+                    alt={detail.brand.name}
+                  />
+                ) : (
+                  <span className="brand-chip" style={{ background: detail.brand.color }}>
+                    {detail.brand.name}
+                  </span>
+                )}
+                <div className="restaurant-modal-location">
+                  <div className="restaurant-modal-address">{detail.address}</div>
+                  {detail.title && <div className="restaurant-modal-title">{detail.title}</div>}
                 </div>
               </div>
             ) : (
-              <div className="rest-card-head" style={{ padding: 0, flex: 1 }}>
+              <div className="restaurant-modal-identity">
                 <span
-                  className="skeleton on-surface"
-                  style={{ width: 96, height: 24, borderRadius: 999 }}
+                  className="skeleton on-surface restaurant-modal-logo-skeleton"
                 />
                 <span
-                  className="skeleton on-surface"
-                  style={{ width: '45%', height: 16, borderRadius: 8 }}
+                  className="skeleton on-surface restaurant-modal-address-skeleton"
                 />
               </div>
             )}
-            {/* Промокоды сети — рядом с колокольчиком: человек уже выбрал
-                точку и вот-вот сделает заказ */}
-            {detail && (
-              <button
-                className="head-bell"
-                onClick={() => setCodesOpen(true)}
-                aria-label="Промокоды сети"
-                title="Промокоды сети"
-              >
-                <Icon name="ticket" size={19} />
+            <button className="modal-close" onClick={dismiss} aria-label="Закрыть">
+              <Icon name="close" size={20} />
+            </button>
+            {detail && <div className="restaurant-modal-actions">
+              <button onClick={() => navigate(`/map?point=${restaurantId}`)}>
+                <Icon name="map" size={18} />
+                <span>На карте</span>
               </button>
-            )}
-            {/* Колокольчик — в строке с названием, а не отдельной полосой */}
-            {detail && (
+              <button onClick={() => setHistoryOpen(true)}>
+                <Icon name="chart" size={18} />
+                <span>Сводка</span>
+              </button>
               <button
-                className={`head-bell${
-                  isSubscribedToRestaurant(restaurantId) ? ' on' : ''
-                }`}
+                onClick={() => setCodesOpen(true)}
+              >
+                <Icon name="ticket" size={18} />
+                <span>Промокоды</span>
+              </button>
+              <button
+                className={isSubscribedToRestaurant(restaurantId) ? 'on' : ''}
                 onClick={() => {
                   if (!user) {
                     navigate('/login');
@@ -127,24 +150,21 @@ export default function RestaurantModal({ restaurantId, onClose }: Props) {
                     ? 'Отписаться от новостей точки'
                     : 'Подписаться на новости точки'
                 }
-                title={
-                  isSubscribedToRestaurant(restaurantId)
-                    ? 'Отписаться от новостей точки'
-                    : 'Подписаться на новости точки'
-                }
               >
                 <Icon
                   name={isSubscribedToRestaurant(restaurantId) ? 'bell' : 'bellOff'}
-                  size={19}
+                  size={18}
                 />
+                <span>{isSubscribedToRestaurant(restaurantId) ? 'Подписан' : 'Подписаться'}</span>
               </button>
-            )}
-            <button className="modal-close" onClick={dismiss} aria-label="Закрыть">
-              <Icon name="close" size={20} />
-            </button>
+            </div>}
           </div>
           <CapturePanel restaurantId={restaurantId} />
           <div className="modal-body" style={{ paddingBottom: 16 }}>
+            {detail && <button className="data-issue-link" onClick={() => {
+              if (!user) { navigate('/login'); return; }
+              setIssueOpen(true);
+            }}><Icon name="alert" size={16} />Сообщить об ошибке в данных</button>}
             {detail && detail.promotions.length === 0 && (
               <div className="empty-state">Сейчас в этой точке нет действующих акций</div>
             )}
@@ -166,6 +186,8 @@ export default function RestaurantModal({ restaurantId, onClose }: Props) {
       {codesOpen && detail && (
         <PromoCodesModal brand={detail.brand} onClose={() => setCodesOpen(false)} />
       )}
+      {historyOpen && detail && <RestaurantHistoryModal restaurant={detail} onClose={() => setHistoryOpen(false)} />}
+      {issueOpen && detail && <DataIssueModal restaurant={detail} onClose={() => setIssueOpen(false)} />}
 
       {/* Отметка наличия — свой оверлей со своим порталом, вкладывать её
           в портал карточки нельзя (см. комментарий в Overlay.tsx) */}

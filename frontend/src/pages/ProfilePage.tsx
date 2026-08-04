@@ -8,7 +8,7 @@ import PasswordSettings from '../components/PasswordSettings';
 import ProfileSection from '../components/ProfileSection';
 import { useAuth } from '../hooks/useAuth';
 import { useSubscriptions } from '../hooks/useSubscriptions';
-import type { Report, RestaurantSuggestion, Suggestion, TelegramInfo } from '../types';
+import type { DataIssue, IssueStatus, Report, RestaurantSuggestion, Suggestion, TelegramInfo } from '../types';
 import { DEVELOPER_TELEGRAM, DEVELOPER_TELEGRAM_URL } from '../utils/contacts';
 import { formatDateTime } from '../utils/time';
 
@@ -17,12 +17,18 @@ const SUGGESTION_LABELS: Record<Suggestion['status'], { text: string; cls: strin
   approved: { text: 'Одобрена', cls: 'ok' },
   rejected: { text: 'Отклонена', cls: 'error' },
 };
+const ISSUE_LABELS: Record<IssueStatus, { text: string; cls: string }> = {
+  pending: { text: 'На проверке', cls: 'warn' },
+  resolved: { text: 'Исправлено', cls: 'ok' },
+  rejected: { text: 'Отклонено', cls: 'error' },
+};
 
 export default function ProfilePage() {
   const { user, logout } = useAuth();
   const [reports, setReports] = useState<Report[]>([]);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [restSuggestions, setRestSuggestions] = useState<RestaurantSuggestion[]>([]);
+  const [issues, setIssues] = useState<DataIssue[]>([]);
   const [tgInfo, setTgInfo] = useState<TelegramInfo | null>(null);
   const { subscriptions, remove } = useSubscriptions();
   const navigate = useNavigate();
@@ -35,6 +41,7 @@ export default function ProfilePage() {
       .get<RestaurantSuggestion[]>('/restaurant-suggestions/mine')
       .then(setRestSuggestions)
       .catch(() => {});
+    api.get<DataIssue[]>('/issues/mine').then(setIssues).catch(() => {});
     if (!user.is_phone_verified) {
       api.get<TelegramInfo>('/telegram/info').then(setTgInfo).catch(() => {});
     }
@@ -155,6 +162,23 @@ export default function ProfilePage() {
             </div>
           </div>
         ))}
+      </ProfileSection>
+
+      <ProfileSection title="Сообщения об ошибках" count={issues.length}>
+        {issues.length === 0 && <div className="list-item muted">Вы ещё не сообщали об ошибках</div>}
+        {issues.map((issue) => {
+          const label = ISSUE_LABELS[issue.status];
+          return <div className="list-item" key={`i${issue.id}`}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+              <strong>{issue.restaurant.brand.name} — {issue.restaurant.address}</strong>
+              <span className={`tag ${label.cls}`}>{label.text}</span>
+            </div>
+            {issue.promotion_title && <div className="muted">Акция: {issue.promotion_title}</div>}
+            <div>{issue.details}</div>
+            {issue.moderator_comment && <div className="muted">Комментарий модератора: {issue.moderator_comment}</div>}
+            <div className="muted">{formatDateTime(issue.created_at)}</div>
+          </div>;
+        })}
       </ProfileSection>
 
       <ProfileSection title="Отчёты" count={reports.length}>

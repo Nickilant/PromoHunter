@@ -9,12 +9,40 @@ import type { RestaurantListItem } from '../types';
 import { distanceM, formatDistance } from '../utils/distance';
 import { timeAgo } from '../utils/time';
 
-// Показываем ближайшие: дальше человек всё равно не пойдёт, а список
-// на весь город есть на карте и во вкладке акций
+// Показываем по ближайшей точке каждой сети: полный список адресов всё равно
+// доступен на карте и внутри бренда, а здесь важен быстрый выбор, куда идти.
 const LIMIT = 20;
 
 interface Nearby extends RestaurantListItem {
   meters: number;
+}
+
+function nearestRestaurantPerBrand(
+  restaurants: RestaurantListItem[],
+  position: { lat: number; lng: number },
+): Nearby[] {
+  const sorted = restaurants
+    .map((restaurant) => ({
+      ...restaurant,
+      meters: distanceM(position, restaurant),
+    }))
+    .sort((a, b) => a.meters - b.meters);
+  const seenBrands = new Set<number>();
+  return sorted
+    .filter((restaurant) => {
+      if (seenBrands.has(restaurant.brand.id)) return false;
+      seenBrands.add(restaurant.brand.id);
+      return true;
+    })
+    .slice(0, LIMIT);
+}
+
+function yandexRouteUrl(
+  from: { lat: number; lng: number },
+  to: { lat: number; lng: number },
+): string {
+  const routePoints = `${from.lat},${from.lng}~${to.lat},${to.lng}`;
+  return `https://yandex.ru/maps/?mode=routes&rtext=${encodeURIComponent(routePoints)}&rtt=auto`;
 }
 
 export default function NearbyPage() {
@@ -56,20 +84,15 @@ export default function NearbyPage() {
 
   useEffect(locate, [locate]);
 
-  const nearby: Nearby[] = position
-    ? restaurants
-        .map((r) => ({ ...r, meters: distanceM(position, r) }))
-        .sort((a, b) => a.meters - b.meters)
-        .slice(0, LIMIT)
-    : [];
+  const nearby = position ? nearestRestaurantPerBrand(restaurants, position) : [];
 
   return (
     <div className="page">
       <div className="page-intro">
         <h1>Рядом с вами</h1>
         <p className="muted">
-          Точки по расстоянию от вас. Загляните в карточку — там акции и
-          что в них сейчас есть.
+          Ближайшая точка каждой сети. Откройте карточку с акциями или сразу
+          постройте маршрут.
         </p>
       </div>
 
@@ -114,34 +137,42 @@ export default function NearbyPage() {
       {nearby.map((r) => {
         const updated = timeAgo(r.last_report_at);
         return (
-          <button
-            key={r.id}
-            className="nearby-item"
-            onClick={() => setSelectedId(r.id)}
-          >
-            <span className="nearby-distance">{formatDistance(r.meters)}</span>
-            <span className="nearby-body">
-              <span className="nearby-title">
-                <span
-                  className="brand-chip small"
-                  style={{ background: r.brand.color }}
-                >
-                  {r.brand.name}
+          <div className="nearby-card" key={r.id}>
+            <button className="nearby-item" onClick={() => setSelectedId(r.id)}>
+              <span className="nearby-distance">{formatDistance(r.meters)}</span>
+              <span className="nearby-body">
+                <span className="nearby-title">
+                  <span
+                    className="brand-chip small"
+                    style={{ background: r.brand.color }}
+                  >
+                    {r.brand.name}
+                  </span>
+                  {r.title && <span className="nearby-name">{r.title}</span>}
                 </span>
-                {r.title && <span className="nearby-name">{r.title}</span>}
+                <span className="nearby-address">{r.address}</span>
+                <span className="nearby-meta muted">
+                  {r.active_promotions_count > 0
+                    ? `акций: ${r.active_promotions_count}`
+                    : 'акций нет'}
+                  {updated && ` · отчёты ${updated}`}
+                </span>
               </span>
-              <span className="nearby-address">{r.address}</span>
-              <span className="nearby-meta muted">
-                {r.active_promotions_count > 0
-                  ? `акций: ${r.active_promotions_count}`
-                  : 'акций нет'}
-                {updated && ` · отчёты ${updated}`}
+              <span className="chevron-right">
+                <Icon name="chevronRight" size={20} />
               </span>
-            </span>
-            <span className="chevron-right">
-              <Icon name="chevronRight" size={20} />
-            </span>
-          </button>
+            </button>
+            <a
+              className="nearby-route"
+              href={yandexRouteUrl(position!, r)}
+              target="_blank"
+              rel="noreferrer"
+              aria-label={`Построить маршрут в Яндекс Картах до ${r.brand.name}, ${r.address}`}
+            >
+              <Icon name="route" size={20} />
+              <span>Маршрут</span>
+            </a>
+          </div>
         );
       })}
 

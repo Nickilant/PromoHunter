@@ -47,6 +47,12 @@ class SuggestionStatus(str, enum.Enum):
     rejected = "rejected"
 
 
+class IssueStatus(str, enum.Enum):
+    pending = "pending"
+    resolved = "resolved"
+    rejected = "rejected"
+
+
 class ReportChannel(str, enum.Enum):
     on_site = "on_site"      # человек на точке
     delivery = "delivery"    # заказ через доставку
@@ -534,6 +540,34 @@ class RestaurantSuggestion(Base):
     user: Mapped["User"] = relationship(foreign_keys=[user_id])
     reviewed_by: Mapped["User | None"] = relationship(foreign_keys=[reviewed_by_id])
     brand: Mapped["Brand"] = relationship()
+
+
+class DataIssue(Base):
+    """Сообщение пользователя об ошибке в точке или акции."""
+
+    __tablename__ = "data_issues"
+    __table_args__ = (Index("ix_data_issues_status_created", "status", "created_at"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    restaurant_id: Mapped[int] = mapped_column(ForeignKey("restaurants.id", ondelete="CASCADE"), nullable=False)
+    promotion_id: Mapped[int | None] = mapped_column(ForeignKey("promotions.id", ondelete="SET NULL"))
+    type: Mapped[str] = mapped_column(String(40), nullable=False)
+    details: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[IssueStatus] = mapped_column(
+        Enum(IssueStatus, name="issue_status", values_callable=lambda e: [x.value for x in e]),
+        default=IssueStatus.pending,
+        nullable=False,
+    )
+    moderator_comment: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    reviewed_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+
+    user: Mapped["User"] = relationship(foreign_keys=[user_id])
+    reviewed_by: Mapped["User | None"] = relationship(foreign_keys=[reviewed_by_id])
+    restaurant: Mapped["Restaurant"] = relationship()
+    promotion: Mapped["Promotion | None"] = relationship()
 
 
 class PromotionSuggestion(Base):

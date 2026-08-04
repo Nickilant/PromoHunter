@@ -4,6 +4,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.models import (
     Faction,
+    IssueStatus,
     PromotionCityMode,
     ReportChannel,
     SuggestionStatus,
@@ -130,6 +131,7 @@ class BrandShort(ORMModel):
     id: int
     name: str
     color: str
+    logo_url: str | None = None
 
 
 class RestaurantListItem(ORMModel):
@@ -241,6 +243,24 @@ class RestaurantDetail(BaseModel):
 class FeedEntry(BaseModel):
     restaurant: RestaurantShort
     promotions: list[PromotionWithStatuses]
+
+
+class HistoryItem(BaseModel):
+    promotion_title: str
+    item_name: str
+    reports_count: int
+    available_count: int
+    availability_percent: int
+    last_available_at: datetime | None = None
+    last_unavailable_at: datetime | None = None
+
+
+class RestaurantHistory(BaseModel):
+    days: int
+    reports_count: int
+    contributors_count: int
+    last_report_at: datetime | None = None
+    items: list[HistoryItem]
 
 
 # --- reports ---
@@ -382,6 +402,42 @@ class RestaurantSuggestionApproveIn(BaseModel):
     address: str = Field(min_length=1, max_length=300)
     lat: float
     lng: float
+
+
+# --- сообщения об ошибках в данных ---
+
+class DataIssueIn(BaseModel):
+    restaurant_id: int
+    promotion_id: int | None = None
+    type: str = Field(min_length=1, max_length=40)
+    details: str = Field(min_length=5, max_length=2000)
+
+
+class DataIssueReviewIn(BaseModel):
+    status: IssueStatus
+    moderator_comment: str | None = Field(default=None, max_length=2000)
+
+
+class DataIssueOut(ORMModel):
+    id: int
+    restaurant: RestaurantShort
+    promotion_id: int | None = None
+    promotion_title: str | None = Field(default=None, validation_alias="promotion")
+    type: str
+    details: str
+    status: IssueStatus
+    moderator_comment: str | None = None
+    created_at: datetime
+    reviewed_at: datetime | None = None
+
+    @field_validator("promotion_title", mode="before")
+    @classmethod
+    def _promotion_title(cls, value):
+        return getattr(value, "title", None) if value is not None else None
+
+
+class AdminDataIssueOut(DataIssueOut):
+    user: UserOut
 
 
 # --- admin: brands ---

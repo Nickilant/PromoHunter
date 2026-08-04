@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, NavLink, Outlet } from 'react-router-dom';
 
 import { api } from '../api/client';
-import type { RestaurantSuggestionGroup, StaffScope, SuggestionGroup } from '../types';
+import type { AdminDataIssue, RestaurantSuggestionGroup, StaffScope, SuggestionGroup } from '../types';
 import Icon from '../components/Icon';
 import { useStaffScope } from './useStaffScope';
 
@@ -25,11 +25,13 @@ const links = [
     label: 'Заявки: рестораны',
     counter: 'restaurant' as const,
   },
+  { to: 'issues', label: 'Ошибки в данных', counter: 'issues' as const },
 ];
 
 export default function AdminLayout() {
   const [pendingPromo, setPendingPromo] = useState(0);
   const [pendingRestaurant, setPendingRestaurant] = useState(0);
+  const [pendingIssues, setPendingIssues] = useState(0);
   const scope = useStaffScope();
 
   const refreshPendingCount = useCallback(() => {
@@ -39,6 +41,7 @@ export default function AdminLayout() {
         setPendingPromo(groups.reduce((sum, g) => sum + g.suggestions.length, 0)),
       )
       .catch(() => {});
+    api.get<AdminDataIssue[]>('/admin/issues?status=pending').then((items) => setPendingIssues(items.length)).catch(() => {});
     api
       .get<RestaurantSuggestionGroup[]>('/admin/restaurant-suggestions?status=pending')
       .then((groups) =>
@@ -53,7 +56,7 @@ export default function AdminLayout() {
     refreshPendingCount();
   }, [refreshPendingCount]);
 
-  const counters = { promo: pendingPromo, restaurant: pendingRestaurant };
+  const counters = { promo: pendingPromo, restaurant: pendingRestaurant, issues: pendingIssues };
 
   return (
     <div className="admin-shell">

@@ -42,11 +42,11 @@ export interface BrandShort {
   id: number;
   name: string;
   color: string;
+  logo_url?: string | null;
 }
 
 export interface Brand extends BrandShort {
   slug: string;
-  logo_url: string | null;
 }
 
 export interface AdminBrand extends Brand {
@@ -168,6 +168,43 @@ export interface Report {
   is_receipt_verified: boolean;
   capture: CaptureResult | null;
   created_at: string;
+}
+
+export interface HistoryItem {
+  promotion_title: string;
+  item_name: string;
+  reports_count: number;
+  available_count: number;
+  availability_percent: number;
+  last_available_at: string | null;
+  last_unavailable_at: string | null;
+}
+
+export interface RestaurantHistory {
+  days: number;
+  reports_count: number;
+  contributors_count: number;
+  last_report_at: string | null;
+  items: HistoryItem[];
+}
+
+export type IssueStatus = 'pending' | 'resolved' | 'rejected';
+
+export interface DataIssue {
+  id: number;
+  restaurant: RestaurantShort;
+  promotion_id: number | null;
+  promotion_title: string | null;
+  type: string;
+  details: string;
+  status: IssueStatus;
+  moderator_comment: string | null;
+  created_at: string;
+  reviewed_at: string | null;
+}
+
+export interface AdminDataIssue extends DataIssue {
+  user: User;
 }
 
 export type SuggestionStatus = 'pending' | 'approved' | 'rejected';

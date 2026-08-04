@@ -1,11 +1,11 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.database import get_db
-from app.models import Brand, City, Promotion, Report, Restaurant
+from app.models import Brand, City, Promotion, PromotionItem, Report, ReportItem, Restaurant
 from app.schemas import (
     BrandOut,
     CatalogBrand,
@@ -16,6 +16,8 @@ from app.schemas import (
     PromotionWithStatuses,
     RestaurantDetail,
     RestaurantListItem,
+    RestaurantHistory,
+    HistoryItem,
     RestaurantShort,
 )
 from app.services.promo_scope import promotion_visible_in, visible_in_city_clause
@@ -310,7 +312,7 @@ def restaurant_detail(restaurant_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/feed", response_model=list[FeedEntry])
-def feed(q: str | None = None, city: str | None = None, db: Session = Depends(get_db)):
+def feed(q: str | None = None, city: str | None = None, brand_id: int | None = None, db: Session = Depends(get_db)):
     """Поисковый эндпоинт: карточки ресторанов с вложенными акциями."""
     now = datetime.now(timezone.utc)
 
@@ -321,6 +323,8 @@ def feed(q: str | None = None, city: str | None = None, db: Session = Depends(ge
     )
     if city:
         restaurants_stmt = restaurants_stmt.where(Restaurant.city == city)
+    if brand_id is not None:
+        restaurants_stmt = restaurants_stmt.where(Restaurant.brand_id == brand_id)
     restaurants = db.scalars(restaurants_stmt).unique().all()
     promotions = (
         db.scalars(
@@ -393,3 +397,48 @@ def feed(q: str | None = None, city: str | None = None, db: Session = Depends(ge
     epoch = datetime.fromtimestamp(0, tz=timezone.utc)
     entries.sort(key=lambda pair: pair[0] or epoch, reverse=True)
     return [entry for _, entry in entries]
+
+
+@router.get("/restaurants/{restaurant_id}/history", response_model=RestaurantHistory)
+def restaurant_history(restaurant_id: int, days: int = 7, db: Session = Depends(get_db)):
+    """Краткая фактическая сводка по отчётам точки за ограниченный период."""
+    days = max(1, min(days, 30))
+    restaurant = db.get(Restaurant, restaurant_id)
+    if restaurant is None or not restaurant.is_active:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Точка не найдена")
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+    rows = db.execute(
+        select(
+            Promotion.title,
+            PromotionItem.name,
+            func.count(ReportItem.id),
+            func.count(ReportItem.id).filter(ReportItem.is_available.is_(True)),
+            func.max(Report.created_at).filter(ReportItem.is_available.is_(True)),
+            func.max(Report.created_at).filter(ReportItem.is_available.is_(False)),
+        )
+        .join(Report, Report.id == ReportItem.report_id)
+        .join(PromotionItem, PromotionItem.id == ReportItem.promotion_item_id)
+        .join(Promotion, Promotion.id == Report.promotion_id)
+        .where(Report.restaurant_id == restaurant_id, Report.created_at >= since)
+        .group_by(Promotion.id, Promotion.title, PromotionItem.id, PromotionItem.name)
+        .order_by(Promotion.title, PromotionItem.sort_order)
+    ).all()
+    reports_count, contributors_count, last_report_at = db.execute(
+        select(func.count(Report.id), func.count(func.distinct(Report.user_id)), func.max(Report.created_at))
+        .where(Report.restaurant_id == restaurant_id, Report.created_at >= since)
+    ).one()
+    return RestaurantHistory(
+        days=days,
+        reports_count=reports_count,
+        contributors_count=contributors_count,
+        last_report_at=last_report_at,
+        items=[HistoryItem(
+            promotion_title=title,
+            item_name=name,
+            reports_count=total,
+            available_count=available,
+            availability_percent=round(available * 100 / total),
+            last_available_at=last_yes,
+            last_unavailable_at=last_no,
+        ) for title, name, total, available, last_yes, last_no in rows],
+    )

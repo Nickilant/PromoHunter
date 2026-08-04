@@ -1,17 +1,22 @@
-import { FormEvent, useEffect, useRef, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import { api } from '../api/client';
 import CapturePanel from '../components/CapturePanel';
+import BrandFilterModal from '../components/BrandFilterModal';
+import DataIssueModal from '../components/DataIssueModal';
 import { MapFocus, RestaurantsMap } from '../components/MapView';
 import PromotionAccordion from '../components/PromotionAccordion';
+import PromoCodesModal from '../components/PromoCodesModal';
 import ReportModal from '../components/ReportModal';
+import RestaurantHistoryModal from '../components/RestaurantHistoryModal';
 import { useAuth } from '../hooks/useAuth';
 import { useCity } from '../hooks/useCity';
 import { useGame } from '../hooks/useGame';
 import { useSubscriptions } from '../hooks/useSubscriptions';
 import { geocodeAddress, geocodeCity } from '../utils/geocode';
 import type {
+  Brand,
   PromotionWithStatuses,
   RestaurantDetail,
   RestaurantListItem,
@@ -28,6 +33,12 @@ export default function MapPage() {
   const [searchError, setSearchError] = useState<string | null>(null);
   const [focus, setFocus] = useState<MapFocus | null>(null);
   const [searchPoint, setSearchPoint] = useState<MapFocus | null>(null);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [issueOpen, setIssueOpen] = useState(false);
+  const [codesOpen, setCodesOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [brandLogoUrl, setBrandLogoUrl] = useState<string | null>(null);
+  const [selectedBrandIds, setSelectedBrandIds] = useState<Set<number>>(() => new Set());
   const [reportTarget, setReportTarget] = useState<{
     restaurant: RestaurantShort;
     promotion: PromotionWithStatuses;
@@ -41,6 +52,39 @@ export default function MapPage() {
   // ?point=<id> — карту открыли из карточки точки кнопкой «На карте»
   const requestedPoint = params.get('point');
   const focusedFromUrl = useRef(false);
+  const brands = useMemo(
+    () => Array.from(new Map(restaurants.map((restaurant) => [restaurant.brand.id, restaurant.brand])).values())
+      .sort((a, b) => a.name.localeCompare(b.name, 'ru')),
+    [restaurants],
+  );
+  const visibleRestaurants = useMemo(
+    () => selectedBrandIds.size === 0
+      ? restaurants
+      : restaurants.filter((restaurant) => selectedBrandIds.has(restaurant.brand.id)),
+    [restaurants, selectedBrandIds],
+  );
+
+  useEffect(() => {
+    if (!selected) {
+      setBrandLogoUrl(null);
+      return;
+    }
+    if (selected.brand.logo_url) {
+      setBrandLogoUrl(selected.brand.logo_url);
+      return;
+    }
+
+    let cancelled = false;
+    api.get<Brand[]>('/brands').then((items) => {
+      if (cancelled) return;
+      setBrandLogoUrl(
+        items.find((brand) => brand.id === selected.brand.id)?.logo_url ?? null,
+      );
+    }).catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [selected]);
 
   useEffect(() => {
     if (!requestedPoint || focusedFromUrl.current) return;
@@ -61,6 +105,7 @@ export default function MapPage() {
 
   useEffect(() => {
     if (!city) return;
+    setSelectedBrandIds(new Set());
     let cancelled = false;
     api
       .get<RestaurantListItem[]>(`/restaurants?city=${encodeURIComponent(city)}`)
@@ -117,7 +162,7 @@ export default function MapPage() {
   return (
     <div className="map-page">
       <RestaurantsMap
-        restaurants={restaurants}
+        restaurants={visibleRestaurants}
         keepFocus={focusedFromUrl.current}
         selectedId={selectedId}
         onSelect={select}
@@ -126,7 +171,27 @@ export default function MapPage() {
         points={gameEnabled ? points : undefined}
         layerVisible={layerVisible}
         onToggleLayer={toggleLayer}
+        selectedBrandCount={selectedBrandIds.size}
+        onOpenBrandFilter={() => setFilterOpen(true)}
       />
+
+      {filterOpen && (
+        <BrandFilterModal
+          brands={brands}
+          selectedIds={selectedBrandIds}
+          onApply={(ids) => {
+            setSelectedBrandIds(new Set(ids));
+            if (selectedId !== null && ids.size > 0) {
+              const current = restaurants.find((restaurant) => restaurant.id === selectedId);
+              if (current && !ids.has(current.brand.id)) {
+                setSelectedId(null);
+                setSelected(null);
+              }
+            }
+          }}
+          onClose={() => setFilterOpen(false)}
+        />
+      )}
 
       <form className="map-search" onSubmit={submitSearch}>
         <input
@@ -149,68 +214,42 @@ export default function MapPage() {
         <div className="bottom-sheet">
           <div className="bottom-sheet-inner" key={selectedId}>
             <div className="bottom-sheet-grip" />
-            <div className="rest-card-head">
+            <div className="rest-card-head restaurant-modal-head map-point-head">
               {selected ? (
-                <>
-                  <span
-                    className="brand-chip"
-                    style={{ background: selected.brand.color }}
-                  >
-                    {selected.brand.name}
-                  </span>
-                  <div className="rest-card-titles">
-                    {selected.title && <div className="title">{selected.title}</div>}
-                    <div className="address">{selected.address}</div>
+                <div className="restaurant-modal-identity">
+                  {brandLogoUrl ? (
+                    <img
+                      className="restaurant-modal-logo"
+                      src={brandLogoUrl}
+                      alt={selected.brand.name}
+                    />
+                  ) : (
+                    <span
+                      className="brand-chip"
+                      style={{ background: selected.brand.color }}
+                    >
+                      {selected.brand.name}
+                    </span>
+                  )}
+                  <div className="restaurant-modal-location">
+                    <div className="restaurant-modal-address">{selected.address}</div>
+                    {selected.title && (
+                      <div className="restaurant-modal-title">{selected.title}</div>
+                    )}
                   </div>
-                </>
+                </div>
               ) : (
-                <>
+                <div className="restaurant-modal-identity">
                   <span
-                    className="skeleton on-surface"
-                    style={{ width: 96, height: 24, borderRadius: 999 }}
+                    className="skeleton on-surface restaurant-modal-logo-skeleton"
                   />
                   <span
-                    className="skeleton on-surface"
-                    style={{ width: '45%', height: 16, borderRadius: 8 }}
+                    className="skeleton on-surface restaurant-modal-address-skeleton"
                   />
-                </>
-              )}
-              {/* Колокольчик — в одной строке с названием: отдельной строкой
-                  он налезал на состояние точки */}
-              {selected && selectedId !== null && (
-                <button
-                  className={`head-bell${
-                    isSubscribedToRestaurant(selectedId) ? ' on' : ''
-                  }`}
-                  style={{ marginLeft: 'auto' }}
-                  onClick={() => {
-                    if (!user) {
-                      navigate('/login');
-                      return;
-                    }
-                    toggleRestaurant(selectedId);
-                  }}
-                  aria-pressed={isSubscribedToRestaurant(selectedId)}
-                  aria-label={
-                    isSubscribedToRestaurant(selectedId)
-                      ? 'Отписаться от новостей точки'
-                      : 'Подписаться на новости точки'
-                  }
-                  title={
-                    isSubscribedToRestaurant(selectedId)
-                      ? 'Отписаться от новостей точки'
-                      : 'Подписаться на новости точки'
-                  }
-                >
-                  <Icon
-                    name={isSubscribedToRestaurant(selectedId) ? 'bell' : 'bellOff'}
-                    size={19}
-                  />
-                </button>
+                </div>
               )}
               <button
                 className="modal-close"
-                style={selected ? undefined : { marginLeft: 'auto' }}
                 onClick={() => {
                   setSelectedId(null);
                   setSelected(null);
@@ -219,10 +258,59 @@ export default function MapPage() {
               >
                 <Icon name="close" size={20} />
               </button>
+              {selected && selectedId !== null && (
+                <div className="restaurant-modal-actions">
+                  <a
+                    href={`https://yandex.ru/maps/?mode=routes&rtext=~${selected.lat},${selected.lng}&rtt=auto`}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={`Построить маршрут до ${selected.address}`}
+                  >
+                    <Icon name="route" size={18} />
+                    <span>Построить маршрут</span>
+                  </a>
+                  <button onClick={() => setHistoryOpen(true)}>
+                    <Icon name="chart" size={18} />
+                    <span>Сводка</span>
+                  </button>
+                  <button onClick={() => setCodesOpen(true)}>
+                    <Icon name="ticket" size={18} />
+                    <span>Промокоды</span>
+                  </button>
+                  <button
+                    className={isSubscribedToRestaurant(selectedId) ? 'on' : ''}
+                    onClick={() => {
+                      if (!user) {
+                        navigate('/login');
+                        return;
+                      }
+                      toggleRestaurant(selectedId);
+                    }}
+                    aria-pressed={isSubscribedToRestaurant(selectedId)}
+                    aria-label={
+                      isSubscribedToRestaurant(selectedId)
+                        ? 'Отписаться от новостей точки'
+                        : 'Подписаться на новости точки'
+                    }
+                  >
+                    <Icon
+                      name={isSubscribedToRestaurant(selectedId) ? 'bell' : 'bellOff'}
+                      size={18}
+                    />
+                    <span>
+                      {isSubscribedToRestaurant(selectedId) ? 'Подписан' : 'Подписаться'}
+                    </span>
+                  </button>
+                </div>
+              )}
             </div>
             {selectedId !== null && <CapturePanel restaurantId={selectedId} />}
             {/* скроллится только список акций — шапка и подписка закреплены */}
             <div className="bottom-sheet-scroll">
+              {selected && <button className="data-issue-link" style={{ margin: '0 16px 4px' }} onClick={() => {
+                if (!user) { navigate('/login'); return; }
+                setIssueOpen(true);
+              }}><Icon name="alert" size={16} />Сообщить об ошибке в данных</button>}
               {selected && selected.promotions.length === 0 && (
                 <div className="empty-state" style={{ padding: '16px 24px 24px' }}>
                   Сейчас в этой точке нет действующих акций
@@ -248,6 +336,16 @@ export default function MapPage() {
           promotion={reportTarget.promotion}
           onClose={() => setReportTarget(null)}
           onReported={() => selectedId !== null && select(selectedId)}
+        />
+      )}
+      {issueOpen && selected && <DataIssueModal restaurant={selected} onClose={() => setIssueOpen(false)} />}
+      {codesOpen && selected && (
+        <PromoCodesModal brand={selected.brand} onClose={() => setCodesOpen(false)} />
+      )}
+      {historyOpen && selected && (
+        <RestaurantHistoryModal
+          restaurant={selected}
+          onClose={() => setHistoryOpen(false)}
         />
       )}
     </div>

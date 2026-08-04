@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import { api } from '../api/client';
+import Icon from '../components/Icon';
 import type { CityInfo, PromotionCityMode, PromotionScope } from '../types';
 
 interface Props {
@@ -18,7 +19,7 @@ interface Props {
  */
 export default function PromotionScopeEditor({ value, onChange, disabled }: Props) {
   const [cities, setCities] = useState<CityInfo[]>([]);
-  const [custom, setCustom] = useState('');
+  const [query, setQuery] = useState('');
 
   useEffect(() => {
     api.get<CityInfo[]>('/cities').then(setCities).catch(() => {});
@@ -36,18 +37,13 @@ export default function PromotionScopeEditor({ value, onChange, disabled }: Prop
     });
   };
 
-  const addCustom = () => {
-    const name = custom.trim();
-    if (!name) return;
-    if (!value.cities.some((c) => same(c, name))) {
-      onChange({ ...value, cities: [...value.cities, name] });
-    }
-    setCustom('');
-  };
-
-  // Города, которых нет в справочнике, но которые уже в списке
-  const known = new Set(cities.map((c) => c.name.toLowerCase()));
-  const extra = value.cities.filter((c) => !known.has(c.toLowerCase()));
+  const normalizedQuery = query.trim().toLocaleLowerCase('ru');
+  const matches = normalizedQuery
+    ? cities
+        .filter((city) => city.name.toLocaleLowerCase('ru').includes(normalizedQuery))
+        .filter((city) => !value.cities.some((selected) => same(selected, city.name)))
+        .slice(0, 8)
+    : [];
 
   return (
     <div className="scope-editor">
@@ -81,46 +77,33 @@ export default function PromotionScopeEditor({ value, onChange, disabled }: Prop
         </label>
       </div>
 
-      <div className="scope-cities">
-        {[...cities.map((c) => c.name), ...extra].map((name) => {
-          const listed = value.cities.some((c) => same(c, name));
-          return (
-            <button
-              type="button"
-              key={name}
-              className={`scope-city${listed ? ' on' : ''} ${value.mode}`}
-              onClick={() => toggle(name)}
-              disabled={disabled}
-              aria-pressed={listed}
-            >
-              {name}
+      {value.cities.length > 0 && (
+        <div className="scope-selected" aria-label="Выбранные города">
+          {value.cities.map((name) => (
+            <button type="button" key={name} className={`scope-city on ${value.mode}`} onClick={() => toggle(name)} disabled={disabled} aria-label={`Убрать ${name}`}>
+              {name}<Icon name="close" size={13} strokeWidth={2.4} />
             </button>
-          );
-        })}
-      </div>
+          ))}
+        </div>
+      )}
 
-      <div className="scope-custom">
-        <input
-          className="text-input"
-          placeholder="Другой город…"
-          value={custom}
-          onChange={(e) => setCustom(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              addCustom();
-            }
-          }}
-          disabled={disabled}
-        />
-        <button
-          type="button"
-          className="btn btn-ghost btn-small"
-          onClick={addCustom}
-          disabled={disabled || !custom.trim()}
-        >
-          Добавить
-        </button>
+      <div className="scope-city-search">
+        <div className="scope-search-input">
+          <Icon name="search" size={17} />
+          <input placeholder="Найти город…" value={query} onChange={(e) => setQuery(e.target.value)} disabled={disabled} aria-label="Поиск города" />
+          {query && <button type="button" onClick={() => setQuery('')} aria-label="Очистить поиск"><Icon name="close" size={16} /></button>}
+        </div>
+        {normalizedQuery && (
+          <div className="scope-search-results">
+            {matches.map((city) => (
+              <button type="button" key={city.name} onClick={() => { toggle(city.name); setQuery(''); }} disabled={disabled}>
+                <span><Icon name="city" size={16} />{city.name}</span>
+                <small>{city.restaurants_count} точек</small>
+              </button>
+            ))}
+            {matches.length === 0 && <div className="scope-search-empty">Город не найден или уже выбран</div>}
+          </div>
+        )}
       </div>
 
       <div className="scope-summary">{summary(value)}</div>

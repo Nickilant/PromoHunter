@@ -223,6 +223,23 @@ function LayerToggle({
   );
 }
 
+function BrandFilterButton({ count, onOpen }: { count: number; onOpen: () => void }) {
+  return (
+    <button
+      className={`brand-filter-btn${count > 0 ? ' on' : ''}`}
+      onClick={(event) => {
+        event.stopPropagation();
+        onOpen();
+      }}
+      aria-label={count > 0 ? `Фильтр ресторанов, выбрано: ${count}` : 'Фильтр ресторанов'}
+      title="Фильтр ресторанов"
+    >
+      <Icon name="filter" size={20} />
+      {count > 0 && <span className="map-control-badge">{count}</span>}
+    </button>
+  );
+}
+
 interface RestaurantsMapProps {
   restaurants: RestaurantListItem[];
   selectedId: number | null;
@@ -233,6 +250,8 @@ interface RestaurantsMapProps {
   points?: Map<number, PointControl>;
   layerVisible?: boolean;
   onToggleLayer?: () => void;
+  selectedBrandCount?: number;
+  onOpenBrandFilter?: () => void;
   /** Карту открыли ради конкретной точки — общий обзор города не нужен */
   keepFocus?: boolean;
 }
@@ -246,6 +265,8 @@ export function RestaurantsMap({
   points,
   layerVisible = false,
   onToggleLayer,
+  selectedBrandCount = 0,
+  onOpenBrandFilter,
   keepFocus = false,
 }: RestaurantsMapProps) {
   const [me, setMe] = useState<UserPosition | null>(null);
@@ -290,6 +311,9 @@ export function RestaurantsMap({
       {me && <UserMarker position={me} />}
       {points && onToggleLayer && (
         <LayerToggle visible={layerVisible} onToggle={onToggleLayer} />
+      )}
+      {onOpenBrandFilter && (
+        <BrandFilterButton count={selectedBrandCount} onOpen={onOpenBrandFilter} />
       )}
       <LocateButton onLocated={setMe} />
     </MapContainer>

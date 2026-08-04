@@ -15,7 +15,11 @@ export type IconName =
   | 'plus'
   | 'pin'
   | 'locate'
+  | 'route'
   | 'search'
+  | 'filter'
+  | 'chart'
+  | 'alert'
   | 'chevronDown'
   | 'chevronRight'
   | 'chevronLeft'
@@ -94,6 +98,30 @@ const PATHS: Record<IconName, ReactNode> = {
     <>
       <circle cx="10.8" cy="10.8" r="6.4" />
       <path d="m20 20-4.6-4.6" />
+    </>
+  ),
+  route: (
+    <>
+      <circle cx="6" cy="18" r="2.2" />
+      <circle cx="18" cy="6" r="2.2" />
+      <path d="M8.2 18h2.3a2 2 0 0 0 2-2v-2a2 2 0 0 1 2-2H16M13.5 6H10a2 2 0 0 0-2 2v2" />
+      <path d="m15 9 3-3-3-3" />
+    </>
+  ),
+  filter: (
+    <>
+      <path d="M4 6h16M7 12h10M10 18h4" />
+    </>
+  ),
+  chart: (
+    <>
+      <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />
+    </>
+  ),
+  alert: (
+    <>
+      <path d="M10.2 4.2 2.8 17a2 2 0 0 0 1.7 3h15a2 2 0 0 0 1.7-3L13.8 4.2a2 2 0 0 0-3.6 0Z" />
+      <path d="M12 9v4M12 16.5v.01" />
     </>
   ),
   city: (
