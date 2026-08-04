@@ -64,7 +64,8 @@ export default function App() {
       <GameGate />
       <Routes>
       <Route element={<UserShell />}>
-        <Route path="/" element={<FeedPage />} />
+        <Route path="/" element={<Navigate to="/nearby" replace />} />
+        <Route path="/promotions" element={<FeedPage />} />
         <Route path="/brand/:brandId" element={<BrandPage />} />
         <Route path="/map" element={<MapPage />} />
         <Route path="/nearby" element={<NearbyPage />} />

@@ -5,7 +5,7 @@ import { api } from '../api/client';
 import CapturePanel from '../components/CapturePanel';
 import BrandFilterModal from '../components/BrandFilterModal';
 import DataIssueModal from '../components/DataIssueModal';
-import { MapFocus, RestaurantsMap } from '../components/MapView';
+import { MapFocus, RestaurantsMap, UserPosition } from '../components/MapView';
 import PromotionAccordion from '../components/PromotionAccordion';
 import PromoCodesModal from '../components/PromoCodesModal';
 import ReportModal from '../components/ReportModal';
@@ -24,6 +24,14 @@ import type {
 } from '../types';
 import Icon from '../components/Icon';
 
+function yandexRouteUrl(
+  from: { lat: number; lng: number },
+  to: { lat: number; lng: number },
+): string {
+  const routePoints = `${from.lat},${from.lng}~${to.lat},${to.lng}`;
+  return `https://yandex.ru/maps/?mode=routes&rtext=${encodeURIComponent(routePoints)}&rtt=auto`;
+}
+
 export default function MapPage() {
   const [restaurants, setRestaurants] = useState<RestaurantListItem[]>([]);
   const [selected, setSelected] = useState<RestaurantDetail | null>(null);
@@ -38,6 +46,9 @@ export default function MapPage() {
   const [codesOpen, setCodesOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [brandLogoUrl, setBrandLogoUrl] = useState<string | null>(null);
+  const [userPosition, setUserPosition] = useState<UserPosition | null>(null);
+  const [routing, setRouting] = useState(false);
+  const [routeError, setRouteError] = useState<string | null>(null);
   const [selectedBrandIds, setSelectedBrandIds] = useState<Set<number>>(() => new Set());
   const [reportTarget, setReportTarget] = useState<{
     restaurant: RestaurantShort;
@@ -130,6 +141,7 @@ export default function MapPage() {
   const select = (id: number) => {
     setSelectedId(id);
     setSelected(null);
+    setRouteError(null);
     api.get<RestaurantDetail>(`/restaurants/${id}`).then(setSelected).catch(() => {});
   };
 
@@ -159,6 +171,60 @@ export default function MapPage() {
     setReportTarget({ restaurant, promotion });
   };
 
+  const openRoute = () => {
+    if (!selected || routing) return;
+    setRouteError(null);
+
+    const openYandexMaps = (
+      position: UserPosition,
+      routeTab?: Window | null,
+      fallbackToCurrentTab = false,
+    ) => {
+      const url = yandexRouteUrl(position, selected);
+      if (routeTab) {
+        routeTab.opener = null;
+        routeTab.location.href = url;
+      } else if (fallbackToCurrentTab) {
+        window.location.assign(url);
+      } else {
+        const opened = window.open(url, '_blank', 'noopener,noreferrer');
+        if (!opened) window.location.assign(url);
+      }
+    };
+
+    if (userPosition) {
+      openYandexMaps(userPosition);
+      return;
+    }
+    if (!navigator.geolocation) {
+      setRouteError('Геолокация недоступна — маршрут нельзя построить');
+      return;
+    }
+
+    // Вкладку резервируем прямо по клику: мобильный браузер иначе блокирует
+    // window.open после асинхронного ответа геолокации как всплывающее окно.
+    const routeTab = window.open('', '_blank');
+    setRouting(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const current = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+          accuracy: position.coords.accuracy,
+        };
+        setUserPosition(current);
+        setRouting(false);
+        openYandexMaps(current, routeTab, true);
+      },
+      () => {
+        routeTab?.close();
+        setRouting(false);
+        setRouteError('Разрешите доступ к геолокации, чтобы построить маршрут');
+      },
+      { enableHighAccuracy: true, timeout: 12000 },
+    );
+  };
+
   return (
     <div className="map-page">
       <RestaurantsMap
@@ -173,6 +239,7 @@ export default function MapPage() {
         onToggleLayer={toggleLayer}
         selectedBrandCount={selectedBrandIds.size}
         onOpenBrandFilter={() => setFilterOpen(true)}
+        onUserPositionChange={setUserPosition}
       />
 
       {filterOpen && (
@@ -261,15 +328,14 @@ export default function MapPage() {
               </button>
               {selected && selectedId !== null && (
                 <div className="restaurant-modal-actions">
-                  <a
-                    href={`https://yandex.ru/maps/?mode=routes&rtext=~${selected.lat},${selected.lng}&rtt=auto`}
-                    target="_blank"
-                    rel="noreferrer"
+                  <button
+                    onClick={openRoute}
+                    disabled={routing}
                     aria-label={`Построить маршрут до ${selected.address}`}
                   >
-                    <Icon name="route" size={18} />
-                    <span>Построить маршрут</span>
-                  </a>
+                    {routing ? <span className="spinner" /> : <Icon name="route" size={18} />}
+                    <span>{routing ? 'Определяем место' : 'Построить маршрут'}</span>
+                  </button>
                   <button onClick={() => setHistoryOpen(true)}>
                     <Icon name="chart" size={18} />
                     <span>Сводка</span>
@@ -304,6 +370,7 @@ export default function MapPage() {
                   </button>
                 </div>
               )}
+              {routeError && <div className="route-error">{routeError}</div>}
             </div>
             {selectedId !== null && <CapturePanel restaurantId={selectedId} />}
             </div>

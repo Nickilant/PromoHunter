@@ -254,6 +254,7 @@ interface RestaurantsMapProps {
   onOpenBrandFilter?: () => void;
   /** Карту открыли ради конкретной точки — общий обзор города не нужен */
   keepFocus?: boolean;
+  onUserPositionChange?: (position: UserPosition) => void;
 }
 
 export function RestaurantsMap({
@@ -268,6 +269,7 @@ export function RestaurantsMap({
   selectedBrandCount = 0,
   onOpenBrandFilter,
   keepFocus = false,
+  onUserPositionChange,
 }: RestaurantsMapProps) {
   const [me, setMe] = useState<UserPosition | null>(null);
   return (
@@ -315,7 +317,10 @@ export function RestaurantsMap({
       {onOpenBrandFilter && (
         <BrandFilterButton count={selectedBrandCount} onOpen={onOpenBrandFilter} />
       )}
-      <LocateButton onLocated={setMe} />
+      <LocateButton onLocated={(position) => {
+        setMe(position);
+        onUserPositionChange?.(position);
+      }} />
     </MapContainer>
   );
 }

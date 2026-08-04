@@ -1819,6 +1819,15 @@ select.city-chip {
   background: var(--primary-soft);
 }
 
+.route-error {
+  padding: 8px 10px;
+  border-radius: var(--radius-control);
+  color: var(--status-unavailable-ink);
+  background: var(--status-unavailable-soft);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
 .map-point-head {
   align-items: stretch;
   padding-top: 8px;

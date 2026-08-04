@@ -16,11 +16,11 @@ interface NavItem {
 
 const NAV: NavItem[] = [
   {
-    to: '/',
+    to: '/promotions',
     icon: 'tag',
     label: 'Акции',
     slot: 0,
-    match: (p) => p === '/' || p.startsWith('/brand'),
+    match: (p) => p === '/promotions' || p.startsWith('/brand'),
   },
   { to: '/map', icon: 'map', label: 'Карта', slot: 1, match: (p) => p === '/map' },
   { to: '/rating', icon: 'trophy', label: 'Рейтинг', slot: 3, match: (p) => p === '/rating' },
@@ -42,6 +42,7 @@ export default function BottomNav() {
   const lastSlot = useRef(0);
   if (slot >= 0) lastSlot.current = slot;
   const shown = pressed ?? (slot >= 0 ? slot : lastSlot.current);
+  const hasVisibleIndicator = slot >= 0 || pressed !== null;
 
   const indicator = useRef<HTMLSpanElement>(null);
 
@@ -60,7 +61,9 @@ export default function BottomNav() {
 
   const renderItem = (item: NavItem) => {
     const isActive = active?.to === item.to;
-    const isTarget = shown === item.slot;
+    // На центральной вкладке индикатор скрыт — обычные пункты не должны
+    // сохранять его зелёный цвет только из-за запомненной позиции.
+    const isTarget = hasVisibleIndicator && shown === item.slot;
     return (
       <Link
         key={item.to}
@@ -90,7 +93,7 @@ export default function BottomNav() {
         ref={indicator}
         className="dock-indicator"
         style={{
-          opacity: slot < 0 && pressed === null ? 0 : 1,
+          opacity: hasVisibleIndicator ? 1 : 0,
           transform: `translateX(${shown * 100}%)`,
         }}
       />
@@ -104,7 +107,7 @@ export default function BottomNav() {
         aria-current={pathname.startsWith('/nearby') ? 'page' : undefined}
         onPointerDown={() => setPressed(null)}
       >
-        <Icon name="plus" size={24} strokeWidth={2.2} />
+        <Icon name="locate" size={24} strokeWidth={2} />
       </Link>
       {NAV.slice(2).map(renderItem)}
     </nav>
