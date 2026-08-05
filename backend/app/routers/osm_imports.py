@@ -127,8 +127,8 @@ def patch_import_point(
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Точка не найдена")
     if point.imported_restaurant_id is not None:
         raise HTTPException(status.HTTP_409_CONFLICT, detail="Точка уже импортирована")
-    point.title = (payload.title or "").strip() or None
     point.address = payload.address.strip()
+    point.title = (payload.title or "").strip() or point.address
     existing = list(db.scalars(select(Restaurant).where(
         Restaurant.brand_id == batch.brand_id,
         func.lower(func.trim(Restaurant.city)) == city_key(batch.city),
@@ -169,7 +169,7 @@ def commit_import(
             continue
         restaurant = Restaurant(
             brand_id=batch.brand_id,
-            title=point.title,
+            title=point.title or point.address,
             city=batch.city,
             address=point.address,
             lat=point.lat,
