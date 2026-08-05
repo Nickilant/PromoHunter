@@ -1,7 +1,7 @@
 from sqlalchemy import func, select
 
 from app.models import Brand, City, ModeratorCity, Restaurant, User, UserRole
-from app.services.osm import OsmPoint
+from app.services.osm import OsmPoint, _search_pattern
 from app.services.scope import city_key
 
 
@@ -11,6 +11,12 @@ def register(client, phone: str):
         json={"phone": phone, "password": "secret123", "display_name": "Сотрудник"},
     )
     return {"Authorization": f"Bearer {response.json()['access_token']}"}
+
+
+def test_osm_search_pattern_tolerates_brand_punctuation():
+    pattern = _search_pattern("Вкусно и точка")
+    assert pattern == "Вкусно.*и.*точка"
+    assert _search_pattern("Rostic’s") == "Rostic.*s"
 
 
 def test_osm_staging_marks_duplicates_and_commits_selected(client, db, monkeypatch):

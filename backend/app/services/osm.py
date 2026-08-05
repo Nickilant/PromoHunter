@@ -57,15 +57,28 @@ def _address(tags: dict[str, str]) -> str:
     return (tags.get("addr:full") or "Адрес не указан в OSM")[:300]
 
 
+def _search_pattern(query: str) -> str:
+    """Нечувствительный к оформлению шаблон названия.
+
+    В OSM один и тот же бренд встречается с дефисом, длинным тире,
+    типографским апострофом и без них. Ищем слова в исходном порядке, разрешая
+    между ними любые разделители, но не превращаем запрос в набор отдельных
+    несвязанных совпадений.
+    """
+    words = re.findall(r"\w+", query, flags=re.UNICODE)
+    if not words:
+        raise OsmError("Введите название бренда буквами или цифрами")
+    return ".*".join(re.escape(word) for word in words)
+
+
 def find_restaurants(city: str, query: str) -> list[OsmPoint]:
     south, west, north, east = _city_bbox(city)
-    escaped = re.escape(query.strip())
+    pattern = _search_pattern(query.strip())
     bbox = f"{south},{west},{north},{east}"
     overpass_query = f"""
 [out:json][timeout:35];
 (
-  nwr[\"brand\"~\"^{escaped}$\",i]({bbox});
-  nwr[\"name\"~\"{escaped}\",i]({bbox});
+  nwr[~\"^(name|name:ru|brand|operator|official_name|short_name)$\"~\"{pattern}\",i]({bbox});
 );
 out center tags;
 """
