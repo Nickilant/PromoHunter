@@ -10,6 +10,7 @@ import PromotionAccordion from '../components/PromotionAccordion';
 import PromoCodesModal from '../components/PromoCodesModal';
 import ReportModal from '../components/ReportModal';
 import RestaurantHistoryModal from '../components/RestaurantHistoryModal';
+import RouteBrowserModal from '../components/RouteBrowserModal';
 import { useAuth } from '../hooks/useAuth';
 import { useCity } from '../hooks/useCity';
 import { useGame } from '../hooks/useGame';
@@ -23,14 +24,6 @@ import type {
   RestaurantShort,
 } from '../types';
 import Icon from '../components/Icon';
-
-function yandexRouteUrl(
-  from: { lat: number; lng: number },
-  to: { lat: number; lng: number },
-): string {
-  const routePoints = `${from.lat},${from.lng}~${to.lat},${to.lng}`;
-  return `https://yandex.ru/maps/?mode=routes&rtext=${encodeURIComponent(routePoints)}&rtt=auto`;
-}
 
 export default function MapPage() {
   const [restaurants, setRestaurants] = useState<RestaurantListItem[]>([]);
@@ -49,6 +42,10 @@ export default function MapPage() {
   const [userPosition, setUserPosition] = useState<UserPosition | null>(null);
   const [routing, setRouting] = useState(false);
   const [routeError, setRouteError] = useState<string | null>(null);
+  const [routePreview, setRoutePreview] = useState<{
+    from: UserPosition;
+    to: RestaurantDetail;
+  } | null>(null);
   const [selectedBrandIds, setSelectedBrandIds] = useState<Set<number>>(() => new Set());
   const [reportTarget, setReportTarget] = useState<{
     restaurant: RestaurantShort;
@@ -175,25 +172,8 @@ export default function MapPage() {
     if (!selected || routing) return;
     setRouteError(null);
 
-    const openYandexMaps = (
-      position: UserPosition,
-      routeTab?: Window | null,
-      fallbackToCurrentTab = false,
-    ) => {
-      const url = yandexRouteUrl(position, selected);
-      if (routeTab) {
-        routeTab.opener = null;
-        routeTab.location.href = url;
-      } else if (fallbackToCurrentTab) {
-        window.location.assign(url);
-      } else {
-        const opened = window.open(url, '_blank', 'noopener,noreferrer');
-        if (!opened) window.location.assign(url);
-      }
-    };
-
     if (userPosition) {
-      openYandexMaps(userPosition);
+      setRoutePreview({ from: userPosition, to: selected });
       return;
     }
     if (!navigator.geolocation) {
@@ -201,9 +181,6 @@ export default function MapPage() {
       return;
     }
 
-    // Вкладку резервируем прямо по клику: мобильный браузер иначе блокирует
-    // window.open после асинхронного ответа геолокации как всплывающее окно.
-    const routeTab = window.open('', '_blank');
     setRouting(true);
     navigator.geolocation.getCurrentPosition(
       (position) => {
@@ -214,10 +191,9 @@ export default function MapPage() {
         };
         setUserPosition(current);
         setRouting(false);
-        openYandexMaps(current, routeTab, true);
+        setRoutePreview({ from: current, to: selected });
       },
       () => {
-        routeTab?.close();
         setRouting(false);
         setRouteError('Разрешите доступ к геолокации, чтобы построить маршрут');
       },
@@ -415,6 +391,14 @@ export default function MapPage() {
         <RestaurantHistoryModal
           restaurant={selected}
           onClose={() => setHistoryOpen(false)}
+        />
+      )}
+      {routePreview && (
+        <RouteBrowserModal
+          from={routePreview.from}
+          to={routePreview.to}
+          destination={`${routePreview.to.brand.name}, ${routePreview.to.address}`}
+          onClose={() => setRoutePreview(null)}
         />
       )}
     </div>

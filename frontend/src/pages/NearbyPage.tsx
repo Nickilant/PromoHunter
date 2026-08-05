@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import Icon from '../components/Icon';
 import RestaurantModal from '../components/RestaurantModal';
+import RouteBrowserModal from '../components/RouteBrowserModal';
 import { useCity } from '../hooks/useCity';
 import type { RestaurantListItem } from '../types';
 import { distanceM, formatDistance } from '../utils/distance';
@@ -37,14 +38,6 @@ function nearestRestaurantPerBrand(
     .slice(0, LIMIT);
 }
 
-function yandexRouteUrl(
-  from: { lat: number; lng: number },
-  to: { lat: number; lng: number },
-): string {
-  const routePoints = `${from.lat},${from.lng}~${to.lat},${to.lng}`;
-  return `https://yandex.ru/maps/?mode=routes&rtext=${encodeURIComponent(routePoints)}&rtt=auto`;
-}
-
 export default function NearbyPage() {
   const { city } = useCity();
   const [restaurants, setRestaurants] = useState<RestaurantListItem[]>([]);
@@ -52,6 +45,7 @@ export default function NearbyPage() {
   const [locating, setLocating] = useState(true);
   const [geoError, setGeoError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [routeTarget, setRouteTarget] = useState<RestaurantListItem | null>(null);
 
   useEffect(() => {
     if (!city) return;
@@ -157,16 +151,14 @@ export default function NearbyPage() {
                 <Icon name="chevronRight" size={20} />
               </span>
             </button>
-            <a
+            <button
               className="nearby-route"
-              href={yandexRouteUrl(position!, r)}
-              target="_blank"
-              rel="noreferrer"
+              onClick={() => setRouteTarget(r)}
               aria-label={`Построить маршрут в Яндекс Картах до ${r.brand.name}, ${r.address}`}
             >
               <Icon name="route" size={20} />
               <span>Маршрут</span>
-            </a>
+            </button>
           </div>
         );
       })}
@@ -175,6 +167,14 @@ export default function NearbyPage() {
         <RestaurantModal
           restaurantId={selectedId}
           onClose={() => setSelectedId(null)}
+        />
+      )}
+      {position && routeTarget && (
+        <RouteBrowserModal
+          from={position}
+          to={routeTarget}
+          destination={`${routeTarget.brand.name}, ${routeTarget.address}`}
+          onClose={() => setRouteTarget(null)}
         />
       )}
     </div>
