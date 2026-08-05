@@ -8,6 +8,8 @@ from app.models import Brand, RestaurantSuggestion, User
 from app.services.brand_visibility import brand_is_visible
 from app.services.scope import normalize_city
 from app.schemas import RestaurantSuggestionIn, RestaurantSuggestionOut
+from app.config import settings
+from app.services.abuse import enforce_suggestion_cooldown
 
 router = APIRouter(prefix="/restaurant-suggestions", tags=["restaurant-suggestions"])
 
@@ -21,6 +23,8 @@ def create_restaurant_suggestion(
     brand = db.get(Brand, payload.brand_id)
     if brand is None or not brand_is_visible(brand, user):
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Бренд не найден")
+
+    enforce_suggestion_cooldown(db, user.id, settings.suggestion_cooldown_minutes)
 
     suggestion = RestaurantSuggestion(
         user_id=user.id,

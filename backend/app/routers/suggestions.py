@@ -8,6 +8,8 @@ from app.models import Brand, PromotionSuggestion, Restaurant, User
 from app.schemas import SuggestionIn, SuggestionOut
 from app.services.scope import normalize_city
 from app.services.brand_visibility import brand_is_visible
+from app.config import settings
+from app.services.abuse import enforce_suggestion_cooldown
 
 router = APIRouter(prefix="/suggestions", tags=["suggestions"])
 
@@ -37,6 +39,8 @@ def create_suggestion(
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST, detail="Укажите хотя бы один товар"
         )
+
+    enforce_suggestion_cooldown(db, user.id, settings.suggestion_cooldown_minutes)
 
     suggestion = PromotionSuggestion(
         user_id=user.id,

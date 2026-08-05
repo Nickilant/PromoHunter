@@ -9,6 +9,9 @@ class Settings(BaseSettings):
     jwt_expire_minutes: int = 10080
     status_window_hours: int = 24
     report_cooldown_minutes: int = 30
+    suggestion_cooldown_minutes: int = 15
+    issue_cooldown_minutes: int = 5
+    promo_code_vote_cooldown_seconds: int = 60
     seed_on_start: bool = False
     upload_dir: str = "uploads"
 
@@ -102,7 +105,7 @@ class Settings(BaseSettings):
     receipt_max_i_rate_per_minute: float = 20.0   # предел скорости счётчика ФД
     receipt_bind_confirmations: int = 3       # подтверждений привязки fn к точке
     receipt_bind_ttl_days: int = 365          # срок жизни привязки fn
-    capture_geo_radius_m: float = 300.0       # радиус приёма чека от точки
+    capture_geo_radius_m: float = 800.0       # радиус приёма чека от обычного пользователя
     capture_require_geo: bool = True
 
     # сила фракции на точке

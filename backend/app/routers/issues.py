@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
@@ -10,6 +10,7 @@ from app.models import DataIssue, IssueStatus, Promotion, Restaurant, User
 from app.schemas import AdminDataIssueOut, DataIssueIn, DataIssueOut, DataIssueReviewIn
 from app.services.scope import Scope, city_filter, require_staff
 from app.services.brand_visibility import brand_is_visible
+from app.config import settings
 
 router = APIRouter(tags=["issues"])
 
@@ -64,6 +65,18 @@ def create_issue(
     )
     if duplicate:
         raise HTTPException(status.HTTP_409_CONFLICT, detail="Такое сообщение уже ожидает проверки")
+    recent = db.scalar(
+        select(DataIssue.id).where(
+            DataIssue.user_id == user.id,
+            DataIssue.created_at >= datetime.now(timezone.utc)
+            - timedelta(minutes=settings.issue_cooldown_minutes),
+        ).limit(1)
+    )
+    if recent is not None:
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Следующее сообщение можно отправить через {settings.issue_cooldown_minutes} мин.",
+        )
     issue = DataIssue(
         user_id=user.id,
         restaurant_id=restaurant.id,

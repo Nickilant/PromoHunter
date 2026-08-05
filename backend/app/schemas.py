@@ -39,7 +39,7 @@ class RegisterIn(PhoneMixin):
 
 
 class LoginIn(PhoneMixin):
-    password: str
+    password: str = Field(min_length=1, max_length=128)
 
 
 class PasswordChangeIn(BaseModel):
@@ -68,13 +68,13 @@ class PhoneVerificationConfirmOut(BaseModel):
 
 
 class TelegramAuthIn(BaseModel):
-    init_data: str
+    init_data: str = Field(min_length=1, max_length=8192)
     city: str | None = Field(default=None, max_length=100)
 
 
 class TelegramContactIn(TelegramAuthIn):
     # строка response из Telegram.WebApp.requestContact — подписана ботом
-    contact_response: str
+    contact_response: str = Field(min_length=1, max_length=8192)
 
 
 class UserOut(ORMModel):
@@ -273,10 +273,10 @@ class ReportItemIn(BaseModel):
 class ReportIn(BaseModel):
     restaurant_id: int
     promotion_id: int
-    items: list[ReportItemIn] = Field(min_length=1)
+    items: list[ReportItemIn] = Field(min_length=1, max_length=100)
     channel: ReportChannel = ReportChannel.on_site
-    lat: float | None = None
-    lng: float | None = None
+    lat: float | None = Field(default=None, ge=-90, le=90)
+    lng: float | None = Field(default=None, ge=-180, le=180)
     # Строка из QR-кода чека: превращает отчёт в подтверждённый и даёт
     # силу фракции на точке (игровой режим)
     receipt_qr: str | None = Field(default=None, max_length=300)
@@ -320,8 +320,8 @@ class SuggestionIn(BaseModel):
     brand_name_raw: str | None = Field(default=None, max_length=120)
     restaurant_id: int | None = None
     title: str = Field(min_length=1, max_length=200)
-    description: str | None = None
-    items_raw: str = Field(min_length=1)
+    description: str | None = Field(default=None, max_length=2000)
+    items_raw: str = Field(min_length=1, max_length=4000)
 
 
 class SuggestionOut(ORMModel):
@@ -355,9 +355,9 @@ class RestaurantSuggestionIn(BaseModel):
     title: str | None = Field(default=None, max_length=200)
     city: str = Field(min_length=1, max_length=100)
     address: str = Field(min_length=1, max_length=300)
-    lat: float
-    lng: float
-    comment: str | None = None
+    lat: float = Field(ge=-90, le=90)
+    lng: float = Field(ge=-180, le=180)
+    comment: str | None = Field(default=None, max_length=2000)
 
 
 class RestaurantSuggestionOut(ORMModel):

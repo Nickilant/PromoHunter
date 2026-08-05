@@ -173,6 +173,21 @@ def vote_promo_code(
     if code is None or code.expires_at <= now:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Промокод не найден")
 
+    recent_vote = db.scalar(
+        select(PromoCodeVote.id).where(
+            PromoCodeVote.promo_code_id == code.id,
+            PromoCodeVote.user_id == user.id,
+            PromoCodeVote.worked == payload.worked,
+            PromoCodeVote.created_at
+            >= now - timedelta(seconds=settings.promo_code_vote_cooldown_seconds),
+        ).limit(1)
+    )
+    if recent_vote is not None:
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Не нужно голосовать повторно так быстро",
+        )
+
     award = apply_vote(db, code, user.id, payload.worked, now)
     db.add(
         PromoCodeVote(

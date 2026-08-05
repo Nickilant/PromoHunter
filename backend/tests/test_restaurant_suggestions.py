@@ -37,6 +37,21 @@ def test_restaurant_suggestion_flow(client, db):
     sid = resp.json()["id"]
     assert resp.json()["brand"]["name"] == "Сеть"
 
+    # Между любыми пользовательскими заявками действует общий кулдаун.
+    repeated = client.post(
+        "/api/restaurant-suggestions",
+        json={
+            "brand_id": brand.id,
+            "city": "Казань",
+            "address": "Баумана, 2",
+            "lat": 55.79,
+            "lng": 49.11,
+        },
+        headers=user_headers,
+    )
+    assert repeated.status_code == 429
+    assert "через" in repeated.json()["detail"]
+
     # несуществующий бренд — 404
     resp = client.post(
         "/api/restaurant-suggestions",
