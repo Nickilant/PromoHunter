@@ -267,6 +267,32 @@ export interface RestaurantSuggestionGroup {
   suggestions: AdminRestaurantSuggestion[];
 }
 
+export interface OsmImportPoint {
+  id: number;
+  osm_type: 'node' | 'way' | 'relation';
+  osm_id: number;
+  title: string | null;
+  address: string;
+  lat: number;
+  lng: number;
+  duplicate_restaurant_id: number | null;
+  imported_restaurant_id: number | null;
+}
+
+export interface OsmImportBatch {
+  id: number;
+  brand: BrandShort;
+  city: string;
+  query: string;
+  created_at: string;
+  points: OsmImportPoint[];
+}
+
+export interface OsmImportCommitResult {
+  imported: number;
+  skipped: number;
+}
+
 export interface PromotionItemAdmin {
   id: number;
   name: string;

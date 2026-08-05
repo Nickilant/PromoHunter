@@ -14,6 +14,11 @@ class Settings(BaseSettings):
     promo_code_vote_cooldown_seconds: int = 60
     seed_on_start: bool = False
     upload_dir: str = "uploads"
+    osm_nominatim_url: str = "https://nominatim.openstreetmap.org"
+    osm_overpass_url: str = "https://overpass-api.de/api/interpreter"
+    osm_user_agent: str = "PromoHunter/1.0 (restaurant import)"
+    osm_import_limit: int = 2000
+    osm_import_ttl_days: int = 7
 
     # --- сила голоса при дозревании вердиктов (см. docs/trust-and-rating-spec.md) ---
     channel_on_site_coef: float = 1.0

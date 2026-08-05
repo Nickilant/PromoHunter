@@ -182,6 +182,49 @@ class Restaurant(Base):
     brand: Mapped["Brand"] = relationship(back_populates="restaurants")
 
 
+class OsmImportBatch(Base):
+    """Временный снимок результатов OSM по одному бренду и городу."""
+
+    __tablename__ = "osm_import_batches"
+    __table_args__ = (Index("ix_osm_import_batches_city_created", "city", "created_at"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    brand_id: Mapped[int] = mapped_column(ForeignKey("brands.id", ondelete="CASCADE"), nullable=False)
+    city: Mapped[str] = mapped_column(String(100), nullable=False)
+    query: Mapped[str] = mapped_column(String(120), nullable=False)
+    created_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    brand: Mapped["Brand"] = relationship()
+    points: Mapped[list["OsmImportPoint"]] = relationship(
+        back_populates="batch", cascade="all, delete-orphan"
+    )
+
+
+class OsmImportPoint(Base):
+    """Кандидат из OSM; живёт отдельно, пока сотрудник не подтвердит импорт."""
+
+    __tablename__ = "osm_import_points"
+    __table_args__ = (
+        UniqueConstraint("batch_id", "osm_type", "osm_id", name="uq_osm_import_point_source"),
+        Index("ix_osm_import_points_batch", "batch_id"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    batch_id: Mapped[int] = mapped_column(ForeignKey("osm_import_batches.id", ondelete="CASCADE"), nullable=False)
+    osm_type: Mapped[str] = mapped_column(String(12), nullable=False)
+    osm_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    title: Mapped[str | None] = mapped_column(String(200))
+    address: Mapped[str] = mapped_column(String(300), nullable=False)
+    lat: Mapped[float] = mapped_column(Float, nullable=False)
+    lng: Mapped[float] = mapped_column(Float, nullable=False)
+    duplicate_restaurant_id: Mapped[int | None] = mapped_column(ForeignKey("restaurants.id", ondelete="SET NULL"))
+    imported_restaurant_id: Mapped[int | None] = mapped_column(ForeignKey("restaurants.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    batch: Mapped["OsmImportBatch"] = relationship(back_populates="points")
+
+
 class Promotion(Base):
     __tablename__ = "promotions"
     __table_args__ = (Index("ix_promotions_brand_id_is_active", "brand_id", "is_active"),)

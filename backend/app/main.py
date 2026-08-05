@@ -15,6 +15,7 @@ from app.routers import (
     auth,
     game,
     issues,
+    osm_imports,
     promo_codes,
     public,
     rating,
@@ -107,6 +108,7 @@ app.include_router(rating.router, prefix="/api")
 app.include_router(promo_codes.router, prefix="/api")
 app.include_router(game.router, prefix="/api")
 app.include_router(issues.router, prefix="/api")
+app.include_router(osm_imports.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
 
 

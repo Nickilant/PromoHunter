@@ -17,6 +17,7 @@ const links = [
   { to: 'brands', label: 'Бренды', globalOnly: true },
   { to: 'cities', label: 'Города' },
   { to: 'restaurants', label: 'Рестораны' },
+  { to: 'osm-imports', label: 'Импорт из OSM' },
   { to: 'promotions', label: 'Акции' },
   { to: 'users', label: 'Пользователи', globalOnly: true },
   { to: 'suggestions', label: 'Заявки: акции', counter: 'promo' as const },

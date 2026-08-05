@@ -384,6 +384,49 @@ class RestaurantSuggestionOut(ORMModel):
         return getattr(value, "display_name", None) if value is not None else None
 
 
+# --- OSM import staging ---
+
+class OsmImportCreateIn(BaseModel):
+    brand_id: int
+    city: str = Field(min_length=1, max_length=100)
+    query: str | None = Field(default=None, max_length=120)
+
+
+class OsmImportCommitIn(BaseModel):
+    point_ids: list[int] = Field(min_length=1, max_length=2000)
+
+
+class OsmImportPointPatch(BaseModel):
+    title: str | None = Field(default=None, max_length=200)
+    address: str = Field(min_length=3, max_length=300)
+
+
+class OsmImportPointOut(ORMModel):
+    id: int
+    osm_type: str
+    osm_id: int
+    title: str | None = None
+    address: str
+    lat: float
+    lng: float
+    duplicate_restaurant_id: int | None = None
+    imported_restaurant_id: int | None = None
+
+
+class OsmImportBatchOut(ORMModel):
+    id: int
+    brand: BrandShort
+    city: str
+    query: str
+    created_at: datetime
+    points: list[OsmImportPointOut]
+
+
+class OsmImportCommitOut(BaseModel):
+    imported: int
+    skipped: int
+
+
 class AdminRestaurantSuggestionOut(RestaurantSuggestionOut):
     user: UserOut
 

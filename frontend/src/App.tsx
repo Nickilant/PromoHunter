@@ -5,6 +5,7 @@ import AdminLayout from './admin/AdminLayout';
 import AdminBrands from './admin/AdminBrands';
 import AdminCities from './admin/AdminCities';
 import AdminIssues from './admin/AdminIssues';
+import AdminOsmImports from './admin/AdminOsmImports';
 import NearbyPage from './pages/NearbyPage';
 import AdminPromotions from './admin/AdminPromotions';
 import AdminRestaurants from './admin/AdminRestaurants';
@@ -119,6 +120,7 @@ export default function App() {
         <Route path="brands" element={<AdminBrands />} />
         <Route path="cities" element={<AdminCities />} />
         <Route path="restaurants" element={<AdminRestaurants />} />
+        <Route path="osm-imports" element={<AdminOsmImports />} />
         <Route path="promotions" element={<AdminPromotions />} />
         <Route path="users" element={<AdminUsers />} />
         <Route path="suggestions" element={<AdminSuggestions />} />
