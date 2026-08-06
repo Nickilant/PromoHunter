@@ -20,6 +20,8 @@ export default function AdminOsmImports() {
   const [active, setActive] = useState<OsmImportBatch | null>(null);
   const [brandId, setBrandId] = useState('');
   const [city, setCity] = useState('');
+  const [cityQuery, setCityQuery] = useState('');
+  const [citySearchOpen, setCitySearchOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(true);
@@ -41,7 +43,10 @@ export default function AdminOsmImports() {
       setCities(cityRows.filter((item) => item.is_active));
       setBatches(imports);
       if (!brandId && brandRows.length) setBrandId(String(brandRows[0].id));
-      if (!city && cityRows.length) setCity(cityRows[0].name);
+      if (!city && cityRows.length) {
+        setCity(cityRows[0].name);
+        setCityQuery(cityRows[0].name);
+      }
       if (!active && imports.length) chooseBatch(imports[0]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Не удалось загрузить данные');
@@ -91,6 +96,18 @@ export default function AdminOsmImports() {
 
   const available = useMemo(() => (active ? selectableIds(active) : []), [active]);
   const allSelected = available.length > 0 && available.every((id) => selected.has(id));
+  const cityMatches = useMemo(() => {
+    const normalized = cityQuery.trim().toLocaleLowerCase('ru');
+    return cities
+      .filter((item) => !normalized || item.name.toLocaleLowerCase('ru').includes(normalized))
+      .slice(0, 8);
+  }, [cities, cityQuery]);
+
+  const selectCity = (name: string) => {
+    setCity(name);
+    setCityQuery(name);
+    setCitySearchOpen(false);
+  };
 
   const commit = async () => {
     if (!active || selected.size === 0) return;
@@ -166,9 +183,51 @@ export default function AdminOsmImports() {
         </div>
         <div className="field">
           <label htmlFor="osm-city">Город</label>
-          <select id="osm-city" value={city} onChange={(event) => setCity(event.target.value)} required>
-            {cities.map((item) => <option key={item.id} value={item.name}>{item.name}</option>)}
-          </select>
+          <div className="scope-city-search osm-city-search">
+            <div className="scope-search-input">
+              <Icon name="search" size={17} />
+              <input
+                id="osm-city"
+                role="combobox"
+                aria-expanded={citySearchOpen}
+                aria-controls="osm-city-results"
+                aria-autocomplete="list"
+                autoComplete="off"
+                value={cityQuery}
+                onFocus={() => setCitySearchOpen(true)}
+                onChange={(event) => {
+                  setCityQuery(event.target.value);
+                  setCity('');
+                  setCitySearchOpen(true);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape') setCitySearchOpen(false);
+                  if (event.key === 'Enter' && citySearchOpen && cityMatches.length === 1) {
+                    event.preventDefault();
+                    selectCity(cityMatches[0].name);
+                  }
+                }}
+                placeholder="Начните вводить город…"
+                required
+              />
+              {cityQuery && (
+                <button type="button" onClick={() => { setCityQuery(''); setCity(''); setCitySearchOpen(true); }} aria-label="Очистить город">
+                  <Icon name="close" size={16} />
+                </button>
+              )}
+            </div>
+            {citySearchOpen && (
+              <div className="scope-search-results" id="osm-city-results">
+                {cityMatches.map((item) => (
+                  <button type="button" key={item.id} onClick={() => selectCity(item.name)}>
+                    <span><Icon name="city" size={16} />{item.name}</span>
+                    <small>{item.restaurants_count} точек</small>
+                  </button>
+                ))}
+                {cityMatches.length === 0 && <div className="scope-search-empty">Город не найден</div>}
+              </div>
+            )}
+          </div>
         </div>
         <div className="field osm-query-field">
           <label htmlFor="osm-query">Название в OSM</label>

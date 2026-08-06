@@ -492,6 +492,14 @@
   min-width: 0;
 }
 
+.osm-city-search .scope-search-results {
+  position: absolute;
+  z-index: 4;
+  right: 0;
+  left: 0;
+  max-height: 260px;
+}
+
 .osm-import-form .btn,
 .osm-commit-bar .btn {
   display: inline-flex;

@@ -165,7 +165,9 @@ function OwnershipLayer({
         const point = points.get(r.id);
         if (!point) return null;
         const battle = point.leader !== null;
-        if (point.owner === null && !battle) return null;
+        // При спокойном владении цвет уже показывает сама капля маркера.
+        // Отдельный круг нужен только для активной борьбы и её таймера.
+        if (!battle) return null;
         const color = point.owner ? FACTION_HEX[point.owner] : NEUTRAL_HEX;
         const leaderColor = point.leader ? FACTION_HEX[point.leader] : color;
         return (
