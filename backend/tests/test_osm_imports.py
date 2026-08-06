@@ -1,7 +1,16 @@
 from sqlalchemy import func, select
 
 from app.models import Brand, City, ModeratorCity, Restaurant, User, UserRole
-from app.services.osm import MISSING_ADDRESS, OsmPoint, _points_from_elements, _search_pattern
+from app.services.osm import (
+    MISSING_ADDRESS,
+    OsmPoint,
+    _id_selector,
+    _points_from_elements,
+    _search_pattern,
+    _search_values,
+    _split_bbox,
+    _unique_elements,
+)
 from app.services.scope import city_key
 
 
@@ -16,7 +25,14 @@ def register(client, phone: str):
 def test_osm_search_pattern_tolerates_brand_punctuation():
     pattern = _search_pattern("Вкусно и точка")
     assert pattern == "Вкусно.*и.*точка"
-    assert _search_pattern("Rostic’s") == "Rostic.*s"
+    assert _search_pattern("Rostic's") == "Rostic.*s"
+
+
+def test_osm_search_values_include_dash_variants():
+    values = _search_values("Вкусно и точка")
+    assert "Вкусно и точка" in values
+    assert "Вкусно — и точка" in values
+    assert "Вкусно - и точка" in values
 
 
 def test_osm_point_uses_nearby_building_address_as_title():
@@ -59,6 +75,34 @@ def test_osm_point_does_not_take_distant_address():
     )
     assert points[0].address == MISSING_ADDRESS
     assert points[0].title is None
+
+
+def test_osm_id_selector_groups_types():
+    selector = _id_selector([
+        {"type": "node", "id": 1},
+        {"type": "way", "id": 2},
+        {"type": "node", "id": 3},
+    ])
+    assert "node(id:1,3);" in selector
+    assert "way(id:2);" in selector
+
+
+def test_osm_bbox_is_split_without_gaps():
+    assert _split_bbox((0, 10, 4, 18)) == [
+        (0, 10, 2, 14),
+        (0, 14, 2, 18),
+        (2, 10, 4, 14),
+        (2, 14, 4, 18),
+    ]
+
+
+def test_osm_elements_are_deduplicated_after_tiling():
+    elements = _unique_elements([
+        {"type": "node", "id": 1, "tags": {"name": "Сеть"}},
+        {"type": "node", "id": 1, "tags": {"name": "Сеть"}},
+        {"type": "way", "id": 1, "tags": {"name": "Сеть"}},
+    ])
+    assert [(item["type"], item["id"]) for item in elements] == [("node", 1), ("way", 1)]
 
 
 def test_osm_staging_marks_duplicates_and_commits_selected(client, db, monkeypatch):

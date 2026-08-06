@@ -2,6 +2,9 @@
 
 import math
 import re
+import time
+from concurrent.futures import ThreadPoolExecutor
+from itertools import product
 from dataclasses import dataclass
 
 import httpx
@@ -25,12 +28,16 @@ class OsmPoint:
 
 MISSING_ADDRESS = "Адрес не указан в OSM"
 SEARCH_TAGS = ("name", "name:ru", "brand", "operator", "official_name", "short_name")
+OVERPASS_FALLBACK_URLS = (
+    "https://overpass.kumi.systems/api/interpreter",
+    "https://overpass.private.coffee/api/interpreter",
+)
 
 
-def _client() -> httpx.Client:
+def _client(read_timeout: float = 40.0) -> httpx.Client:
     return httpx.Client(
         headers={"User-Agent": settings.osm_user_agent, "Accept": "application/json"},
-        timeout=httpx.Timeout(40.0, connect=10.0),
+        timeout=httpx.Timeout(read_timeout, connect=10.0),
         follow_redirects=True,
     )
 
@@ -73,6 +80,17 @@ def _search_pattern(query: str) -> str:
     if not words:
         raise OsmError("Введите название бренда буквами или цифрами")
     return ".*".join(re.escape(word) for word in words)
+
+
+def _search_values(query: str) -> list[str]:
+    """Варианты точного написания для быстрого индексного поиска Overpass."""
+    words = re.findall(r"\w+", query, flags=re.UNICODE)
+    values = {query.strip()}
+    if 1 < len(words) <= 4:
+        separators = (" ", " - ", " – ", " — ")
+        for combination in product(separators, repeat=len(words) - 1):
+            values.add("".join(word + (combination[index] if index < len(combination) else "") for index, word in enumerate(words)))
+    return sorted(value for value in values if value)
 
 
 def _coordinates(element: dict) -> tuple[float, float] | None:
@@ -143,29 +161,170 @@ def _points_from_elements(elements: list[dict], query: str) -> list[OsmPoint]:
     return points
 
 
-def find_restaurants(city: str, query: str) -> list[OsmPoint]:
-    south, west, north, east = _city_bbox(city)
-    pattern = _search_pattern(query.strip())
-    bbox = f"{south},{west},{north},{east}"
+def _overpass(query: str, read_timeout: float) -> list[dict]:
+    urls = tuple(dict.fromkeys((settings.osm_overpass_url, *OVERPASS_FALLBACK_URLS)))
+    deadline = time.monotonic() + read_timeout
+    last_error: Exception | None = None
+    for index, url in enumerate(urls):
+        remaining = deadline - time.monotonic()
+        if remaining < 2:
+            break
+        attempt_timeout = max(2.0, remaining / (len(urls) - index))
+        try:
+            with _client(attempt_timeout) as client:
+                response = client.post(
+                    url,
+                    content=query.encode(),
+                    headers={"Content-Type": "text/plain; charset=utf-8"},
+                )
+                response.raise_for_status()
+                return response.json().get("elements", [])
+        except (httpx.HTTPError, ValueError) as error:
+            last_error = error
+    if last_error is not None:
+        raise last_error
+    raise httpx.ReadTimeout("Истёк общий таймаут запроса Overpass")
+
+
+def _split_bbox(bbox: tuple[float, float, float, float]) -> list[tuple[float, float, float, float]]:
+    south, west, north, east = bbox
+    middle_lat = (south + north) / 2
+    middle_lng = (west + east) / 2
+    return [
+        (south, west, middle_lat, middle_lng),
+        (south, middle_lng, middle_lat, east),
+        (middle_lat, west, north, middle_lng),
+        (middle_lat, middle_lng, north, east),
+    ]
+
+
+def _search_bbox(
+    bbox: tuple[float, float, float, float],
+    pattern: str,
+    values: list[str],
+    deadline: float,
+    depth: int = 0,
+    exact_search: bool = False,
+) -> list[dict]:
+    remaining = deadline - time.monotonic()
+    if remaining < 3:
+        raise httpx.ReadTimeout("Истёк общий таймаут поиска по городу")
+    south, west, north, east = bbox
+    if exact_search:
+        statements = []
+        for key in SEARCH_TAGS:
+            for value in values:
+                escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+                statements.append(f'nwr["{key}"="{escaped}"]({south},{west},{north},{east});')
+        selector = "(\n" + "\n".join(statements) + "\n);"
+    else:
+        selector = (
+            f'nwr[~"^(name|name:ru|brand|operator|official_name|short_name)$"~"{pattern}",i]'
+            f'({south},{west},{north},{east});'
+        )
     overpass_query = f"""
-[out:json][timeout:35];
-nwr[~\"^(name|name:ru|brand|operator|official_name|short_name)$\"~\"{pattern}\",i]({bbox})->.matches;
+[out:json][timeout:{max(2, min(12, int(remaining) - 1))}];
+{selector}
+out center tags;
+"""
+    try:
+        elements = _overpass(overpass_query, min(14.0, remaining))
+        return [item for item in elements if _is_match(item.get("tags") or {}, pattern)]
+    except (httpx.HTTPError, ValueError):
+        if depth >= 1 or deadline - time.monotonic() < 8:
+            raise
+        result: list[dict] = []
+        for tile in _split_bbox(bbox):
+            result.extend(_search_bbox(tile, pattern, values, deadline, depth + 1, exact_search))
+        return result
+
+
+def _unique_elements(elements: list[dict]) -> list[dict]:
+    unique: dict[tuple[str, int], dict] = {}
+    for element in elements:
+        if "id" in element:
+            unique[(str(element.get("type", "node")), int(element["id"]))] = element
+    return list(unique.values())
+
+
+def _id_selector(elements: list[dict]) -> str:
+    by_type: dict[str, list[str]] = {"node": [], "way": [], "relation": []}
+    for element in elements:
+        osm_type = str(element.get("type", ""))
+        if osm_type in by_type:
+            by_type[osm_type].append(str(int(element["id"])))
+    return "\n".join(
+        f"  {osm_type}(id:{','.join(ids)});"
+        for osm_type, ids in by_type.items()
+        if ids
+    )
+
+
+def _enrich_addresses(elements: list[dict], query: str) -> list[OsmPoint]:
+    """Догрузить адресное окружение небольшими запросами.
+
+    Ошибка или очередь Overpass в одной пачке не отменяет весь импорт. Общий
+    бюджет не даёт синхронному API упереться в минутный таймаут reverse proxy.
+    """
+    result: list[OsmPoint] = []
+    deadline = time.monotonic() + 15.0
+    chunk_size = 100
+    for start in range(0, len(elements), chunk_size):
+        chunk = elements[start : start + chunk_size]
+        remaining = deadline - time.monotonic()
+        if remaining < 2:
+            result.extend(_points_from_elements(chunk, query))
+            continue
+        selector = _id_selector(chunk)
+        overpass_query = f"""
+[out:json][timeout:12];
+(
+{selector}
+)->.matches;
 (
   .matches;
   nwr(around.matches:75)[\"addr:housenumber\"];
 );
 out center tags;
 """
-    try:
-        with _client() as client:
-            response = client.post(
-                settings.osm_overpass_url,
-                content=overpass_query.encode(),
-                headers={"Content-Type": "text/plain; charset=utf-8"},
-            )
-            response.raise_for_status()
-            elements = response.json().get("elements", [])
-    except (httpx.HTTPError, ValueError) as error:
-        raise OsmError("OpenStreetMap сейчас не ответил — попробуйте немного позже") from error
+        try:
+            enriched = _overpass(overpass_query, min(12.0, remaining))
+        except (httpx.HTTPError, ValueError):
+            enriched = chunk
+        result.extend(_points_from_elements(enriched, query))
+    return result
 
-    return _points_from_elements(elements, query)[: settings.osm_import_limit]
+
+def find_restaurants(city: str, query: str) -> list[OsmPoint]:
+    bbox = _city_bbox(city)
+    normalized_query = query.strip()
+    pattern = _search_pattern(normalized_query)
+    values = _search_values(normalized_query)
+    try:
+        south, west, north, east = bbox
+        # Запросы по административной границе мегаполиса часто застревают в
+        # очереди Overpass. Сразу делим крупные области, а неудачный сектор
+        # при необходимости дробим ещё раз.
+        is_large = max(north - south, east - west) > 0.35
+        initial_boxes = _split_bbox(bbox) if is_large else [bbox]
+        deadline = time.monotonic() + 35.0
+        if len(initial_boxes) == 1:
+            elements = _search_bbox(initial_boxes[0], pattern, values, deadline)
+        else:
+            # Не более двух одновременных запросов: публичные Overpass-инстансы
+            # ограничивают слишком агрессивных клиентов.
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                batches = list(
+                    executor.map(
+                        lambda initial_bbox: _search_bbox(
+                            initial_bbox, pattern, values, deadline, exact_search=True
+                        ),
+                        initial_boxes,
+                    )
+                )
+            elements = [element for batch in batches for element in batch]
+    except (httpx.HTTPError, ValueError) as error:
+        raise OsmError("OpenStreetMap сейчас не ответил - попробуйте немного позже") from error
+
+    elements = _unique_elements(elements)[: settings.osm_import_limit]
+    return _enrich_addresses(elements, query)
