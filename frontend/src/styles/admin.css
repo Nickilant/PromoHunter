@@ -500,6 +500,15 @@
   max-height: 260px;
 }
 
+/* Фокус показывает внешний контейнер поиска; второй контур на самом input
+   создавал неприятное зелёное кольцо внутри поля. */
+.field .osm-city-search .scope-search-input input:focus,
+.field .osm-city-search .scope-search-input input:focus-visible {
+  border: 0;
+  outline: 0;
+  box-shadow: none;
+}
+
 .osm-import-form .btn,
 .osm-commit-bar .btn {
   display: inline-flex;
